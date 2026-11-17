@@ -41,10 +41,12 @@ sudo africhome
 ## SlowDNS SSH notes
 
 - SlowDNS uses iodine DNS tunnelling; it is not a V2Ray transport.
-- Delegate a subdomain to a nameserver on this VPS and configure registrar glue records where required.
-- UDP port 53 must be available. Do not stop an existing DNS service blindly.
+- The menu accepts a tunnel domain and nameserver hostname, then displays the required A, registrar glue, NS-delegation, and UDP 53 firewall records. These records must be created at the domain registrar/DNS provider; the script cannot register glue records automatically.
+- The server uses iodine's default 1130-byte tunnel MTU explicitly. Client instructions retain lazy mode (`-L 1`) and the maximum upstream hostname length (`-M 255`); fragment sizing remains automatically negotiated rather than forcing a potentially incompatible value.
+- Create Trial (default one day) and Normal (administrator-selected days) SSH accounts. Each account gets a separate generated SSH password and Linux account-expiry date. Linux enforces expiry; admins can list, renew, lock, unlock, or delete managed accounts.
+- The iodine tunnel password is shared by all tunnel clients; it is not a per-customer credential. Customer-specific access control and expiry are enforced by their separate SSH accounts.
 - After the DNS tunnel is established, SSH is reached at `10.77.0.1`.
-- DNS tunnels are slow and can be blocked or rate-limited. Use strong credentials and SSH keys.
+- DNS tunnels have inherently limited throughput and can be blocked or rate-limited. Lazy mode and fragment negotiation help, but actual speed depends on the DNS resolver/relay, network path, and client. Use strong credentials and SSH keys where practical.
 
 ## WireGuard notes
 
