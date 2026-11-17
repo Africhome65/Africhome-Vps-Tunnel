@@ -142,11 +142,12 @@ pu_remove() {
   if ! xray run -test -config "$PU_CONFIG"; then cp -a "$backup" "$PU_CONFIG"; ah_err "Validation failed; restored."; return 1; fi
   tmp="$(mktemp)"
   jq --arg e "$email" '[.[] | select(.email != $e)]' "$PU_DB" > "$tmp"
-  install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
   if ! systemctl restart xray; then
-    cp -a "$backup" "$PU_CONFIG"
-    ah_err "Xray restart failed. Config restored; review the account database backup at $backup."; return 1
+    cp -a "$backup" "$PU_CONFIG"; rm -f "$tmp"
+    systemctl restart xray || true
+    ah_err "Xray restart failed; previous config restored."; return 1
   fi
+  install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
   ah_ok "Account $name removed."
 }
 
@@ -171,11 +172,12 @@ pu_expire() {
     if ! xray run -test -config "$PU_CONFIG"; then cp -a "$backup" "$PU_CONFIG"; ah_err "Expiry cleanup validation failed; config restored."; return 1; fi
     tmp="$(mktemp)"
     jq '[.[] | select(.expires_at == 0 or .expires_at > now)]' "$PU_DB" > "$tmp"
-    install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
     if ! systemctl restart xray; then
-      cp -a "$backup" "$PU_CONFIG"
-      ah_err "Xray restart failed; config restored. Check account database before retrying."; return 1
+      cp -a "$backup" "$PU_CONFIG"; rm -f "$tmp"
+      systemctl restart xray || true
+      ah_err "Xray restart failed; previous config restored. Expiry records were retained."; return 1
     fi
+    install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
     ah_ok "Expired protocol accounts have been removed."
   fi
 }
@@ -184,14 +186,14 @@ pu_install_timer() {
   ah_require_root || return 1
   local script service timer
   script="/opt/africhome-vps-tunnel/modules/protocol_users.sh"
-  [[ -x "$script" ]] || { ah_err "Install the latest Africhome release before enabling expiry automation."; return 1; }
+  [[ -r "$script" ]] || { ah_err "Install the latest Africhome release before enabling expiry automation."; return 1; }
   cat > /etc/systemd/system/africhome-expire.service <<EOF
 [Unit]
 Description=Expire Africhome Xray protocol accounts
 
 [Service]
 Type=oneshot
-ExecStart=$script --expire
+ExecStart=/bin/bash $script --expire
 EOF
   cat > /etc/systemd/system/africhome-expire.timer <<'EOF'
 [Unit]
