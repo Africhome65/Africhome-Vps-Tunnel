@@ -201,6 +201,23 @@ EOF
   ah_info "Use SFTP to download this file to your device. It contains a private key; keep it secret."
 }
 
+wg_export_client() {
+  wg_require_tools || return 1
+  local name source destination
+  read -r -p "Client name to export (for example android): " name
+  [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
+  source="$WG_CLIENT_DIR/$name.conf"
+  destination="$WG_EXPORT_DIR/$name.conf"
+  [[ -s "$source" ]] || { ah_warn "Client configuration not found: $source"; return 1; }
+  install -d -m 700 "$WG_EXPORT_DIR" || return 1
+  install -m 600 "$source" "$destination" || { ah_err "Could not export the client configuration."; return 1; }
+  ah_ok "Client configuration is ready for secure transfer."
+  printf 'File: %s\\n' "$destination"
+  echo "Transfer it to your phone with an SFTP app, then in WireGuard choose:"
+  echo "  +  > Import from file or archive"
+  ah_info "This file contains a private key. Do not share it or upload it to public storage."
+}
+
 wg_list_clients() {
   wg_require_tools || return 1
   echo "Configured WireGuard peers:"
@@ -274,6 +291,7 @@ wg_menu() {
     echo "3) Add client"
     echo "4) List peers and status"
     echo "5) Remove client"
+    echo "6) Export client config for phone"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -282,6 +300,7 @@ wg_menu() {
       3) wg_add_client; ah_pause ;;
       4) wg_list_clients; ah_pause ;;
       5) wg_remove_client; ah_pause ;;
+      6) wg_export_client; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
