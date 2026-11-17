@@ -47,8 +47,9 @@ while true; do
     5) slowdns_menu ;;
     6) xray_menu ;;
     7) vmess_menu ;;
-    8) echo "Trojan and Shadowsocks are not implemented yet."; ah_pause ;;
-    9) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    8) trojan_menu ;;
+    9) echo "Shadowsocks is not implemented yet."; ah_pause ;;
+    10) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
