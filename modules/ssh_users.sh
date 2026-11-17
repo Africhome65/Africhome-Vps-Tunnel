@@ -23,11 +23,22 @@ ssh_users_create(){
       ah_err "Could not set expiry; account creation was rolled back."; return
     fi
   fi
-  echo "Set a password for $username. Use a strong, unique password."
-  if ! passwd "$username"; then
+  local password password_confirm
+  echo "Set a strong, unique password for $username."
+  echo "WARNING: Password characters will be visible while you type."
+  read -r -p "New password (visible): " password
+  read -r -p "Confirm password (visible): " password_confirm
+  if [[ -z "$password" || "$password" == *:* || "$password" != "$password_confirm" ]]; then
+    unset password password_confirm
+    userdel "$username" || true
+    ah_err "Password was empty, contained an unsupported colon, or did not match; account creation was rolled back."; return
+  fi
+  if ! printf '%s:%s\\n' "$username" "$password" | chpasswd; then
+    unset password password_confirm
     userdel "$username" || true
     ah_err "Password setup failed; account creation was rolled back."; return
   fi
+  unset password password_confirm
   ah_ok "SSH system account '$username' created."
   [[ -n "$expiry" ]] && ah_info "Account expiry: $expiry"
   ah_warn "This creates a Linux account; SSH daemon policy, key-only authentication, and network access still depend on your server configuration."
