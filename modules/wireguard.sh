@@ -237,6 +237,70 @@ wg_show_client_qr() {
   ah_info "On Android, open WireGuard, tap +, then Scan from QR code."
 }
 
+wg_display_client_config() {
+  wg_require_tools || return 1
+  local name source
+  read -r -p "Client name to display (for example android): " name
+  [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
+  source="$WG_CLIENT_DIR/$name.conf"
+  [[ -s "$source" ]] || { ah_warn "Client configuration not found: $source"; return 1; }
+  echo
+  ah_warn "The text below includes a private key. Copy it only into your own WireGuard app; never share screenshots or chat messages containing it."
+  echo "----- BEGIN WIREGUARD CONFIG: $name -----"
+  cat "$source"
+  echo "----- END WIREGUARD CONFIG -----"
+  echo
+  ah_info "On Android: WireGuard > + > Create from scratch, then enter the Interface and Peer values. You can also import the saved file."
+}
+
+wg_set_client_expiry() {
+  wg_require_tools || return 1
+  local name source pub expiry days expiry_dir module_dir
+  read -r -p "Client name to set expiry for: " name
+  [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
+  source="$WG_CLIENT_DIR/$name.conf"
+  [[ -s "$source" ]] || { ah_warn "Client configuration not found."; return 1; }
+  pub="$(awk -v marker="# client:$name" '$0==marker{found=1;next} found && /^PublicKey[[:space:]]*=/{sub(/^[^=]*=[[:space:]]*/, "");print;exit} found && /^# client:/{exit}' "$WG_CONF")"
+  [[ -n "$pub" ]] || { ah_err "Could not find this client's public key in the server configuration."; return 1; }
+  read -r -p "Expiry in days (0 = no expiry): " days
+  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
+  (( days <= 36500 )) || { ah_err "Maximum duration is 36500 days."; return 1; }
+  expiry_dir="/etc/africhome/wireguard-expiry"
+  install -d -m 700 "$expiry_dir"
+  if (( days == 0 )); then
+    rm -f "$expiry_dir/$name.expiry"
+    ah_ok "Expiry cleared for $name."
+    return 0
+  fi
+  expiry="$(date -d "+\${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return 1; }
+  printf '%s\n%s\n' "$expiry" "$pub" > "$expiry_dir/$name.expiry"
+  chmod 600 "$expiry_dir/$name.expiry"
+  module_dir="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+  install -m 0755 "$module_dir/scripts/wg-expiry.sh" /usr/local/sbin/africhome-wg-expiry
+  cat > /etc/cron.d/africhome-wg-expiry <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+*/5 * * * * root /usr/local/sbin/africhome-wg-expiry
+EOF
+  chmod 644 /etc/cron.d/africhome-wg-expiry
+  ah_ok "Expiry set for $name: $expiry ($days days)."
+  ah_info "The VPS automatically revokes this peer when it expires (checked every 5 minutes)."
+}
+
+wg_list_client_expiries() {
+  local dir="/etc/africhome/wireguard-expiry" file name expiry
+  echo "WireGuard client expiry dates:"
+  if [[ ! -d "$dir" ]] || ! compgen -G "$dir/*.expiry" >/dev/null; then
+    echo "No expiring WireGuard clients are recorded."
+    return 0
+  fi
+  for file in "$dir"/*.expiry; do
+    name="\${file##*/}"; name="\${name%.expiry}"
+    expiry="$(head -n 1 "$file")"
+    printf '%-24s %s\n' "$name" "$expiry"
+  done
+}
+
 wg_list_clients() {
   wg_require_tools || return 1
   install -d -m 700 "$WG_CLIENT_DIR" "$WG_EXPORT_DIR" || return 1
@@ -313,6 +377,9 @@ wg_menu() {
     echo "5) Remove client"
     echo "6) Export client config for phone"
     echo "7) Display client QR code in terminal"
+    echo "8) Display/copy client config in terminal"
+    echo "9) Set or clear client expiry"
+    echo "10) List client expiry dates"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -323,6 +390,9 @@ wg_menu() {
       5) wg_remove_client; ah_pause ;;
       6) wg_export_client; ah_pause ;;
       7) wg_show_client_qr; ah_pause ;;
+      8) wg_display_client_config; ah_pause ;;
+      9) wg_set_client_expiry; ah_pause ;;
+      10) wg_list_client_expiries; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
