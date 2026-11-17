@@ -275,7 +275,9 @@ wg_set_client_expiry() {
   expiry="$(date -d "+\${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return 1; }
   printf '%s\n%s\n' "$expiry" "$pub" > "$expiry_dir/$name.expiry"
   chmod 600 "$expiry_dir/$name.expiry"
-  module_dir="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+  module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  ah_apt_install cron || return 1
+  systemctl enable --now cron || { ah_err "Could not enable cron; expiry will not be enforced until cron is running."; return 1; }
   install -m 0755 "$module_dir/scripts/wg-expiry.sh" /usr/local/sbin/africhome-wg-expiry
   cat > /etc/cron.d/africhome-wg-expiry <<'EOF'
 SHELL=/bin/bash
