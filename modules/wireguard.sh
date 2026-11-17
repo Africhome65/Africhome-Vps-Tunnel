@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 WG_CONF="/etc/wireguard/wg0.conf"
 WG_CLIENT_DIR="/root/africhome-wireguard-clients"
+WG_EXPORT_DIR="/home/africhome-wireguard-clients"
 WG_PORT="51820"
 WG_NET_PREFIX="10.66.66"
 WG_SERVER_ADDR="10.66.66.1/24"
@@ -20,7 +21,7 @@ wg_install() {
   ah_require_root || return 1
   ah_info "Installing WireGuard and required networking tools..."
   ah_apt_install wireguard wireguard-tools iptables curl || return 1
-  install -d -m 700 /etc/wireguard "$WG_CLIENT_DIR"
+  install -d -m 700 /etc/wireguard "$WG_CLIENT_DIR" "$WG_EXPORT_DIR"
   ah_ok "WireGuard packages installed."
 }
 
@@ -180,21 +181,24 @@ EOF
     ah_err "Generated server configuration failed validation."
     return 1
   fi
-  if ! install -m 600 "$server_tmp" "$WG_CONF" || ! install -m 600 "$client_tmp" "$WG_CLIENT_DIR/$name.conf"; then
+  if ! install -m 600 "$server_tmp" "$WG_CONF" ||
+     ! install -m 600 "$client_tmp" "$WG_CLIENT_DIR/$name.conf" ||
+     ! install -m 600 "$client_tmp" "$WG_EXPORT_DIR/$name.conf"; then
     cp -a "$backup" "$WG_CONF"
-    rm -f "$WG_CLIENT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
+    rm -f "$WG_CLIENT_DIR/$name.conf" "$WG_EXPORT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
     ah_err "Could not save the client. Previous server configuration restored."
     return 1
   fi
   if ! wg set wg0 peer "$client_pub" preshared-key <(printf '%s\n' "$psk") allowed-ips "$ip/32"; then
     cp -a "$backup" "$WG_CONF"
-    rm -f "$WG_CLIENT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
+    rm -f "$WG_CLIENT_DIR/$name.conf" "$WG_EXPORT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
     ah_err "Could not activate the peer. Previous server configuration restored."
     return 1
   fi
   rm -f "$backup" "$server_tmp" "$client_tmp"
-  ah_ok "Client $name created: $WG_CLIENT_DIR/$name.conf"
-  ah_info "Copy this file securely to the client's WireGuard app. It contains a private key."
+  ah_ok "Client $name created successfully."
+  printf 'Download-ready file: %s/%s.conf\n' "$WG_EXPORT_DIR" "$name"
+  ah_info "Use SFTP to download this file to your device. It contains a private key; keep it secret."
 }
 
 wg_list_clients() {
@@ -202,9 +206,9 @@ wg_list_clients() {
   echo "Configured WireGuard peers:"
   wg show wg0 peers 2>/dev/null || true
   echo
-  echo "Client configuration files:"
+  echo "Download-ready client files in $WG_EXPORT_DIR:"
   if compgen -G "$WG_CLIENT_DIR/*.conf" >/dev/null; then
-    find "$WG_CLIENT_DIR" -maxdepth 1 -type f -name '*.conf' -printf '%f\n' | sort
+    find "$WG_EXPORT_DIR" -maxdepth 1 -type f -name '*.conf' -printf '%f\n' | sort
   else
     echo "No client files found."
   fi
@@ -257,7 +261,7 @@ wg_remove_client() {
     ah_err "Could not remove the live peer. Previous server configuration restored."
     return 1
   fi
-  rm -f "$backup" "$tmp" "$file"
+  rm -f "$backup" "$tmp" "$file" "$WG_EXPORT_DIR/$name.conf"
   ah_ok "Client $name removed."
 }
 
