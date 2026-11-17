@@ -103,3 +103,10 @@ License to be determined.
 - The manager only tracks accounts it creates. Existing initial accounts and accounts added outside Africhome are not automatically enrolled.
 - This module does not currently impose per-user connection/concurrency limits. Those require separate Xray policy/routing design and must not be confused with expiry.
 - Client credentials are shown at creation time. Configure client import details to match the selected inbound's transport and security settings.
+
+## Security and installer audit notes
+
+- The installer checks for Ubuntu 22.04+ or Debian 11+ and installs the core command-line dependencies used by the menu and protocol modules.
+- The Fail2ban action creates an Africhome SSH jail only when one does not already exist, detects the active SSH daemon port (falling back to 22), validates the Fail2ban configuration, and enables the service.
+- UFW is not enabled automatically. If an administrator chooses to enable it, the script allows the detected SSH TCP port before enabling UFW; additional protocol ports must still be opened deliberately.
+- The optional nftables BitTorrent filter is a common-port block only. It is not comprehensive detection and is runtime-only unless an administrator configures persistence separately.
