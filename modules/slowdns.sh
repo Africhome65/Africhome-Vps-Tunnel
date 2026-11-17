@@ -25,9 +25,13 @@ sd_wait_dns() {
   ns_lc="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]')"
 
   if ! command -v dig >/dev/null 2>&1; then
-    ah_err "The dig command is missing. Install dnsutils, then retry."
-    return 1
+    ah_info "Installing DNS lookup tools..."
+    ah_apt_install dnsutils || return 1
   fi
+  command -v dig >/dev/null 2>&1 || {
+    ah_err "The dig command is still unavailable after installing dnsutils."
+    return 1
+  }
 
   ah_info "Checking DNS delegation every 5 seconds (maximum 5 minutes)..."
   for attempt in $(seq 1 60); do
