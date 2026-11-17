@@ -9,6 +9,7 @@ PU_LOCK="/run/lock/africhome-protocol-users.lock"
 pu_require_tools() {
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
   command -v xray >/dev/null 2>&1 || { ah_err "Install Xray first."; return 1; }
+  command -v openssl >/dev/null 2>&1 || ah_apt_install openssl || return 1;
   [[ -s "$PU_CONFIG" ]] || { ah_err "Xray configuration not found."; return 1; }
   jq -e 'type == "object" and (.inbounds | type == "array")' "$PU_CONFIG" >/dev/null 2>&1 || { ah_err "Xray configuration is invalid or has no inbounds array."; return 1; }
   install -d -m 700 /etc/africhome
