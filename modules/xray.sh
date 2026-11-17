@@ -87,7 +87,6 @@ EOF
   chmod 600 "$XRAY_ENV"
   if ! systemctl enable xray || ! systemctl restart xray; then
     rm -f "$XRAY_CONFIG" "$XRAY_ENV"
-    systemctl disable --now xray >/dev/null 2>&1 || true
     ah_err "Xray could not start with the new configuration. The generated config and saved credentials were removed."
     return 1
   fi
