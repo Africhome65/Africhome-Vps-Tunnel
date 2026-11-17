@@ -181,25 +181,50 @@ wg_list_clients() {
 
 wg_remove_client() {
   wg_require_tools || return 1
-  local name file pub
+  local name file pub backup tmp
   read -r -p "Client name to remove: " name
   [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
   file="$WG_CLIENT_DIR/$name.conf"
-  [[ -f "$file" ]] || { ah_warn "Client file not found."; return 1; }
-  pub="$(awk '/^PublicKey[[:space:]]*=/ {sub(/^[^=]*=[[:space:]]*/, ""); print; exit}' "$WG_CONF" 2>/dev/null)"
-  # Find the peer public key in the named, commented section.
-  pub="$(awk -v marker="# client:$name" '$0==marker {found=1; next} found && /^PublicKey[[:space:]]*=/ {sub(/^[^=]*=[[:space:]]*/, ""); print; exit} found && /^# client:/ {exit}' "$WG_CONF")"
+  [[ -f "$file" && -s "$WG_CONF" ]] || { ah_warn "Client file or server configuration not found."; return 1; }
+  pub="$(awk -v marker="# client:$name" '
+    $0==marker {found=1; next}
+    found && /^PublicKey[[:space:]]*=/ {sub(/^[^=]*=[[:space:]]*/, ""); print; exit}
+    found && /^# client:/ {exit}
+  ' "$WG_CONF")"
   [[ -n "$pub" ]] || { ah_err "Could not find the peer in the server config; no changes made."; return 1; }
   read -r -p "Remove peer '$name'? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
-  wg set wg0 peer "$pub" remove
-  awk -v marker="# client:$name" '
+
+  backup="$(mktemp)"
+  tmp="$(mktemp)"
+  cp -a "$WG_CONF" "$backup"
+  if ! awk -v marker="# client:$name" '
     $0==marker {skip=1; next}
     skip && /^# client:/ {skip=0}
     !skip {print}
-  ' "$WG_CONF" > "$WG_CONF.tmp"
-  install -m 600 "$WG_CONF.tmp" "$WG_CONF"
-  rm -f "$WG_CONF.tmp" "$file"
+  ' "$WG_CONF" > "$tmp"; then
+    rm -f "$backup" "$tmp"
+    ah_err "Could not prepare the updated server configuration."
+    return 1
+  fi
+  chmod 600 "$tmp"
+  if ! wg-quick strip "$tmp" >/dev/null 2>&1; then
+    rm -f "$backup" "$tmp"
+    ah_err "Updated server configuration failed validation."
+    return 1
+  fi
+  if ! install -m 600 "$tmp" "$WG_CONF"; then
+    rm -f "$backup" "$tmp"
+    ah_err "Could not save the updated server configuration."
+    return 1
+  fi
+  if ! wg set wg0 peer "$pub" remove; then
+    cp -a "$backup" "$WG_CONF"
+    rm -f "$backup" "$tmp"
+    ah_err "Could not remove the live peer. Previous server configuration restored."
+    return 1
+  fi
+  rm -f "$backup" "$tmp" "$file"
   ah_ok "Client $name removed."
 }
 
