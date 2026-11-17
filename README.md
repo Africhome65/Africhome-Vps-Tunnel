@@ -11,7 +11,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
 - SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
-- VMess over WebSocket + TLS inbound management, client import URI, status, and removal
+- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal
 
 ## Planned / not yet implemented
 
@@ -27,7 +27,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - For WireGuard: UDP 51820 (or chosen port)
 - For SlowDNS: delegated DNS subdomain and UDP 53
 - For VLESS REALITY: chosen TCP port (default 443)
-- For VMess: a DNS name pointing to the VPS and an existing valid TLS certificate/private key
+- For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key
 
 ## Installation
 
@@ -79,3 +79,11 @@ Review scripts before running them. Keep VPS console access available when chang
 ## License
 
 License to be determined.
+
+## Trojan TLS notes
+
+- Trojan adds a tagged inbound to the existing Xray JSON config and preserves other inbounds.
+- Supply a domain and matching certificate/key files already installed on the VPS. The module does not issue or renew certificates.
+- The module checks for Xray port conflicts, backs up the config, validates it with `xray run -test`, and restores the backup if validation or restart fails.
+- Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
+- The generated client URI contains the account password; keep it private. Removing the inbound leaves its firewall rule unchanged.
