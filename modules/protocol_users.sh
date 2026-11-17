@@ -5,6 +5,8 @@ set -Eeuo pipefail
 PU_CONFIG="/usr/local/etc/xray/config.json"
 PU_DB="/etc/africhome-protocol-users.json"
 PU_LOCK="/run/lock/africhome-protocol-users.lock"
+PU_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$PU_BASE_DIR/lib/common.sh"
 
 pu_require_tools() {
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
@@ -67,7 +69,7 @@ pu_add() {
         .settings.clients = ((.settings.clients // []) + (
           if $p == "trojan" then [{"password": $credential, "email": $email}]
           elif $p == "vmess" then [{"id": $credential, "alterId": 0, "email": $email}]
-          else [{"id": $credential, "email": $email}] end
+          else [{"id": $credential, "email": $email} + (if ([.inbounds[] | select(.protocol == $p and .port == $port) | .settings.clients[0].flow // empty][0] // "") == "" then {} else {"flow": ([.inbounds[] | select(.protocol == $p and .port == $port) | .settings.clients[0].flow][0])} end)] end
         ))
       else . end
     )
