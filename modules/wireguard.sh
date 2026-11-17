@@ -63,7 +63,7 @@ wg_setup_server() {
   umask 077
   server_priv="$(wg genkey)" || { ah_err "Could not generate server private key."; return 1; }
   server_pub="$(printf '%s' "$server_priv" | wg pubkey)" || { ah_err "Could not derive server public key."; return 1; }
-  tmp_conf="$(mktemp /etc/wireguard/wg0.conf.XXXXXX)" || return 1
+  tmp_conf="$(mktemp /etc/wireguard/wg0checkXXXXXX.conf)" || return 1
   old_forward="$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo 0)"
   cat > "$tmp_conf" <<EOF
 [Interface]
@@ -145,8 +145,8 @@ wg_add_client() {
   psk="$(wg genpsk)" || return 1
 
   backup="$(mktemp)"
-  server_tmp="$(mktemp)"
-  client_tmp="$(mktemp)"
+  server_tmp="$(mktemp /etc/wireguard/wg0peerXXXXXX.conf)"
+  client_tmp="$(mktemp /etc/wireguard/wg0removeXXXXXX.conf)"
   cp -a "$WG_CONF" "$backup"
   if ! cat "$WG_CONF" > "$server_tmp" || ! cat >> "$server_tmp" <<EOF
 
