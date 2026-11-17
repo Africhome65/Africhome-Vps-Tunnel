@@ -2,13 +2,18 @@
 
 security_fail2ban_install(){
   ah_require_root || return 1
-  ah_apt_install fail2ban || { ah_err "Fail2ban installation failed."; return 1; }
+  ah_info "Installing Fail2ban and its systemd journal support..."
+  ah_apt_install fail2ban python3-systemd || {
+    ah_err "Fail2ban package installation failed."
+    return 1
+  }
 
   local ssh_port jail_file
   ssh_port="$(sshd -T 2>/dev/null | awk '$1=="port"{print $2; exit}')"
   [[ "$ssh_port" =~ ^[0-9]+$ ]] || ssh_port=22
-  install -d -m 755 /etc/fail2ban/jail.d
+  install -d -m 755 /etc/fail2ban/jail.d || return 1
   jail_file="/etc/fail2ban/jail.d/africhome-sshd.local"
+
   if [[ ! -e "$jail_file" ]]; then
     cat > "$jail_file" <<EOF
 [sshd]
@@ -25,12 +30,39 @@ EOF
   fi
 
   if ! fail2ban-client -t; then
-    ah_err "Fail2ban configuration validation failed. Review /etc/fail2ban/jail.d/."
+    ah_err "Fail2ban configuration validation failed. Existing configuration was not overwritten."
+    ah_info "Inspect /etc/fail2ban/jail.d/africhome-sshd.local and other jail files."
     return 1
   fi
-  systemctl enable --now fail2ban
-  systemctl restart fail2ban
-  ah_ok "Fail2ban enabled with an SSH jail on TCP port $ssh_port."
+
+  if ! systemctl enable fail2ban || ! systemctl restart fail2ban; then
+    ah_err "Could not enable or restart the Fail2ban service."
+    systemctl --no-pager --full status fail2ban || true
+    journalctl -u fail2ban -n 30 --no-pager || true
+    return 1
+  fi
+
+  if ! systemctl is-active --quiet fail2ban; then
+    ah_err "Fail2ban service did not become active."
+    systemctl --no-pager --full status fail2ban || true
+    journalctl -u fail2ban -n 30 --no-pager || true
+    return 1
+  fi
+
+  if ! fail2ban-client ping >/dev/null 2>&1; then
+    ah_err "Fail2ban service is active but its control socket did not respond."
+    journalctl -u fail2ban -n 30 --no-pager || true
+    return 1
+  fi
+
+  if ! fail2ban-client status sshd >/dev/null 2>&1; then
+    ah_err "Fail2ban is running, but the SSH jail is not active. Check the SSH jail configuration."
+    fail2ban-client status || true
+    return 1
+  fi
+
+  ah_ok "Fail2ban is active and its SSH jail is running on TCP port $ssh_port."
+  fail2ban-client status sshd
 }
 
 security_fail2ban_status(){
