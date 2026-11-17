@@ -26,7 +26,7 @@ sd_setup() {
   [[ "$domain" =~ ^([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}$ ]] || { ah_err "Enter a valid DNS name."; return 1; }
   read -r -s -p "Create a strong tunnel password (minimum 12 characters): " password
   echo
-  [[ "${#password}" -ge 12 && "$password" != *$'\n'* ]] || { ah_err "Password must be at least 12 characters."; return 1; }
+  [[ "$password" =~ ^[A-Za-z0-9_-]{12,64}$ ]] || { ah_err "Use 12-64 characters: letters, numbers, underscore, or dash only."; return 1; }
 
   install -d -m 700 /etc/africhome
   umask 077
