@@ -2,34 +2,57 @@
 
 A terminal-based VPS installation and management toolkit for Ubuntu 22.04+ and Debian 11+.
 
-## Project goals
+## Implemented
 
-- SSH account management
+- Terminal-only management menu (no web panel)
+- SSH Linux account creation, listing, locking/unlocking, and expiry management
+- Fail2ban installation and status
+- UFW status and guarded enablement
+- Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
+- WireGuard installation, server setup, client profile creation, peer listing, and client removal
+
+## Planned / not yet implemented
+
 - SlowDNS SSH
 - Xray/V2Ray: VMess and VLESS
 - Trojan and Shadowsocks
-- WireGuard
-- Fail2ban and firewall management
-- Torrent-port blocking
-- Installation, status, and service management
+- Expanded protocol user, expiry, and service management
 
 ## Requirements
 
 - Ubuntu 22.04 or newer, or Debian 11 or newer
 - Root access
-- A supported VPS with a public IP address
+- Public IPv4 address for WireGuard server setup
+- UDP port 51820 (or chosen port) allowed by the VPS provider firewall
 
 ## Installation
 
-The installation command will be published here once the installer and protocol modules have been committed and tested.
+Run the installer from the repository after reviewing its contents:
 
-## Security
+```bash
+git clone https://github.com/Africhome65/Africhome-Vps-Tunnel.git
+cd Africhome-Vps-Tunnel
+sudo bash install.sh
+```
 
-Run installation scripts only after reviewing their contents. Keep credentials and private keys out of this repository. Use SSH key authentication where possible and retain console access when changing firewall or SSH settings.
+Then launch:
 
-## Development status
+```bash
+sudo africhome
+```
 
-This repository is under active development. Not every protocol listed in the project goals is implemented yet. Check the source and release notes before deploying to production.
+## WireGuard notes
+
+- Server configuration is written to `/etc/wireguard/wg0.conf`.
+- Client profiles are stored under `/root/africhome-wireguard-clients/` with restrictive permissions. Transfer them securely; they contain private keys.
+- Setup enables IPv4 forwarding and installs NAT/forwarding rules through WireGuard's PostUp/PostDown hooks.
+- If UFW is active, the selected WireGuard UDP port is allowed. You must also allow it in your VPS provider/cloud firewall.
+- The generated client profile routes IPv4 traffic through the VPN. IPv6 is not configured by this module.
+- Keep VPS console access available when changing firewall/network settings.
+
+## Security and limitations
+
+Review scripts before running them. Never commit client or server private keys. Torrent-port filtering is only a basic port rule and can be bypassed; it is not reliable application-level torrent detection. This project has not yet been tested on every VPS provider or network configuration.
 
 ## License
 
