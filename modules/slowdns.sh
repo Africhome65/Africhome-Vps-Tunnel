@@ -14,7 +14,7 @@ sd_valid_domain() {
 
 sd_install() {
   ah_require_root || return 1
-  ah_apt_install iodine openssh-client openssl dnsutils || return 1
+  ah_apt_install iodine openssh-client openssl || return 1
   ah_ok "Iodine, SSH client and password generator installed."
 }
 
@@ -23,17 +23,12 @@ sd_wait_dns() {
   local domain_lc ns_lc attempt ns_result a_result
   domain_lc="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   ns_lc="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]')"
-
   if ! command -v dig >/dev/null 2>&1; then
     ah_info "Installing DNS lookup tools..."
     ah_apt_install dnsutils || return 1
   fi
-  command -v dig >/dev/null 2>&1 || {
-    ah_err "The dig command is still unavailable after installing dnsutils."
-    return 1
-  }
-
-  ah_info "Checking DNS delegation every 5 seconds (maximum 5 minutes)..."
+  command -v dig >/dev/null 2>&1 || { ah_err "The dig command is unavailable."; return 1; }
+  ah_info "Checking DNS every 5 seconds (maximum 5 minutes)..."
   for attempt in $(seq 1 60); do
     ns_result="$(dig +time=2 +tries=1 +short NS "$domain" @1.1.1.1 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')"
     a_result="$(dig +time=2 +tries=1 +short A "$ns_host" @1.1.1.1 2>/dev/null | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}
@@ -121,9 +116,9 @@ EOF
 
   ah_info "Required DNS records:"
   echo "  A record: $ns_host -> this VPS public IPv4"
+  echo "  Registrar glue: register $ns_host as a child nameserver with this VPS IP"
   echo "  NS record: $domain -> $ns_host"
   echo "  Firewall: allow UDP 53 at the VPS provider and UFW"
-  echo "  DNS will be checked every 5 seconds for up to 5 minutes."
   if sd_wait_dns "$domain" "$ns_host"; then
     systemctl enable --now africhome-slowdns
     if systemctl is-active --quiet africhome-slowdns; then
@@ -312,20 +307,16 @@ slowdns_menu() {
   done
 }
  | head -n1)"
-
     if printf '%s\n' "$ns_result" | grep -Fxq "$ns_lc" && [[ -n "$a_result" ]]; then
-      ah_ok "DNS delegation is visible. Nameserver $ns_host resolves to $a_result."
+      ah_ok "DNS delegation is visible; nameserver resolves to $a_result."
       return 0
     fi
-
-    printf '[%s/60] Waiting for DNS records...\n' "$attempt"
+    printf '[%s/60] DNS not ready yet; checking again in 5 seconds...\n' "$attempt"
     sleep 5
   done
-
-  ah_err "DNS was not fully visible after 5 minutes."
+  ah_err "DNS is not fully visible after 5 minutes."
   echo "Expected NS: $ns_host for $domain"
-  echo "Nameserver A record currently resolves to: ${a_result:-no IPv4 address}"
-  echo "Check the A record and NS delegation in your DNS provider, then retry."
+  echo "Nameserver A record: ${a_result:-no IPv4 address}"
   return 1
 }
 
