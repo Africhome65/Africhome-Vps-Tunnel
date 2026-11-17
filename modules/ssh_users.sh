@@ -6,12 +6,13 @@ ssh_users_create(){
   read -r -p "New SSH username (letters, digits, _ or -): " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return; }
   if id "$username" >/dev/null 2>&1; then ah_err "That username already exists."; return; fi
-  read -r -p "Account expiry date YYYY-MM-DD (blank = no expiry): " expiry
-  if [[ -n "$expiry" ]]; then
-    [[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { ah_err "Use YYYY-MM-DD."; return; }
-    date -d "$expiry" >/dev/null 2>&1 || { ah_err "Invalid calendar date."; return; }
-    [[ "$(date -d "$expiry" +%F)" == "$expiry" ]] || { ah_err "Invalid date."; return; }
-    [[ "$expiry" > "$(date +%F)" ]] || { ah_err "Expiry must be in the future."; return; }
+  local days
+  read -r -p "Account duration in days (0 = no expiry): " days
+  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return; }
+  if (( days > 36500 )); then ah_err "Maximum duration is 36500 days."; return; fi
+  expiry=""
+  if (( days > 0 )); then
+    expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
   fi
   if ! useradd --create-home --shell /bin/bash "$username"; then
     ah_err "Could not create account."; return
@@ -69,15 +70,15 @@ ssh_users_set_expiry(){
   read -r -p "Existing username: " username
   id "$username" >/dev/null 2>&1 || { ah_err "User does not exist."; return; }
   [[ "$username" != root ]] || { ah_err "Refusing to change root expiry."; return; }
-  read -r -p "New expiry YYYY-MM-DD (or 0 for no expiry): " expiry
-  if [[ "$expiry" == "0" ]]; then
+  read -r -p "Account duration in days from today (0 = no expiry): " days
+  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return; }
+  if (( days > 36500 )); then ah_err "Maximum duration is 36500 days."; return; fi
+  if (( days == 0 )); then
     chage --expiredate "" "$username" && ah_ok "Expiry cleared for $username."
     return
   fi
-  [[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { ah_err "Use YYYY-MM-DD."; return; }
-  date -d "$expiry" >/dev/null 2>&1 || { ah_err "Invalid date."; return; }
-  [[ "$(date -d "$expiry" +%F)" == "$expiry" ]] || { ah_err "Invalid date."; return; }
-  chage --expiredate "$expiry" "$username" && ah_ok "Expiry set for $username: $expiry."
+  expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
+  chage --expiredate "$expiry" "$username" && ah_ok "Expiry set for $username: $expiry (${days} days from today)."
 }
 
 ssh_users_menu(){
