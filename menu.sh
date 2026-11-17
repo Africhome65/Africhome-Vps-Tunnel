@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -14,6 +14,7 @@ BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$BASE_DIR/modules/vmess.sh"
 . "$BASE_DIR/modules/trojan.sh"
 . "$BASE_DIR/modules/shadowsocks.sh"
+. "$BASE_DIR/modules/protocol_users.sh"
 
 while true; do
   clear
@@ -30,8 +31,9 @@ while true; do
   echo "7) VMess management (WebSocket + TLS)"
   echo "8) Trojan management (TLS)"
   echo "9) Shadowsocks management"
-  echo "10) Other protocols (under development)"
-  echo "11) Installation information"
+  echo "10) Protocol account management (expiry)"
+  echo "11) Other protocols (under development)"
+  echo "12) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -51,8 +53,9 @@ while true; do
     7) vmess_menu ;;
     8) trojan_menu ;;
     9) shadowsocks_menu ;;
-    10) echo "Other protocols are not implemented yet."; ah_pause ;;
-    11) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    10) pu_menu ;;
+    11) echo "Other protocols are not implemented yet."; ah_pause ;;
+    12) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
