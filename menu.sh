@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -10,6 +10,7 @@ BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$BASE_DIR/modules/ssh_users.sh"
 . "$BASE_DIR/modules/wireguard.sh"
 . "$BASE_DIR/modules/slowdns.sh"
+. "$BASE_DIR/modules/xray.sh"
 
 while true; do
   clear
@@ -22,8 +23,9 @@ while true; do
   echo "3) SSH account management"
   echo "4) WireGuard management"
   echo "5) SlowDNS SSH management"
-  echo "6) Other protocols (under development)"
-  echo "7) Installation information"
+  echo "6) Xray management (VLESS REALITY)"
+  echo "7) Other protocols (under development)"
+  echo "8) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -39,8 +41,9 @@ while true; do
     3) ssh_users_menu ;;
     4) wg_menu ;;
     5) slowdns_menu ;;
-    6) echo "VMess, VLESS, Trojan and Shadowsocks are not implemented yet."; ah_pause ;;
-    7) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    6) xray_menu ;;
+    7) echo "VMess, Trojan and Shadowsocks are not implemented yet."; ah_pause ;;
+    8) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
