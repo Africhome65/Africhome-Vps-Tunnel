@@ -78,6 +78,15 @@ EOF
 
 sd_status() {
   ah_require_root || return 1
+  if [[ ! -f "$SD_UNIT" ]]; then
+    if command -v iodined >/dev/null 2>&1; then
+      ah_info "Iodine is installed, but the Africhome SlowDNS server is not configured yet."
+      echo "Next step: choose option 2 (Configure DNS tunnel server)."
+    else
+      ah_warn "Iodine is not installed. Choose option 1 (Install iodine) first."
+    fi
+    return 0
+  fi
   systemctl --no-pager --full status africhome-slowdns || true
   echo
   journalctl -u africhome-slowdns -n 20 --no-pager 2>/dev/null || true
