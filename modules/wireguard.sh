@@ -31,8 +31,17 @@ wg_setup_server() {
     ah_warn "$WG_CONF already exists. Existing configuration was not changed."
     return 1
   fi
+  if [[ -e /etc/sysctl.d/99-africhome-wireguard.conf ]]; then
+    ah_warn "The Africhome WireGuard sysctl file already exists. Review it before running setup; it will not be overwritten."
+    return 1
+  fi
+  if systemctl is-active --quiet wg-quick@wg0; then
+    ah_warn "wg-quick@wg0 is already active. Stop and inspect it before creating a new server configuration."
+    return 1
+  fi
 
-  local wan_if public_ip server_priv server_pub old_forward tmp_conf
+  local wan_if public_ip server_priv server_pub old_forward tmp_conf was_enabled=0
+  systemctl is-enabled --quiet wg-quick@wg0 && was_enabled=1 || true
   wan_if="$(ip -4 route show default 2>/dev/null | awk 'NR==1 {print $5}')"
   [[ -n "$wan_if" ]] || { ah_err "Could not detect the internet-facing network interface."; return 1; }
   public_ip="$(curl -4fsS --max-time 8 https://api.ipify.org 2>/dev/null || true)"
@@ -86,7 +95,9 @@ EOF
   if ! sysctl -w net.ipv4.ip_forward=1 >/dev/null ||
      ! systemctl enable wg-quick@wg0 ||
      ! systemctl start wg-quick@wg0; then
-    systemctl disable --now wg-quick@wg0 >/dev/null 2>&1 || true
+    if (( was_enabled == 0 )); then
+      systemctl disable wg-quick@wg0 >/dev/null 2>&1 || true
+    fi
     rm -f "$WG_CONF" /etc/wireguard/server_private.key /etc/wireguard/server_public.key /etc/wireguard/server_endpoint /etc/wireguard/server_port /etc/sysctl.d/99-africhome-wireguard.conf
     sysctl -w "net.ipv4.ip_forward=$old_forward" >/dev/null 2>&1 || true
     ah_err "WireGuard failed to start. Newly created configuration and keys were removed."
