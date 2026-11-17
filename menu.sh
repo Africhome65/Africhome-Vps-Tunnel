@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -12,6 +12,7 @@ BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$BASE_DIR/modules/slowdns.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
+. "$BASE_DIR/modules/trojan.sh"
 
 while true; do
   clear
@@ -26,8 +27,9 @@ while true; do
   echo "5) SlowDNS SSH management"
   echo "6) Xray management (VLESS REALITY)"
   echo "7) VMess management (WebSocket + TLS)"
-  echo "8) Other protocols (under development)"
-  echo "9) Installation information"
+  echo "8) Trojan management (TLS)"
+  echo "9) Other protocols (under development)"
+  echo "10) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
