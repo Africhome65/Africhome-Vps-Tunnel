@@ -272,7 +272,7 @@ wg_set_client_expiry() {
     ah_ok "Expiry cleared for $name."
     return 0
   fi
-  expiry="$(date -d "+\${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return 1; }
+  expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return 1; }
   printf '%s\n%s\n' "$expiry" "$pub" > "$expiry_dir/$name.expiry"
   chmod 600 "$expiry_dir/$name.expiry"
   module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -297,7 +297,7 @@ wg_list_client_expiries() {
     return 0
   fi
   for file in "$dir"/*.expiry; do
-    name="\${file##*/}"; name="\${name%.expiry}"
+    name="${file##*/}"; name="${name%.expiry}"
     expiry="$(head -n 1 "$file")"
     printf '%-24s %s\n' "$name" "$expiry"
   done
