@@ -64,15 +64,18 @@ pu_add() {
   tmp="$(mktemp)"
   cp -a "$PU_CONFIG" "$backup"
   if ! jq --arg p "$protocol" --arg email "$email" --arg credential "$credential" --argjson port "$port" '
-    .inbounds |= map(
-      if .protocol == $p and .port == $port then
-        .settings.clients = ((.settings.clients // []) + (
-          if $p == "trojan" then [{"password": $credential, "email": $email}]
-          elif $p == "vmess" then [{"id": $credential, "alterId": 0, "email": $email}]
-          else [{"id": $credential, "email": $email} + (if ([.inbounds[] | select(.protocol == $p and .port == $port) | .settings.clients[0].flow // empty][0] // "") == "" then {} else {"flow": ([.inbounds[] | select(.protocol == $p and .port == $port) | .settings.clients[0].flow][0])} end)] end
-        ))
-      else . end
-    )
+    . as $root
+    | ($root.inbounds[] | select(.protocol == $p and .port == $port) | .settings.clients[0].flow // "") as $flow
+    | .inbounds |= map(
+        if .protocol == $p and .port == $port then
+          .settings.clients = ((.settings.clients // []) + (
+            if $p == "trojan" then [{"password": $credential, "email": $email}]
+            elif $p == "vmess" then [{"id": $credential, "alterId": 0, "email": $email}]
+            else [{"id": $credential, "email": $email} + (if $flow == "" then {} else {"flow": $flow} end)]
+            end
+          ))
+        else . end
+      )
   ' "$PU_CONFIG" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update Xray config."; return 1
   fi
