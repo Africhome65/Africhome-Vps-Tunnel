@@ -15,8 +15,6 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 
 ## Planned / not yet implemented
 
-- Trojan
-- Shadowsocks
 - Per-client connection/concurrency limits (not implemented)
 
 ## Requirements
