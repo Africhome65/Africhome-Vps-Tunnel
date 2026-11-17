@@ -45,7 +45,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=/etc/africhome-slowdns.env
-ExecStart=/usr/sbin/iodined -f -P ${DNS_PASSWORD} 10.77.0.1/24 ${DNS_DOMAIN}
+ExecStart=/bin/bash -c 'exec /usr/sbin/iodined -f -P "$DNS_PASSWORD" 10.77.0.1/24 "$DNS_DOMAIN"'
 Restart=on-failure
 RestartSec=5
 User=root
