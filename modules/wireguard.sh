@@ -95,19 +95,27 @@ wg_add_client() {
   wg_require_tools || return 1
   systemctl is-active --quiet wg-quick@wg0 || { ah_warn "Set up and start the WireGuard server first."; return 1; }
   local name ip client_priv client_pub server_pub endpoint port psk
+  local backup server_tmp client_tmp
   read -r -p "Client name (letters, numbers, dash, underscore): " name
   [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
   [[ ! -e "$WG_CLIENT_DIR/$name.conf" ]] || { ah_warn "That client already exists."; return 1; }
+  [[ -s "$WG_CONF" && -s /etc/wireguard/server_public.key && -s /etc/wireguard/server_endpoint && -s /etc/wireguard/server_port ]] || {
+    ah_err "WireGuard server state is incomplete. Re-run server setup or restore its state files."; return 1;
+  }
   ip="$(wg_next_client_ip)" || { ah_err "No free client addresses remain."; return 1; }
   umask 077
-  client_priv="$(wg genkey)"
-  client_pub="$(printf '%s' "$client_priv" | wg pubkey)"
+  client_priv="$(wg genkey)" || return 1
+  client_pub="$(printf '%s' "$client_priv" | wg pubkey)" || return 1
   server_pub="$(cat /etc/wireguard/server_public.key)"
   endpoint="$(cat /etc/wireguard/server_endpoint)"
   port="$(cat /etc/wireguard/server_port)"
-  psk="$(wg genpsk)"
-  wg set wg0 peer "$client_pub" preshared-key <(printf '%s\n' "$psk") allowed-ips "$ip/32"
-  cat >> "$WG_CONF" <<EOF
+  psk="$(wg genpsk)" || return 1
+
+  backup="$(mktemp)"
+  server_tmp="$(mktemp)"
+  client_tmp="$(mktemp)"
+  cp -a "$WG_CONF" "$backup"
+  if ! cat "$WG_CONF" > "$server_tmp" || ! cat >> "$server_tmp" <<EOF
 
 # client:$name
 [Peer]
@@ -115,7 +123,12 @@ PublicKey = $client_pub
 PresharedKey = $psk
 AllowedIPs = $ip/32
 EOF
-  cat > "$WG_CLIENT_DIR/$name.conf" <<EOF
+  then
+    rm -f "$backup" "$server_tmp" "$client_tmp"
+    ah_err "Could not prepare the server configuration."
+    return 1
+  fi
+  cat > "$client_tmp" <<EOF
 [Interface]
 PrivateKey = $client_priv
 Address = $ip/32
@@ -128,7 +141,25 @@ Endpoint = $endpoint:$port
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 EOF
-  chmod 600 "$WG_CLIENT_DIR/$name.conf"
+  chmod 600 "$server_tmp" "$client_tmp"
+  if ! wg-quick strip "$server_tmp" >/dev/null 2>&1; then
+    rm -f "$backup" "$server_tmp" "$client_tmp"
+    ah_err "Generated server configuration failed validation."
+    return 1
+  fi
+  if ! install -m 600 "$server_tmp" "$WG_CONF" || ! install -m 600 "$client_tmp" "$WG_CLIENT_DIR/$name.conf"; then
+    cp -a "$backup" "$WG_CONF"
+    rm -f "$WG_CLIENT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
+    ah_err "Could not save the client. Previous server configuration restored."
+    return 1
+  fi
+  if ! wg set wg0 peer "$client_pub" preshared-key <(printf '%s\n' "$psk") allowed-ips "$ip/32"; then
+    cp -a "$backup" "$WG_CONF"
+    rm -f "$WG_CLIENT_DIR/$name.conf" "$backup" "$server_tmp" "$client_tmp"
+    ah_err "Could not activate the peer. Previous server configuration restored."
+    return 1
+  fi
+  rm -f "$backup" "$server_tmp" "$client_tmp"
   ah_ok "Client $name created: $WG_CLIENT_DIR/$name.conf"
   ah_info "Copy this file securely to the client's WireGuard app. It contains a private key."
 }
