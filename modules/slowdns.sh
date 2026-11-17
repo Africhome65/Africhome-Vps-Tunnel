@@ -35,14 +35,14 @@ sd_wait_dns() {
 
   ah_info "Checking DNS every 5 seconds (maximum 5 minutes)..."
   for attempt in $(seq 1 60); do
-    ns_result="$(dig +time=2 +tries=1 +short NS "$domain" @1.1.1.1 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\\.$//')"
-    a_result="$(dig +time=2 +tries=1 +short A "$ns_host" @1.1.1.1 2>/dev/null | grep -E '^[0-9]{1,3}(\\.[0-9]{1,3}){3}$' | head -n1)"
+    ns_result="$(dig +time=2 +tries=1 +short NS "$domain" @1.1.1.1 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')"
+    a_result="$(dig +time=2 +tries=1 +short A "$ns_host" @1.1.1.1 2>/dev/null | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | head -n1)"
 
-    if printf '%s\\n' "$ns_result" | grep -Fxq "$ns_lc" && [[ -n "$a_result" ]]; then
+    if printf '%s\n' "$ns_result" | grep -Fxq "$ns_lc" && [[ -n "$a_result" ]]; then
       ah_ok "DNS delegation is visible; nameserver resolves to $a_result."
       return 0
     fi
-    printf '[%s/60] DNS not ready yet; checking again in 5 seconds...\\n' "$attempt"
+    printf '[%s/60] DNS not ready yet; checking again in 5 seconds...\n' "$attempt"
     sleep 5
   done
 
