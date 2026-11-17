@@ -212,7 +212,7 @@ wg_export_client() {
   install -d -m 700 "$WG_EXPORT_DIR" || return 1
   install -m 600 "$source" "$destination" || { ah_err "Could not export the client configuration."; return 1; }
   ah_ok "Client configuration is ready for secure transfer."
-  printf 'File: %s\\n' "$destination"
+  printf 'File: %s\n' "$destination"
   echo "Transfer it to your phone with an SFTP app, then in WireGuard choose:"
   echo "  +  > Import from file or archive"
   ah_info "This file contains a private key. Do not share it or upload it to public storage."
@@ -220,11 +220,12 @@ wg_export_client() {
 
 wg_list_clients() {
   wg_require_tools || return 1
+  install -d -m 700 "$WG_CLIENT_DIR" "$WG_EXPORT_DIR" || return 1
   echo "Configured WireGuard peers:"
   wg show wg0 peers 2>/dev/null || true
   echo
   echo "Download-ready client files in $WG_EXPORT_DIR:"
-  if compgen -G "$WG_CLIENT_DIR/*.conf" >/dev/null; then
+  if compgen -G "$WG_EXPORT_DIR/*.conf" >/dev/null; then
     find "$WG_EXPORT_DIR" -maxdepth 1 -type f -name '*.conf' -printf '%f\n' | sort
   else
     echo "No client files found."
