@@ -60,7 +60,7 @@ wg_setup_server() {
   [[ -n "$answer" ]] && WG_PORT="$answer"
   [[ "$WG_PORT" =~ ^[0-9]+$ ]] && (( WG_PORT >= 1 && WG_PORT <= 65535 )) || { ah_err "Invalid UDP port."; return 1; }
 
-  install -d -m 700 /etc/wireguard "$WG_CLIENT_DIR"
+  install -d -m 700 /etc/wireguard "$WG_CLIENT_DIR" "$WG_EXPORT_DIR"
   umask 077
   server_priv="$(wg genkey)" || { ah_err "Could not generate server private key."; return 1; }
   server_pub="$(printf '%s' "$server_priv" | wg pubkey)" || { ah_err "Could not derive server public key."; return 1; }
@@ -233,7 +233,7 @@ wg_remove_client() {
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
 
   backup="$(mktemp)"
-  tmp="$(mktemp)"
+  tmp="$(mktemp /etc/wireguard/wg0removeXXXXXX.conf)"
   cp -a "$WG_CONF" "$backup"
   if ! awk -v marker="# client:$name" '
     $0==marker {skip=1; next}
