@@ -9,7 +9,7 @@ EXPIRY_DIR="/etc/africhome/wireguard-expiry"
 today="$(date +%F)"
 for meta in "$EXPIRY_DIR"/*.expiry; do
   [[ -f "$meta" ]] || continue
-  name="\${meta##*/}"; name="\${name%.expiry}"
+  name="${meta##*/}"; name="${name%.expiry}"
   [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || continue
   expiry="$(sed -n '1p' "$meta")"
   pub="$(sed -n '2p' "$meta")"
