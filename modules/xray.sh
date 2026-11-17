@@ -26,6 +26,7 @@ xray_setup_vless_reality() {
   ah_require_root || return 1
   command -v xray >/dev/null 2>&1 || { ah_warn "Install Xray first."; return 1; }
   [[ ! -e "$XRAY_CONFIG" ]] || { ah_warn "$XRAY_CONFIG already exists. Existing configuration was not changed."; return 1; }
+  [[ ! -e "$XRAY_ENV" ]] || { ah_warn "$XRAY_ENV already exists. Existing Africhome credentials were not changed."; return 1; }
 
   local port server_name public_ip uuid key_output private_key public_key short_id
   read -r -p "VLESS REALITY TCP port [443]: " port
