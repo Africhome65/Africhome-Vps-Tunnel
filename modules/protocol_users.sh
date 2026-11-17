@@ -87,19 +87,17 @@ pu_add() {
   fi
 
   tmp="$(mktemp)"
-  if ! jq --arg p "$protocol" --arg name "$username" --arg email "$email" --arg credential "$credential" --argjson port "$port" --argjson expiry "$expires_at"     '. + [{protocol:$p, name:$name, email:$email, credential:$credential, port:$port, expires_at:$expiry, created_at:(now|floor)}]' "$PU_DB" > "$tmp"; then
-    rm -f "$tmp"; cp -a "$backup" "$PU_CONFIG"; ah_err "Could not update account database."; return 1
+  if ! jq --arg p "$protocol" --arg name "$username" --arg email "$email" --arg credential "$credential" --argjson port "$port" --argjson expiry "$expires_at" \
+    '. + [{protocol:$p, name:$name, email:$email, credential:$credential, port:$port, expires_at:$expiry, created_at:(now|floor)}]' "$PU_DB" > "$tmp"; then
+    rm -f "$tmp"; cp -a "$backup" "$PU_CONFIG"; ah_err "Could not prepare account database update."; return 1
+  fi
+  if ! systemctl restart xray; then
+    cp -a "$backup" "$PU_CONFIG"; rm -f "$tmp"
+    systemctl restart xray || true
+    ah_err "Xray restart failed; previous config restored."; return 1
   fi
   install -m 600 "$tmp" "$PU_DB"
   rm -f "$tmp"
-  if ! systemctl restart xray; then
-    cp -a "$backup" "$PU_CONFIG"
-    tmp="$(mktemp)"
-    jq --arg e "$email" '[.[] | select(.email != $e)]' "$PU_DB" > "$tmp"
-    install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
-    systemctl restart xray || true
-    ah_err "Xray restart failed; config and account database rolled back."; return 1
-  fi
   ah_ok "Account created."
   echo "Protocol: $protocol"
   echo "Inbound port: $port"
