@@ -38,15 +38,6 @@ ssh_users_create(){
     ah_err "Password setup failed; account creation was rolled back."; return
   fi
   unset password
-    userdel "$username" || true
-    ah_err "Password was empty, contained an unsupported colon, or did not match; account creation was rolled back."; return
-  fi
-  if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
-    unset password password_confirm
-    userdel "$username" || true
-    ah_err "Password setup failed; account creation was rolled back."; return
-  fi
-  unset password password_confirm
   ah_ok "SSH system account '$username' created."
   [[ -n "$expiry" ]] && ah_info "Account expiry: $expiry"
   ah_warn "This creates a Linux account; SSH daemon policy, key-only authentication, and network access still depend on your server configuration."
