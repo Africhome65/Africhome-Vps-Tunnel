@@ -19,7 +19,7 @@ esac
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git ca-certificates curl
+apt-get install -y git ca-certificates curl jq openssl iproute2 procps util-linux
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --depth=1 origin main
   git -C "$INSTALL_DIR" reset --hard origin/main
@@ -29,6 +29,7 @@ else
 fi
 
 chmod 0755 "$INSTALL_DIR/install.sh" "$INSTALL_DIR/menu.sh"
+chmod 0644 "$INSTALL_DIR/lib/common.sh" "$INSTALL_DIR"/modules/*.sh
 ln -sfn "$INSTALL_DIR/menu.sh" "$BIN_LINK"
 echo "Africhome VPS Tunnel foundation installed."
 echo "Launch the terminal menu with: sudo africhome"
