@@ -85,8 +85,12 @@ EOF
   printf 'XRAY_PORT=%s\nXRAY_HOST=%s\nXRAY_UUID=%s\nXRAY_PUBLIC_KEY=%s\nXRAY_SHORT_ID=%s\nXRAY_SERVER_NAME=%s\n' \
     "$port" "$public_ip" "$uuid" "$public_key" "$short_id" "$server_name" > "$XRAY_ENV"
   chmod 600 "$XRAY_ENV"
-  systemctl enable xray
-  systemctl restart xray
+  if ! systemctl enable xray || ! systemctl restart xray; then
+    rm -f "$XRAY_CONFIG" "$XRAY_ENV"
+    systemctl disable --now xray >/dev/null 2>&1 || true
+    ah_err "Xray could not start with the new configuration. The generated config and saved credentials were removed."
+    return 1
+  fi
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
     ufw allow "$port/tcp" || ah_warn "Could not add TCP $port to UFW; open it manually."
   fi
