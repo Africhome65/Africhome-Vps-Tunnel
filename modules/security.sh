@@ -1,12 +1,38 @@
 #!/usr/bin/env bash
 
 security_fail2ban_install(){
-  ah_require_root || return
-  if command -v fail2ban-client >/dev/null 2>&1; then ah_ok "Fail2ban is already installed."; return; fi
-  ah_apt_install fail2ban || { ah_err "Fail2ban installation failed."; return; }
+  ah_require_root || return 1
+  ah_apt_install fail2ban || { ah_err "Fail2ban installation failed."; return 1; }
+
+  local ssh_port jail_file
+  ssh_port="$(sshd -T 2>/dev/null | awk '$1=="port"{print $2; exit}')"
+  [[ "$ssh_port" =~ ^[0-9]+$ ]] || ssh_port=22
+  install -d -m 755 /etc/fail2ban/jail.d
+  jail_file="/etc/fail2ban/jail.d/africhome-sshd.local"
+  if [[ ! -e "$jail_file" ]]; then
+    cat > "$jail_file" <<EOF
+[sshd]
+enabled = true
+port = $ssh_port
+backend = systemd
+maxretry = 5
+findtime = 10m
+bantime = 1h
+EOF
+    chmod 644 "$jail_file"
+  else
+    ah_info "Existing Africhome Fail2ban SSH jail preserved."
+  fi
+
+  if ! fail2ban-client -t; then
+    ah_err "Fail2ban configuration validation failed. Review /etc/fail2ban/jail.d/."
+    return 1
+  fi
   systemctl enable --now fail2ban
-  ah_ok "Fail2ban installed and enabled."
+  systemctl restart fail2ban
+  ah_ok "Fail2ban enabled with an SSH jail on TCP port $ssh_port."
 }
+
 security_fail2ban_status(){
   if command -v fail2ban-client >/dev/null 2>&1; then
     systemctl --no-pager --full status fail2ban || true
