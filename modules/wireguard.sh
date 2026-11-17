@@ -218,6 +218,25 @@ wg_export_client() {
   ah_info "This file contains a private key. Do not share it or upload it to public storage."
 }
 
+wg_show_client_qr() {
+  wg_require_tools || return 1
+  local name source
+  read -r -p "Client name to display as QR code: " name
+  [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || { ah_err "Invalid client name."; return 1; }
+  source="$WG_CLIENT_DIR/$name.conf"
+  [[ -s "$source" ]] || { ah_warn "Client configuration not found: $source"; return 1; }
+  if ! command -v qrencode >/dev/null 2>&1; then
+    ah_info "Installing qrencode for terminal QR display..."
+    ah_apt_install qrencode || return 1
+  fi
+  echo
+  ah_warn "The QR code contains the client's private key. Keep your screen private and scan it only with your own WireGuard app."
+  echo
+  qrencode -t ansiutf8 < "$source" || { ah_err "Could not render the QR code. Use a UTF-8 terminal that supports ANSI characters."; return 1; }
+  echo
+  ah_info "On Android, open WireGuard, tap +, then Scan from QR code."
+}
+
 wg_list_clients() {
   wg_require_tools || return 1
   install -d -m 700 "$WG_CLIENT_DIR" "$WG_EXPORT_DIR" || return 1
@@ -293,6 +312,7 @@ wg_menu() {
     echo "4) List peers and status"
     echo "5) Remove client"
     echo "6) Export client config for phone"
+    echo "7) Display client QR code in terminal"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -302,6 +322,7 @@ wg_menu() {
       4) wg_list_clients; ah_pause ;;
       5) wg_remove_client; ah_pause ;;
       6) wg_export_client; ah_pause ;;
+      7) wg_show_client_qr; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
