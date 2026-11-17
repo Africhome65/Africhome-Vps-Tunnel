@@ -32,7 +32,7 @@ wg_setup_server() {
     return 1
   fi
 
-  local wan_if public_ip server_priv server_pub
+  local wan_if public_ip server_priv server_pub old_forward tmp_conf
   wan_if="$(ip -4 route show default 2>/dev/null | awk 'NR==1 {print $5}')"
   [[ -n "$wan_if" ]] || { ah_err "Could not detect the internet-facing network interface."; return 1; }
   public_ip="$(curl -4fsS --max-time 8 https://api.ipify.org 2>/dev/null || true)"
@@ -42,18 +42,21 @@ wg_setup_server() {
     read -r -p "Detected public IPv4 $public_ip. Press Enter to use it or type another: " answer
     [[ -n "$answer" ]] && public_ip="$answer"
   fi
-  [[ "$public_ip" =~ ^[0-9a-fA-F:.]+$ ]] || { ah_err "The endpoint must be an IP address."; return 1; }
+  [[ "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || { ah_err "Enter a valid public IPv4 address."; return 1; }
+  if ! awk -F. '{for(i=1;i<=4;i++) if($i<0 || $i>255) exit 1}' <<< "$public_ip"; then
+    ah_err "Invalid IPv4 address."; return 1
+  fi
   read -r -p "WireGuard UDP port [$WG_PORT]: " answer
   [[ -n "$answer" ]] && WG_PORT="$answer"
   [[ "$WG_PORT" =~ ^[0-9]+$ ]] && (( WG_PORT >= 1 && WG_PORT <= 65535 )) || { ah_err "Invalid UDP port."; return 1; }
 
   install -d -m 700 /etc/wireguard "$WG_CLIENT_DIR"
   umask 077
-  server_priv="$(wg genkey)"
-  server_pub="$(printf '%s' "$server_priv" | wg pubkey)"
-  printf '%s\n' "$server_priv" > /etc/wireguard/server_private.key
-  printf '%s\n' "$server_pub" > /etc/wireguard/server_public.key
-  cat > "$WG_CONF" <<EOF
+  server_priv="$(wg genkey)" || { ah_err "Could not generate server private key."; return 1; }
+  server_pub="$(printf '%s' "$server_priv" | wg pubkey)" || { ah_err "Could not derive server public key."; return 1; }
+  tmp_conf="$(mktemp /etc/wireguard/wg0.conf.XXXXXX)" || return 1
+  old_forward="$(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo 0)"
+  cat > "$tmp_conf" <<EOF
 [Interface]
 Address = $WG_SERVER_ADDR
 ListenPort = $WG_PORT
@@ -62,20 +65,39 @@ SaveConfig = false
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $wan_if -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $wan_if -j MASQUERADE
 EOF
-  chmod 600 "$WG_CONF" /etc/wireguard/server_private.key
+  chmod 600 "$tmp_conf"
+  if ! wg-quick strip "$tmp_conf" >/dev/null 2>&1; then
+    rm -f "$tmp_conf"
+    ah_err "Generated WireGuard configuration failed validation."
+    return 1
+  fi
+
+  if ! install -m 600 "$tmp_conf" "$WG_CONF" ||
+     ! printf '%s\n' "$server_priv" > /etc/wireguard/server_private.key ||
+     ! printf '%s\n' "$server_pub" > /etc/wireguard/server_public.key ||
+     ! printf '%s\n' "$public_ip" > /etc/wireguard/server_endpoint ||
+     ! printf '%s\n' "$WG_PORT" > /etc/wireguard/server_port; then
+    rm -f "$tmp_conf" "$WG_CONF" /etc/wireguard/server_private.key /etc/wireguard/server_public.key /etc/wireguard/server_endpoint /etc/wireguard/server_port
+    ah_err "Could not save WireGuard server state; partial files were removed."
+    return 1
+  fi
+  rm -f "$tmp_conf"
   printf 'net.ipv4.ip_forward=1\n' > /etc/sysctl.d/99-africhome-wireguard.conf
-  sysctl --system >/dev/null
+  if ! sysctl -w net.ipv4.ip_forward=1 >/dev/null ||
+     ! systemctl enable wg-quick@wg0 ||
+     ! systemctl start wg-quick@wg0; then
+    systemctl disable --now wg-quick@wg0 >/dev/null 2>&1 || true
+    rm -f "$WG_CONF" /etc/wireguard/server_private.key /etc/wireguard/server_public.key /etc/wireguard/server_endpoint /etc/wireguard/server_port /etc/sysctl.d/99-africhome-wireguard.conf
+    sysctl -w "net.ipv4.ip_forward=$old_forward" >/dev/null 2>&1 || true
+    ah_err "WireGuard failed to start. Newly created configuration and keys were removed."
+    return 1
+  fi
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
     ufw allow "$WG_PORT/udp" || ah_warn "Could not add the WireGuard port to UFW; open it manually."
   fi
-  systemctl enable wg-quick@wg0
-  systemctl start wg-quick@wg0
   ah_ok "WireGuard server started on UDP $WG_PORT."
   printf 'Server public key: %s\nEndpoint: %s:%s\n' "$server_pub" "$public_ip" "$WG_PORT"
   ah_info "Also allow UDP $WG_PORT in your VPS provider/cloud firewall."
-  WG_ENDPOINT="$public_ip"
-  printf '%s\n' "$public_ip" > /etc/wireguard/server_endpoint
-  printf '%s\n' "$WG_PORT" > /etc/wireguard/server_port
 }
 
 wg_next_client_ip() {
