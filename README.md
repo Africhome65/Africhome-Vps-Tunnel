@@ -10,10 +10,10 @@ A terminal-based VPS installation and management toolkit for Ubuntu 22.04+ and D
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
+- SlowDNS SSH server using iodine, with systemd service management and client instructions
 
 ## Planned / not yet implemented
 
-- SlowDNS SSH
 - Xray/V2Ray: VMess and VLESS
 - Trojan and Shadowsocks
 - Expanded protocol user, expiry, and service management
@@ -40,6 +40,14 @@ Then launch:
 ```bash
 sudo africhome
 ```
+
+## SlowDNS SSH notes
+
+- SlowDNS uses iodine DNS tunnelling; it is not a V2Ray transport.
+- You must delegate a subdomain to a nameserver on this VPS and configure registrar glue records where required.
+- The service listens on UDP 53. If another DNS daemon already uses that port, do not stop it blindly; resolve the conflict first.
+- Clients need an iodine client and connect to SSH at `10.77.0.1` after the DNS tunnel is established.
+- DNS tunnels are slow and can be blocked or rate-limited by networks. Use strong tunnel credentials and SSH keys.
 
 ## WireGuard notes
 
