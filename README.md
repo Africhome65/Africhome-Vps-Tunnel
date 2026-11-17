@@ -11,13 +11,13 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
 - SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
-- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
+- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
 ## Planned / not yet implemented
 
 - Trojan
 - Shadowsocks
-- Expanded protocol user and expiry management
+- Per-client connection/concurrency limits (not implemented)
 
 ## Requirements
 
@@ -94,3 +94,12 @@ License to be determined.
 - The module generates a random password, checks Xray inbound port conflicts, backs up the config, validates it, and restores the backup if validation or restart fails.
 - Both TCP and UDP on the selected port must be allowed by the VPS provider firewall. UFW rules are added only if UFW is already active.
 - The generated `ss://` URI contains the password. Keep it private. Removing the inbound leaves firewall rules unchanged.
+
+## Protocol account expiry
+
+- The protocol account manager can add, list, and remove separately identified VLESS, VMess, and Trojan clients on existing Xray inbounds.
+- Accounts can be assigned an expiry date or set to never expire. Enable the daily systemd timer from the protocol account menu to remove expired managed clients automatically.
+- Expiry is checked daily, so an account can remain usable until the next scheduled run unless an administrator selects the manual cleanup action.
+- The manager only tracks accounts it creates. Existing initial accounts and accounts added outside Africhome are not automatically enrolled.
+- This module does not currently impose per-user connection/concurrency limits. Those require separate Xray policy/routing design and must not be confused with expiry.
+- Client credentials are shown at creation time. Configure client import details to match the selected inbound's transport and security settings.
