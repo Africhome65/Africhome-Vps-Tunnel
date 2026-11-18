@@ -262,20 +262,31 @@ wg_set_client_expiry() {
   [[ -s "$source" ]] || { ah_warn "Client configuration not found."; return 1; }
   pub="$(awk -v marker="# client:$name" '$0==marker{found=1;next} found && /^PublicKey[[:space:]]*=/{sub(/^[^=]*=[[:space:]]*/, "");print;exit} found && /^# client:/{exit}' "$WG_CONF")"
   [[ -n "$pub" ]] || { ah_err "Could not find this client's public key in the server configuration."; return 1; }
-  read -r -p "Expiry in days (0 = no expiry): " days
+  read -r -p "Additional validity in days (0 = no expiry): " days
   [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
   (( days <= 36500 )) || { ah_err "Maximum duration is 36500 days."; return 1; }
   expiry_dir="/etc/africhome/wireguard-expiry"
   install -d -m 700 "$expiry_dir"
   if (( days == 0 )); then
     rm -f "$expiry_dir/$name.expiry"
-    ah_ok "Expiry cleared for $name."
+    ah_ok "Expiry cleared for $name (no expiry)."
     return 0
   fi
-  expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return 1; }
+  local current_expiry base_time now
+  now="$(date +%s)"
+  current_expiry=0
+  if [[ -r "$expiry_dir/$name.expiry" ]]; then
+    current_expiry="$(head -n 1 "$expiry_dir/$name.expiry")"
+    if [[ "$current_expiry" =~ ^[0-9]+$ ]]; then :
+    elif [[ "$current_expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then current_expiry="$(date -d "$current_expiry 23:59:59" +%s 2>/dev/null || echo 0)"
+    else current_expiry=0; fi
+  fi
+  base_time="$current_expiry"
+  (( base_time > now )) || base_time="$now"
+  expiry=$(( base_time + days * 86400 ))
   printf '%s\n%s\n' "$expiry" "$pub" > "$expiry_dir/$name.expiry"
   chmod 600 "$expiry_dir/$name.expiry"
-  module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  module_dir="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
   ah_apt_install cron || return 1
   systemctl enable --now cron || { ah_err "Could not enable cron; expiry will not be enforced until cron is running."; return 1; }
   install -m 0755 "$module_dir/scripts/wg-expiry.sh" /usr/local/sbin/africhome-wg-expiry
@@ -285,13 +296,13 @@ PATH=/usr/sbin:/usr/bin:/sbin:/bin
 */5 * * * * root /usr/local/sbin/africhome-wg-expiry
 EOF
   chmod 644 /etc/cron.d/africhome-wg-expiry
-  ah_ok "Expiry set for $name: $expiry ($days days)."
+  ah_ok "Expiry renewed for $name by $days day(s)."
   ah_info "The VPS automatically revokes this peer when it expires (checked every 5 minutes)."
 }
 
 wg_list_client_expiries() {
-  local dir="/etc/africhome/wireguard-expiry" file name expiry
-  echo "WireGuard client expiry dates:"
+  local dir="/etc/africhome/wireguard-expiry" file name expiry expiry_ts now remaining
+  echo "WireGuard client validity remaining:"
   if [[ ! -d "$dir" ]] || ! compgen -G "$dir/*.expiry" >/dev/null; then
     echo "No expiring WireGuard clients are recorded."
     return 0
@@ -299,7 +310,14 @@ wg_list_client_expiries() {
   for file in "$dir"/*.expiry; do
     name="${file##*/}"; name="${name%.expiry}"
     expiry="$(head -n 1 "$file")"
-    printf '%-24s %s\n' "$name" "$expiry"
+    if [[ "$expiry" =~ ^[0-9]+$ ]]; then expiry_ts="$expiry"
+    elif [[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then expiry_ts="$(date -d "$expiry 23:59:59" +%s 2>/dev/null || echo 0)"
+    else expiry_ts=0; fi
+    now="$(date +%s)"
+    if (( expiry_ts == 0 )); then remaining="Unknown"
+    elif (( expiry_ts <= now )); then remaining="Expired"
+    else remaining="$(( (expiry_ts - now + 86399) / 86400 )) days"; fi
+    printf '%-24s %s\n' "$name" "$remaining"
   done
 }
 
@@ -380,7 +398,7 @@ wg_menu() {
     echo "6) Export client config for phone"
     echo "7) Display client QR code in terminal"
     echo "8) Display/copy client config in terminal"
-    echo "9) Set or clear client expiry"
+    echo "9) Renew/set client validity in days (0 = no expiry)"
     echo "10) List client expiry dates"
     echo "0) Back"
     read -r -p "Select an option: " choice
