@@ -47,7 +47,7 @@ dt_expiry_label() {
 
 dt_accounts_create() {
   dt_require_root || return 1
-  local username days expiry password
+  local username days expiry password password_confirm password_mode
   read -r -p "New DNSTT customer SSH username: " username
   dt_valid_username "$username" || { echo "Invalid username; use lowercase letters, digits, _ or - (not root)." >&2; return 1; }
   id "$username" >/dev/null 2>&1 && { echo "That Linux username already exists." >&2; return 1; }
@@ -57,7 +57,38 @@ dt_accounts_create() {
   if (( days > 0 )); then
     expiry="$(date -d "+${days} days" +%F)" || { echo "Could not calculate expiry." >&2; return 1; }
   fi
-  password="$(openssl rand -hex 16)" || return 1
+
+  echo "Password options:"
+  echo "1) Generate a secure random password"
+  echo "2) Set my own password"
+  read -r -p "Choose password option [1-2]: " password_mode
+  case "$password_mode" in
+    1)
+      password="$(openssl rand -hex 16)" || return 1
+      ;;
+    2)
+      read -r -s -p "Enter your password (minimum 12 characters; ':' is not allowed): " password
+      echo
+      [[ ${#password} -ge 12 && "$password" != *:* ]] || {
+        unset password
+        echo "Password must be at least 12 characters and must not contain a colon." >&2
+        return 1
+      }
+      read -r -s -p "Confirm your password: " password_confirm
+      echo
+      if [[ "$password" != "$password_confirm" ]]; then
+        unset password password_confirm
+        echo "Passwords do not match; account was not created." >&2
+        return 1
+      fi
+      unset password_confirm
+      ;;
+    *)
+      echo "Invalid password option; account was not created." >&2
+      return 1
+      ;;
+  esac
+
   if ! useradd --create-home --shell /bin/bash --groups "$DT_GROUP" "$username"; then
     unset password
     echo "Could not create Linux account." >&2
@@ -80,7 +111,11 @@ dt_accounts_create() {
   echo
   echo "DNSTT customer SSH account created."
   printf 'Username: %s\n' "$username"
-  printf 'Password (shown once): %s\n' "$password"
+  if [[ "$password_mode" == 1 ]]; then
+    printf 'Generated password (shown once): %s\n' "$password"
+  else
+    echo "Password: your chosen password has been set (not displayed)."
+  fi
   printf 'Expires: %s\n' "${expiry:-Never}"
   echo "SSH host: this VPS public IP or configured SSH hostname"
   echo "SSH port: 22 (unless your sshd uses another port)"
