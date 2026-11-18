@@ -8,14 +8,13 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Fail2ban installation and status
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
-- WireGuard installation, server setup, client profile creation, peer listing, and client removal
-- SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
 - Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
 - Hysteria 2 server management with a user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
+- Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 
 ## Planned / not yet implemented
 
@@ -26,8 +25,6 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Ubuntu 22.04 or newer, or Debian 11 or newer
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
-- For WireGuard: UDP 51820 (or chosen port)
-- For SlowDNS: delegated DNS subdomain and UDP 53
 - For VLESS REALITY: chosen TCP port (default 443)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key
 - For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
@@ -42,24 +39,6 @@ cd Africhome-Vps-Tunnel
 sudo bash install.sh
 sudo africhome
 ```
-
-## SlowDNS SSH notes
-
-- SlowDNS uses iodine DNS tunnelling; it is not a V2Ray transport.
-- The menu accepts a tunnel domain and nameserver hostname, then displays the required A, registrar glue, NS-delegation, and UDP 53 firewall records. These records must be created at the domain registrar/DNS provider; the script cannot register glue records automatically.
-- The server uses iodine's default 1130-byte tunnel MTU explicitly. Client instructions retain lazy mode (`-L 1`) and the maximum upstream hostname length (`-M 255`); fragment sizing remains automatically negotiated rather than forcing a potentially incompatible value.
-- Create Trial (default one day) and Normal (administrator-selected days) SSH accounts. Each account gets a separate generated SSH password and Linux account-expiry date. Linux enforces expiry; admins can list, renew, lock, unlock, or delete managed accounts.
-- The iodine tunnel password is shared by all tunnel clients; it is not a per-customer credential. Customer-specific access control and expiry are enforced by their separate SSH accounts.
-- After the DNS tunnel is established, SSH is reached at `10.77.0.1`.
-- DNS tunnels have inherently limited throughput and can be blocked or rate-limited. Lazy mode and fragment negotiation help, but actual speed depends on the DNS resolver/relay, network path, and client. Use strong credentials and SSH keys where practical.
-
-## WireGuard notes
-
-- Server config: `/etc/wireguard/wg0.conf`.
-- Client profiles: `/root/africhome-wireguard-clients/`; they contain private keys and must be transferred securely.
-- Setup enables IPv4 forwarding and configures NAT/forwarding through WireGuard hooks.
-- Open the selected UDP port in both UFW (if active) and the VPS provider firewall.
-- Client profiles route IPv4 traffic through the VPN; IPv6 is not configured by this module.
 
 ## Xray VLESS REALITY notes
 
@@ -125,3 +104,17 @@ License to be determined.
 - A Let's Encrypt deploy hook copies renewed certificates into the Hysteria certificate directory with restricted ownership and permissions, then restarts Hysteria.
 - Hysteria client URIs contain credentials. Keep them private. Port-hopping clients must be configured with the same port range and must support Hysteria 2 port hopping.
 - This module backs up an existing Hysteria config before replacement. It does not alter Xray, DNSTT, WireGuard, or unrelated service configurations.
+
+
+## Port and routing discovery
+
+- The Port & Routing Manager currently provides read-only discovery of TCP/UDP listeners, UFW, nftables, iptables, and relevant systemd service states.
+- This stage does not install a proxy, change a listener, alter firewall rules, move VLESS REALITY, or restart services.
+- Provider/cloud firewalls are not visible from inside the VPS and must be checked in the provider control panel.
+- Central TCP 443 routing is a planned feature. REALITY must be passed through unchanged and will remain directly bound to public TCP 443 unless SNI passthrough is proven with the actual Xray client/server combination and an explicit administrator-approved migration.
+- Raw SSH, native OpenVPN, and unrelated UDP services are not assumed to be multiplexable on one socket. TLS wrappers, WebSocket bridges, or dedicated ports must be selected and tested per mode.
+- See [the port-routing architecture](docs/PORT-ROUTING-ARCHITECTURE.md) for constraints, phases, and acceptance criteria.
+
+## Excluded protocols
+
+WireGuard, Iodine/SlowDNS, and ZIVPN are not part of the Africhome protocol menu. DNSTT remains the DNS tunnel service. Existing installations of excluded software are not automatically removed.
