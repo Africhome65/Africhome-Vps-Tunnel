@@ -4,9 +4,9 @@ Status: implementation specification; not yet implemented as a unified feature s
 
 ## Current implementation status (development branch)
 
-The central metadata registry foundation is now implemented in `modules/account_registry.sh`. It stores a stable account ID, label, expiry timestamp, and service-side references/status only; it deliberately does not store passwords, private keys, or client URIs. Xray VLESS, VMess, and Trojan account creation now registers a service record after the native Xray config has been validated and restarted. Xray renew, revoke, and expiry operations also synchronize the corresponding registry status/expiry.
+The central metadata registry foundation is now implemented in `modules/account_registry.sh`. It stores a stable account ID, label, expiry timestamp, and service-side references/status only; it deliberately does not store passwords, private keys, or client URIs. SSH Linux account creation now registers metadata after the OS account and password are successfully created; SSH expiry changes synchronize the registry. SSH password entry is hidden and confirmed. Xray VLESS, VMess, and Trojan account creation now registers a service record after the native Xray config has been validated and restarted. Xray renew, revoke, and expiry operations also synchronize the corresponding registry status/expiry.
 
-This is an initial adapter integration, not yet a complete cross-service account manager. SSH, Hysteria, OpenVPN, Shadowsocks, and DNSTT still require their own verified account adapters before they can be shown as centrally managed. The registry menu currently reports records registered by integrated adapters.
+This is an initial adapter integration, not yet a complete cross-service account manager. Hysteria, OpenVPN, Shadowsocks, and DNSTT still require their own verified account adapters before they can be shown as centrally managed. The registry menu currently reports records registered by integrated adapters.
 
 ## Product goal
 
