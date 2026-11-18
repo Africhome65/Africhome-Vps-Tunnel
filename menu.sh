@@ -45,7 +45,7 @@ while true; do
   echo "2) Security management"
   echo "3) SSH account management"
   echo "4) WireGuard management"
-  echo "5) SlowDNS SSH management"
+  echo "5) Legacy iodine SlowDNS management (backup)"
   echo "6) Xray management (VLESS REALITY)"
   echo "7) VMess management (WebSocket + TLS)"
   echo "8) Trojan management (TLS)"
