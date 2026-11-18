@@ -31,3 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '0\n' | TERM=xterm timeout 15s bash menu.sh
+
+      - name: Check DNSTT installer safety
+        shell: bash
+        run: bash tests/dnstt-safety-check.sh
