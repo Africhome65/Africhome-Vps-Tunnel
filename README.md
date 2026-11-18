@@ -120,3 +120,10 @@ License to be determined.
 - See [docs/dnstt-migration.md](docs/dnstt-migration.md) for the local SSH-forwarding test, safe migration procedure, and domain-length MTU limitation.
 - DNSTT client payload capacity depends on the tunnel domain length. Keep the operator's existing domain when requested; do not promise improved performance without a real throughput test.
 - Current verification covers a local DNSTT client/server stream reaching the SSH banner. External DNS delegation, UDP 53 reachability, and mobile/HTTP Injector compatibility remain unverified.
+
+
+### Bring your own DNSTT domain and nameserver
+
+- Every operator supplies their own delegated tunnel domain and authoritative nameserver hostname; the project must never hard-code the maintainer's domain or nameserver.
+- Configure these values interactively with `sudo bash scripts/configure-dnstt-domain.sh`. They are stored locally in `/etc/africhome-dnstt/server.env` with restrictive permissions.
+- The script does not create DNS records. Operators must configure the A record, NS delegation, and registrar glue (if required) with their own DNS provider.
