@@ -1,7 +1,7 @@
+#!/usr/bin/env bash
+
 SSH_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$SSH_USERS_BASE_DIR/modules/account_registry.sh"
-
-#!/usr/bin/env bash
 
 ssh_users_create(){
   ah_require_root || return
@@ -9,10 +9,10 @@ ssh_users_create(){
   read -r -p "New SSH username (letters, digits, _ or -): " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return; }
   if id "$username" >/dev/null 2>&1; then ah_err "That username already exists."; return; fi
-  local days
   read -r -p "Account duration in days (0 = no expiry): " days
   [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return; }
   if (( days > 36500 )); then ah_err "Maximum duration is 36500 days."; return; fi
+  expires_at=0
   expiry=""
   if (( days > 0 )); then
     expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
