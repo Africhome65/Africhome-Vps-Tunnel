@@ -6,7 +6,6 @@ set -Eeuo pipefail
 DT_GROUP="africhome-dnstt"
 DT_CONFIG_DIR="/etc/africhome-dnstt"
 DT_DOMAIN_CONFIG="$DT_CONFIG_DIR/server.env"
-DT_SERVICE_CONFIG="$DT_CONFIG_DIR/service.env"
 DT_PUBLIC_KEY="$DT_CONFIG_DIR/server.pub"
 
 dt_require_root() {
@@ -123,12 +122,12 @@ dt_accounts_manage() {
       [[ "$days" =~ ^[0-9]+$ ]] && (( days <= 36500 )) || { echo "Enter 0-36500 days." >&2; return 1; }
       expiry=""
       if (( days > 0 )); then expiry="$(date -d "+${days} days" +%F)" || return 1; fi
-      if [[ "$action" == 3 ]]; then passwd -u "$username" >/dev/null 2>&1 || true; fi
+      if [[ "$action" == 3 ]]; then usermod --unlock "$username" || return 1; fi
       chage --expiredate "${expiry}" "$username" || return 1
       echo "Account $username expiry updated: ${expiry:-Never}."
       ;;
     2)
-      usermod --lock --expiredate 1 "$username" && echo "Account $username disabled."
+      usermod --lock --expiredate 1970-01-02 "$username" && echo "Account $username disabled."
       ;;
     4)
       password="$(openssl rand -hex 16)" || return 1
