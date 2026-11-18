@@ -115,6 +115,33 @@ pu_list() {
   while IFS=$'\t' read -r p n port expiry status; do printf '%-10s %-18s %-8s %-22s %s\n' "$p" "$n" "$port" "$expiry" "$status"; done
 }
 
+
+pu_renew() {
+  ah_require_root || return 1
+  pu_require_tools || return 1
+  pu_lock || return 1
+  pu_list
+  read -r -p "Account name to renew: " name
+  local record expires expires_at tmp
+  record="$(jq -c --arg n "$name" '[.[] | select(.name == $n)] | .[0] // empty' "$PU_DB")"
+  [[ -n "$record" ]] || { ah_err "Account not found."; return 1; }
+  read -r -p "New expiry date YYYY-MM-DD (or 'never'): " expires
+  if [[ "$expires" == "never" ]]; then
+    expires_at=0
+  else
+    [[ "$expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { ah_err "Use YYYY-MM-DD or never."; return 1; }
+    expires_at="$(date -d "$expires 23:59:59" +%s 2>/dev/null)" || { ah_err "Invalid expiry date."; return 1; }
+    (( expires_at > $(date +%s) )) || { ah_err "Expiry must be in the future."; return 1; }
+  fi
+  tmp="$(mktemp)"
+  if ! jq --arg n "$name" --argjson expiry "$expires_at" 'map(if .name == $n then .expires_at = $expiry else . end)' "$PU_DB" > "$tmp"; then
+    rm -f "$tmp"; ah_err "Could not update account expiry."; return 1
+  fi
+  install -m 600 "$tmp" "$PU_DB"
+  rm -f "$tmp"
+  ah_ok "Account $name expiry updated to $expires."
+}
+
 pu_remove_one() {
   local protocol="$1" port="$2" email="$3"
   local tmp
@@ -223,16 +250,18 @@ pu_menu() {
     echo "1) Add VLESS / VMess / Trojan account with expiry"
     echo "2) List managed accounts"
     echo "3) Remove managed account"
-    echo "4) Run expiry cleanup now"
-    echo "5) Enable daily automatic expiry"
+    echo "4) Renew account expiry"
+    echo "5) Run expiry cleanup now"
+    echo "6) Enable daily automatic expiry"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
       1) pu_add; ah_pause ;;
       2) pu_list; ah_pause ;;
       3) pu_remove; ah_pause ;;
-      4) pu_expire; ah_pause ;;
-      5) pu_install_timer; ah_pause ;;
+      4) pu_renew; ah_pause ;;
+      5) pu_expire; ah_pause ;;
+      6) pu_install_timer; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
