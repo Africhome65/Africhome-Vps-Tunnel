@@ -37,7 +37,7 @@ hy2_setup() {
   command -v certbot >/dev/null 2>&1 || ah_apt_install certbot || return 1
   command -v ss >/dev/null 2>&1 || ah_apt_install iproute2 || return 1
   command -v openssl >/dev/null 2>&1 || ah_apt_install openssl || return 1
-  local domain email port_spec first_port username password backup config_tmp hook_tmp replace
+  local domain email port_spec first_port last_port username password backup config_tmp hook_tmp replace
   read -r -p "Your domain (DNS A/AAAA must point to this VPS): " domain
   domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   hy2_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
@@ -121,8 +121,12 @@ auth:
 EOF
   install -o root -g root -m 600 "$config_tmp" "$HY2_CONFIG"
   rm -f "$config_tmp"
-  if ! systemctl daemon-reload || ! systemctl enable --now hysteria-server.service; then
-    ah_err "Hysteria failed to start. Check journalctl -u hysteria-server.service."
+  if ! systemctl daemon-reload || ! systemctl enable hysteria-server.service || ! systemctl restart hysteria-server.service; then
+    ah_err "Hysteria failed to start. Restoring the previous configuration when available."
+    if [[ -n "$backup" && -s "$backup" ]]; then
+      cp -a "$backup" "$HY2_CONFIG"
+      systemctl restart hysteria-server.service || true
+    fi
     return 1
   fi
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
