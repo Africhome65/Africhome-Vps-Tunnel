@@ -2,15 +2,35 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" ]] || {
-  echo "Africhome files are incomplete. Re-run the installer." >&2
-  exit 1
-}
+REQUIRED_FILES=(
+  "$BASE_DIR/lib/common.sh"
+  "$BASE_DIR/modules/security.sh"
+  "$BASE_DIR/modules/ssh_users.sh"
+  "$BASE_DIR/modules/wireguard.sh"
+  "$BASE_DIR/modules/slowdns.sh"
+  "$BASE_DIR/modules/dnstt_users.sh"
+  "$BASE_DIR/modules/xray.sh"
+  "$BASE_DIR/modules/vmess.sh"
+  "$BASE_DIR/modules/trojan.sh"
+  "$BASE_DIR/modules/shadowsocks.sh"
+  "$BASE_DIR/modules/protocol_users.sh"
+  "$BASE_DIR/scripts/install-dnstt.sh"
+  "$BASE_DIR/scripts/configure-dnstt-domain.sh"
+  "$BASE_DIR/scripts/install-dnstt-service.sh"
+)
+for required_file in "${REQUIRED_FILES[@]}"; do
+  [[ -f "$required_file" ]] || {
+    echo "Africhome file is missing: $required_file. Re-run the installer." >&2
+    exit 1
+  }
+done
+
 . "$BASE_DIR/lib/common.sh"
 . "$BASE_DIR/modules/security.sh"
 . "$BASE_DIR/modules/ssh_users.sh"
 . "$BASE_DIR/modules/wireguard.sh"
 . "$BASE_DIR/modules/slowdns.sh"
+. "$BASE_DIR/modules/dnstt_users.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
 . "$BASE_DIR/modules/trojan.sh"
@@ -27,14 +47,18 @@ while true; do
   echo "2) Security management"
   echo "3) SSH account management"
   echo "4) WireGuard management"
-  echo "5) SlowDNS SSH management"
+  echo "5) Legacy iodine SlowDNS management (backup)"
   echo "6) Xray management (VLESS REALITY)"
   echo "7) VMess management (WebSocket + TLS)"
   echo "8) Trojan management (TLS)"
   echo "9) Shadowsocks management"
   echo "10) Protocol account management (expiry)"
-  echo "11) Other protocols (under development)"
-  echo "12) Installation information"
+  echo "11) DNSTT installation / key setup"
+  echo "12) DNSTT domain configuration (BYOD)"
+  echo "13) DNSTT server service configuration"
+  echo "14) DNSTT customer accounts / custom DNS resolver"
+  echo "15) Other protocols (under development)"
+  echo "16) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -55,8 +79,25 @@ while true; do
     8) trojan_menu ;;
     9) shadowsocks_menu ;;
     10) pu_menu ;;
-    11) echo "Other protocols are not implemented yet."; ah_pause ;;
-    12) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    11)
+      echo "Installing DNSTT binaries and preparing its keypair..."
+      bash "$BASE_DIR/scripts/install-dnstt.sh"
+      ah_pause
+      ;;
+    12)
+      echo "Configure the domain and authoritative nameserver for this VPS."
+      echo "Use a domain delegated to this server; do not enter someone else's domain."
+      bash "$BASE_DIR/scripts/configure-dnstt-domain.sh"
+      ah_pause
+      ;;
+    13)
+      echo "Prepare the DNSTT server service without stopping existing DNS tunnels."
+      bash "$BASE_DIR/scripts/install-dnstt-service.sh"
+      ah_pause
+      ;;
+    14) dnstt_users_menu; ah_pause ;;
+    15) echo "Other protocols are not implemented yet."; ah_pause ;;
+    16) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac

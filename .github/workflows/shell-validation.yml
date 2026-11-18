@@ -25,3 +25,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck --severity=error
+
+      - name: Smoke-test terminal menu startup and exit
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '0\n' | TERM=xterm timeout 15s bash menu.sh
+
+      - name: Check DNSTT installer safety
+        shell: bash
+        run: bash tests/dnstt-safety-check.sh
+
+      - name: Check DNSTT customer account and resolver safety
+        shell: bash
+        run: bash tests/dnstt-accounts-safety-check.sh

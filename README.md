@@ -9,7 +9,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
-- SlowDNS SSH using iodine, with systemd service management and client instructions
+- Legacy SlowDNS SSH using iodine, retained for controlled migration/rollback
+- DNSTT server/client bootstrap, protected key management, operator-owned domain/nameserver setup, and systemd service preparation
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
@@ -23,7 +24,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
 - For WireGuard: UDP 51820 (or chosen port)
-- For SlowDNS: delegated DNS subdomain and UDP 53
+- For DNSTT: delegated DNS subdomain, authoritative nameserver hostname, and UDP 53
 - For VLESS REALITY: chosen TCP port (default 443)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key\n- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
 
@@ -110,3 +111,34 @@ License to be determined.
 - The Fail2ban action creates an Africhome SSH jail only when one does not already exist, detects the active SSH daemon port (falling back to 22), validates the Fail2ban configuration, and enables the service.
 - UFW is not enabled automatically. If an administrator chooses to enable it, the script allows the detected SSH TCP port before enabling UFW; additional protocol ports must still be opened deliberately.
 - The optional nftables BitTorrent filter is a common-port block only. It is not comprehensive detection and is runtime-only unless an administrator configures persistence separately.
+
+
+## DNSTT primary tunnel (migration in progress)
+
+- DNSTT is the intended primary DNS tunnel. Build the official DNSTT server/client and create a protected server keypair with `sudo bash scripts/install-dnstt.sh`.
+- The bootstrap verifies the pinned Go 1.27.4 archive checksum when a Go 1.21+ toolchain is not already available, builds both binaries, and preserves an existing complete keypair.
+- Configure each operator's own domain and authoritative nameserver with `sudo bash scripts/configure-dnstt-domain.sh`, then prepare the systemd unit with `sudo bash scripts/install-dnstt-service.sh`.
+- Service preparation does not stop iodine, bind public UDP 53, change DNS records or firewall rules, enable the service, or start it. The public port switch must be a separate controlled migration.
+- See [docs/dnstt-migration.md](docs/dnstt-migration.md) for DNS setup, service preparation, safe migration procedure, and domain-length MTU limitation.
+- DNSTT client payload capacity depends on the tunnel domain length. Keep the operator's existing domain when requested; do not promise improved performance without a real throughput test.
+- Current verification covers a local DNSTT client/server stream reaching the SSH banner. External DNS delegation, UDP 53 reachability, and mobile/HTTP Injector compatibility remain unverified.
+
+
+### Bring your own DNSTT domain and nameserver
+
+- Every operator supplies their own delegated tunnel domain and authoritative nameserver hostname; the project must never hard-code the maintainer's domain or nameserver.
+- Configure these values interactively with `sudo bash scripts/configure-dnstt-domain.sh`. They are stored locally in `/etc/africhome-dnstt/server.env` with restrictive permissions.
+- The script does not create DNS records. Operators must configure the A record, NS delegation, and registrar glue (if required) with their own DNS provider.
+
+
+## DNSTT customer accounts and custom DNS resolvers
+
+- DNSTT transports TCP streams over DNS. It does not implement customer username/password authentication itself; Africhome authenticates each customer at the SSH service using a separate Linux account.
+- Use menu option **14) DNSTT customer accounts / custom DNS resolver** to create, list, renew, disable, re-enable, reset, or delete customer SSH accounts.
+- New customer accounts are placed in the `africhome-dnstt` group, use a non-root username, receive a generated password shown once, and can have a Linux account-expiry date. Passwords are not saved in plaintext by this module.
+- Customer accounts use the SSH upstream configured for DNSTT (normally `127.0.0.1:22`). They do not use the VPS root login. The SSH daemon must permit password authentication for these accounts; Africhome does not silently weaken the server's SSH policy.
+- The DNSTT public key authenticates the tunnel server. The customer's SSH username/password authenticates the individual login. These are separate credentials.
+- Client resolver guidance supports recursive DNS over UDP (for example `8.8.8.8:53` or a custom `resolver.example:53`), DNS-over-TLS (`-dot`), and DNS-over-HTTPS (`-doh`). The resolver is selected by the DNSTT client; it is not the authoritative nameserver hostname in the DNS delegation.
+- The DNS domain and authoritative nameserver remain the operator's own values saved in `/etc/africhome-dnstt/server.env`. Existing domain settings and server keys are not replaced by the account/resolver menu.
+- The recursive resolver option affects how the client sends DNSTT DNS queries. It does not turn DNSTT into a general UDP tunnel or make arbitrary UDP applications work.
+- External Android-client compatibility must be tested with the exact app and selected resolver before declaring a profile production-ready.
