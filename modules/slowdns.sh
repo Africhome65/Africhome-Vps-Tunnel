@@ -213,10 +213,20 @@ sd_accounts_change() {
   read -r -p "Select: " action
   case "$action" in
     1)
-      read -r -p "Additional duration in days from today (1-36500): " days
+      read -r -p "Additional days to add (1-36500): " days
       [[ "$days" =~ ^[0-9]+$ ]] && (( days >= 1 && days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
-      expiry="$(date -d "+${days} days" +%F)" || return 1
-      chage --expiredate "$expiry" "$username" && ah_ok "Expiry set for $username: $expiry"
+      local current_expiry base_date
+      current_expiry="$(chage -l "$username" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
+      if [[ "$current_expiry" == "never" || "$current_expiry" == "Never" ]]; then
+        base_date="$(date +%F)"
+      else
+        base_date="$current_expiry"
+        [[ -n "$base_date" ]] || base_date="$(date +%F)"
+        if ! date -d "$base_date" +%F >/dev/null 2>&1; then ah_err "Could not read current expiry."; return 1; fi
+        if [[ "$(date -d "$base_date" +%s)" -lt "$(date +%s)" ]]; then base_date="$(date +%F)"; fi
+      fi
+      expiry="$(date -d "$base_date +${days} days" +%F)" || return 1
+      chage --expiredate "$expiry" "$username" && ah_ok "Account $username renewed by $days day(s)."
       ;;
     2) passwd -l "$username" && ah_ok "Account locked: $username" ;;
     3) passwd -u "$username" && ah_ok "Account unlocked: $username" ;;
