@@ -194,7 +194,6 @@ pu_renew() {
   account_id="$(jq -r '.account_id // empty' <<< "$record")"
   protocol="$(jq -r '.protocol' <<< "$record")"
   email="$(jq -r '.email' <<< "$record")"
-  account_id="$(jq -r '.account_id // empty' <<< "$record")"
   db_backup="${PU_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
   cp -a "$PU_DB" "$db_backup"
   tmp="$(mktemp)"
@@ -235,6 +234,7 @@ pu_remove() {
   protocol="$(jq -r '.protocol' <<< "$record")"
   port="$(jq -r '.port' <<< "$record")"
   email="$(jq -r '.email' <<< "$record")"
+  account_id="$(jq -r '.account_id // empty' <<< "$record")"
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
   cp -a "$PU_CONFIG" "$backup"
   pu_remove_one "$protocol" "$port" "$email" || { ah_err "Could not remove account."; return 1; }
