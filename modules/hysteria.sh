@@ -59,7 +59,7 @@ hy2_setup() {
     read -r -p "Replace existing Hysteria config? [y/N]: " replace
     [[ "$replace" =~ ^[Yy]$ ]] || { ah_info "Existing config left unchanged."; return 1; }
   fi
-  if ss -H -lunp 2>/dev/null | awk -v p=":$first_port" '$5 ~ p"$" {found=1} END{exit !found}'; then
+  if ss -H -lunp 2>/dev/null | awk -v p=":$first_port" '$4 ~ p"$" {found=1} END{exit !found}'; then
     ah_err "UDP port $first_port is already in use. Choose another port."
     return 1
   fi
