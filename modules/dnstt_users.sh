@@ -67,11 +67,11 @@ dt_accounts_create() {
       password="$(openssl rand -hex 16)" || return 1
       ;;
     2)
-      read -r -p "Enter your password ONCE (VISIBLE; minimum 12 characters; ':' is not allowed): " password
+      read -r -p "Enter your password ONCE (VISIBLE; any non-empty length; ':' is not allowed): " password
       echo
-      [[ ${#password} -ge 12 && "$password" != *:* ]] || {
+      [[ -n "$password" && "$password" != *:* ]] || {
         unset password
-        echo "Password must be at least 12 characters and must not contain a colon." >&2
+        echo "Password must not be empty and must not contain a colon." >&2
         return 1
       }
       ;;
