@@ -7,7 +7,15 @@ HY2_CERT_DIR="/etc/hysteria/certs"
 HY2_HOOK="/etc/letsencrypt/renewal-hooks/deploy/africhome-hysteria.sh"
 
 hy2_valid_domain() {
-  [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "$1" != *..* && "$1" != *.-* && "$1" != *-.* ]]
+  local domain="$1" label
+  local -a labels
+  [[ "${#domain}" -le 253 && "$domain" == *.* && "$domain" != .* && "$domain" != *. && "$domain" != *..* ]] || return 1
+  [[ "$domain" =~ ^[A-Za-z0-9.-]+$ ]] || return 1
+  IFS='.' read -r -a labels <<< "$domain"
+  for label in "${labels[@]}"; do
+    [[ "${#label}" -ge 1 && "${#label}" -le 63 ]] || return 1
+    [[ "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || return 1
+  done
 }
 hy2_valid_port_spec() {
   local spec="$1" first last
