@@ -37,7 +37,7 @@ hy2_setup() {
   command -v certbot >/dev/null 2>&1 || ah_apt_install certbot || return 1
   command -v ss >/dev/null 2>&1 || ah_apt_install iproute2 || return 1
   command -v openssl >/dev/null 2>&1 || ah_apt_install openssl || return 1
-  local domain email port_spec first_port last_port username password backup="" config_tmp hook_tmp replace
+  local domain email port_spec first_port last_port ufw_port_spec username password backup="" config_tmp hook_tmp replace
   read -r -p "Your domain (DNS A/AAAA must point to this VPS): " domain
   domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   hy2_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
@@ -46,6 +46,14 @@ hy2_setup() {
   hy2_valid_port_spec "$port_spec" || { ah_err "Use a UDP port 1-65535 or range such as 20000-30000."; return 1; }
   first_port="$(printf '%s' "$port_spec" | cut -d- -f1)"
   last_port="$(printf '%s' "$port_spec" | awk -F- '{print $NF}')"
+  ufw_port_spec="$port_spec"
+  if [[ "$port_spec" == *-* ]]; then
+    ufw_port_spec="$first_port:$last_port"
+    if ! command -v nft >/dev/null 2>&1 && ! command -v iptables >/dev/null 2>&1; then
+      ah_info "Installing nftables for Hysteria port hopping..."
+      ah_apt_install nftables || return 1
+    fi
+  fi
   read -r -p "Email for Let's Encrypt: " email
   [[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { ah_err "Enter a valid email address."; return 1; }
   read -r -p "Hysteria username [africhome]: " username
@@ -133,7 +141,7 @@ EOF
     return 1
   fi
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
-    ufw allow "$port_spec/udp" || ah_warn "Could not add UDP $port_spec to UFW."
+    ufw allow "$ufw_port_spec/udp" || ah_warn "Could not add UDP $port_spec to UFW."
   fi
   umask 077
   printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$HY2_STATE"
