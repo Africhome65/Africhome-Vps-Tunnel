@@ -55,7 +55,7 @@ DNSTT_UDP_ADDR="${DNSTT_UDP_ADDR:-${old_bind:-:53}}"
 read -r -p "SSH upstream address [${old_upstream:-127.0.0.1:22}]: " DNSTT_UPSTREAM
 DNSTT_UPSTREAM="${DNSTT_UPSTREAM:-${old_upstream:-127.0.0.1:22}}"
 
-[[ "$DNSTT_UDP_ADDR" =~ ^(:|[0-9]{1,3}(\.[0-9]{1,3}){3}):[0-9]{1,5}$ ]] || fail "Invalid UDP listen address. Use :53, 0.0.0.0:53, or an IPv4-address:port."
+[[ "$DNSTT_UDP_ADDR" =~ ^(:[0-9]{1,5}|[0-9]{1,3}(\.[0-9]{1,3}){3}:[0-9]{1,5})$ ]] || fail "Invalid UDP listen address. Use :53, 0.0.0.0:53, or an IPv4-address:port."
 listen_port="${DNSTT_UDP_ADDR##*:}"
 (( 10#$listen_port >= 1 && 10#$listen_port <= 65535 )) || fail "UDP listen port must be between 1 and 65535."
 [[ "$DNSTT_UPSTREAM" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || fail "Invalid SSH upstream. Use a hostname-or-IPv4:port such as 127.0.0.1:22."
