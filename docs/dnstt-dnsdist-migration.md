@@ -1,13 +1,13 @@
 # DNSTT migration note (supersedes the earlier dnsdist proposal)
 
 The earlier proposal to use dnsdist to multiplex iodine and DNSTT is no
-longer the selected design. Africhome's current DNSTT plan is DNSTT only,
-with the operator's existing tunnel domain retained. No dnsdist service or
-new/shorter domain is required by this design.
+longer selected. Africhome uses a direct DNSTT server. Each installer must
+prompt users for their own delegated tunnel domain and authoritative
+nameserver hostname; no maintainer domain or nameserver may be hard-coded.
 
-See [DNSTT bootstrap and safe migration](dnstt-migration.md) for the current
-automated build/key setup, verified local SSH-forwarding test, domain-length
+See [DNSTT bootstrap and safe migration](dnstt-migration.md) for the user-owned
+DNS configuration flow, bootstrap, local SSH-forwarding test, domain-length
 MTU limitation, and safe migration requirements.
 
-Do not stop iodine or take over public UDP port 53 until an external DNSTT
-client has been tested and the operator explicitly approves the switch.
+Do not stop iodine or take over public UDP 53 until an external DNSTT client
+has been tested and the operator explicitly approves the switch.
