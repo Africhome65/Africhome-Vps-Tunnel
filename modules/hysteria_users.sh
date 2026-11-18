@@ -11,9 +11,8 @@ HY2_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 hy2u_require() {
   command -v python3 >/dev/null 2>&1 || { echo "[FAIL] python3 is required." >&2; return 1; }
-  python3 -c 'import yaml' >/dev/null 2>&1 || {
-    echo "[FAIL] python3-yaml is required (install package python3-yaml)." >&2; return 1;
-  }
+  command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
+  python3 -c 'import yaml' >/dev/null 2>&1 || ah_apt_install python3-yaml || return 1
   command -v openssl >/dev/null 2>&1 || return 1
   command -v systemctl >/dev/null 2>&1 || return 1
   [[ -s "$HY2_USERS_CONFIG" ]] || { echo "[FAIL] Hysteria config not found." >&2; return 1; }
@@ -79,7 +78,7 @@ hy2u_add() {
   ah_require_root || return 1
   hy2u_require || return 1
   hy2u_lock || return 1
-  local username password account_id days expires_at expires backup dbtmp
+  local username password account_id days expires_at expires backup dbtmp dbbackup
   read -r -p "New Hysteria username: " username
   hy2u_validate_username "$username" || { ah_err "Invalid username."; return 1; }
   if jq -e --arg n "$username" 'any(.[]; .username == $n)' "$HY2_USERS_DB" >/dev/null; then
@@ -92,7 +91,9 @@ hy2u_add() {
   password="$(openssl rand -hex 24)" || return 1
   account_id="$(openssl rand -hex 16)" || return 1
   backup="${HY2_USERS_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
   cp -a "$HY2_USERS_CONFIG" "$backup" || return 1
+  cp -a "$HY2_USERS_DB" "$dbbackup" || return 1
   hy2u_yaml_change add "$username" "$password" || { ah_err "Could not safely update Hysteria userpass config."; return 1; }
   if ! systemctl restart hysteria-server.service; then
     cp -a "$backup" "$HY2_USERS_CONFIG"
@@ -108,11 +109,17 @@ hy2u_add() {
   if ! ar_register_service "$account_id" "$username" "hysteria" "$username" "$expires_at"; then
     cp -a "$backup" "$HY2_USERS_CONFIG"
     systemctl restart hysteria-server.service || true
-    ah_err "Central registry update failed; Hysteria config restored. Remove the uncommitted metadata record before retrying."; return 1
+    cp -a "$dbbackup" "$HY2_USERS_DB"
+    ah_err "Central registry update failed; Hysteria config and local metadata were restored."; return 1
   fi
   echo "Hysteria username: $username"
   echo "Password: $password"
   echo "Expires: $expires"
+  if [[ -r /etc/africhome-hysteria.env ]]; then
+    # shellcheck disable=SC1091
+    . /etc/africhome-hysteria.env
+    printf 'Client URI: hysteria2://%s:%s@%s:%s/?sni=%s#Africhome-%s\\n' "$username" "$password" "$HY2_DOMAIN" "$HY2_PORT_SPEC" "$HY2_DOMAIN" "$username"
+  fi
   ah_warn "Save this password securely. Hysteria userpass stores passwords in the server config."
 }
 
@@ -179,6 +186,35 @@ hy2u_expire() {
   fi
 }
 
+hy2u_install_timer() {
+  ah_require_root || return 1
+  local script="/opt/africhome-vps-tunnel/modules/hysteria_users.sh"
+  [[ -r "$script" ]] || { ah_err "Install the Africhome release before enabling Hysteria expiry automation."; return 1; }
+  cat > /etc/systemd/system/africhome-hysteria-expire.service <<EOF
+[Unit]
+Description=Expire Africhome Hysteria users
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $script --expire
+EOF
+  cat > /etc/systemd/system/africhome-hysteria-expire.timer <<'EOF'
+[Unit]
+Description=Daily expiry check for Africhome Hysteria users
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now africhome-hysteria-expire.timer
+  ah_ok "Daily Hysteria account expiry timer enabled."
+}
+
 hy2u_menu() {
   while true; do
     echo
@@ -186,12 +222,14 @@ hy2u_menu() {
     echo "1) Create user (days-based expiry)"
     echo "2) List users"
     echo "3) Revoke user"
+    echo "4) Enable daily expiry automation"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
       1) hy2u_add; ah_pause ;;
       2) hy2u_list; ah_pause ;;
       3) hy2u_remove; ah_pause ;;
+      4) hy2u_install_timer; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
