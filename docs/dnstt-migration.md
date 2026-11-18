@@ -60,6 +60,32 @@ records, change firewall rules, or create/start a DNSTT service. The private
 key stays on the VPS and is never committed or distributed; clients receive
 only the public key.
 
+## Prepare the DNSTT service
+
+After the binaries, keypair, and operator-owned DNS values are configured,
+prepare the systemd unit:
+
+```bash
+sudo bash scripts/install-dnstt-service.sh
+```
+
+The script asks for the UDP listen address (default `:53`) and SSH upstream
+(default `127.0.0.1:22`). It stores service settings in
+`/etc/africhome-dnstt/service.env` with mode 0600 and installs
+`africhome-dnstt.service`. It does not enable or start the service. If UDP
+port 53 is occupied by iodine, the script reports the conflict and leaves
+iodine untouched. Do not start DNSTT until the planned migration has stopped
+the old listener and verified the rollback procedure.
+
+Inspect the generated unit before activation:
+
+```bash
+sudo systemctl cat africhome-dnstt
+```
+
+The systemd unit reads the operator's saved tunnel domain and upstream; it
+does not contain the maintainer's domain or nameserver.
+
 ## Verified development test
 
 The development VPS used its own configured domain and nameserver, with:
