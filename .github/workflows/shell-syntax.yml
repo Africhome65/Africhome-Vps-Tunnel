@@ -11,4 +11,4 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Validate changed shell entry points
-        run: bash -n install.sh menu.sh modules/hysteria.sh modules/port_routing.sh tests/port-routing-validation.sh
+        run: bash -n install.sh menu.sh modules/hysteria.sh modules/port_routing.sh tests/port-routing-validation.sh tests/haproxy-sni-validation.sh
