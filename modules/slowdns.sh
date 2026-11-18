@@ -220,7 +220,20 @@ sd_accounts_create() {
   read -r -p "Add customer's SSH public key now? [y/N]: " key_choice
   if [[ "$key_choice" =~ ^[Yy]$ ]]; then
     read -r -p "Paste one-line SSH public key: " public_key
-    if [[ "$public_key" != *
+    if ssh-keygen -lf <(printf '%s\n' "$public_key") >/dev/null 2>&1; then
+      install -d -m 700 -o "$username" -g "$username" "/home/$username/.ssh"
+      printf '%s\n' "$public_key" > "/home/$username/.ssh/authorized_keys"
+      chown "$username:$username" "/home/$username/.ssh/authorized_keys"
+      chmod 600 "/home/$username/.ssh/authorized_keys"
+      ah_ok "SSH public key installed for $username."
+    else
+      userdel --remove "$username" 2>/dev/null || true
+      unset password
+      ah_err "Invalid public key. Account creation was rolled back; try again with a valid OpenSSH public key."
+      return 1
+    fi
+  fi
+
   # again from the management menu. It is never committed to the repository.
   umask 077
   {
