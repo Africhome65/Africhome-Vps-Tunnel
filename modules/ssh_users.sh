@@ -44,14 +44,22 @@ ssh_users_create(){
 }
 
 ssh_users_list(){
-  printf '%-22s %-12s %-14s\n' "USERNAME" "UID" "EXPIRY"
+  printf '%-22s %-12s %-14s\n' "USERNAME" "UID" "REMAINING"
   while IFS=: read -r name _ uid _ _ _ shell; do
     [[ "$uid" =~ ^[0-9]+$ ]] || continue
     (( uid >= 1000 )) || continue
     [[ "$shell" == */nologin || "$shell" == */false ]] && continue
     local exp
     exp="$(chage -l "$name" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
-    printf '%-22s %-12s %-14s\n' "$name" "$uid" "${exp:-unknown}"
+    if [[ "$exp" == "never" || "$exp" == "Never" ]]; then exp="Never"
+    elif [[ -n "$exp" ]]; then
+      local exp_ts now
+      exp_ts="$(date -d "$exp" +%s 2>/dev/null || echo 0)"; now="$(date +%s)"
+      if (( exp_ts == 0 )); then exp="Unknown"
+      elif (( exp_ts <= now )); then exp="Expired"
+      else exp="$(( (exp_ts - now + 86399) / 86400 )) days"; fi
+    else exp="Unknown"; fi
+    printf '%-22s %-12s %-14s\n' "$name" "$uid" "$exp"
   done < <(getent passwd)
 }
 
