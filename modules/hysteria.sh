@@ -30,6 +30,45 @@ hy2_valid_port_spec() {
   fi
 }
 
+
+hy2_write_config() {
+  local output="$1" port_spec="$2" cert_dir="$3" username="$4" password="$5"
+  cat > "$output" <<EOF
+listen: :$port_spec
+tls:
+  cert: $cert_dir/fullchain.pem
+  key: $cert_dir/privkey.pem
+auth:
+  type: userpass
+  userpass:
+    $username: $password
+EOF
+}
+
+hy2_write_renewal_hook() {
+  local output="$1" domain="$2"
+  cat > "$output" <<'HOOK'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+DOMAIN="@@DOMAIN@@"
+DEST="/etc/hysteria/certs"
+SRC="/etc/letsencrypt/live/$DOMAIN"
+[[ -s "$SRC/fullchain.pem" && -s "$SRC/privkey.pem" ]] || exit 1
+install -d -o hysteria -g hysteria -m 750 "$DEST"
+tmp_cert="$(mktemp "$DEST/.fullchain.XXXXXX")"
+tmp_key="$(mktemp "$DEST/.privkey.XXXXXX")"
+trap 'rm -f "$tmp_cert" "$tmp_key"' EXIT
+install -o hysteria -g hysteria -m 640 "$SRC/fullchain.pem" "$tmp_cert"
+install -o hysteria -g hysteria -m 640 "$SRC/privkey.pem" "$tmp_key"
+mv -f "$tmp_cert" "$DEST/fullchain.pem"
+mv -f "$tmp_key" "$DEST/privkey.pem"
+systemctl restart hysteria-server.service
+HOOK
+  sed "s/@@DOMAIN@@/$domain/g" "$output" > "$output.tmp"
+  mv -f "$output.tmp" "$output"
+  chmod 750 "$output"
+}
+
 hy2_install() {
   ah_require_root || return 1
   command -v curl >/dev/null 2>&1 || ah_apt_install curl ca-certificates || return 1
@@ -105,39 +144,10 @@ hy2_setup() {
   install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/privkey.pem" "$HY2_CERT_DIR/privkey.pem"
 
   install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
-  hook_tmp="$(mktemp)"
-  cat > "$hook_tmp" <<'HOOK'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-DOMAIN="@@DOMAIN@@"
-DEST="/etc/hysteria/certs"
-SRC="/etc/letsencrypt/live/$DOMAIN"
-[[ -s "$SRC/fullchain.pem" && -s "$SRC/privkey.pem" ]] || exit 1
-install -d -o hysteria -g hysteria -m 750 "$DEST"
-tmp_cert="$(mktemp "$DEST/.fullchain.XXXXXX")"
-tmp_key="$(mktemp "$DEST/.privkey.XXXXXX")"
-trap 'rm -f "$tmp_cert" "$tmp_key"' EXIT
-install -o hysteria -g hysteria -m 640 "$SRC/fullchain.pem" "$tmp_cert"
-install -o hysteria -g hysteria -m 640 "$SRC/privkey.pem" "$tmp_key"
-mv -f "$tmp_cert" "$DEST/fullchain.pem"
-mv -f "$tmp_key" "$DEST/privkey.pem"
-systemctl restart hysteria-server.service
-HOOK
-  sed "s/@@DOMAIN@@/$domain/g" "$hook_tmp" > "$HY2_HOOK"
-  rm -f "$hook_tmp"
-  chmod 750 "$HY2_HOOK"
+  hy2_write_renewal_hook "$HY2_HOOK" "$domain"
 
   config_tmp="$(mktemp)"
-  cat > "$config_tmp" <<EOF
-listen: :$port_spec
-tls:
-  cert: $HY2_CERT_DIR/fullchain.pem
-  key: $HY2_CERT_DIR/privkey.pem
-auth:
-  type: userpass
-  userpass:
-    $username: $password
-EOF
+  hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
   install -o root -g root -m 600 "$config_tmp" "$HY2_CONFIG"
   rm -f "$config_tmp"
   if ! systemctl daemon-reload || ! systemctl enable hysteria-server.service || ! systemctl restart hysteria-server.service; then
