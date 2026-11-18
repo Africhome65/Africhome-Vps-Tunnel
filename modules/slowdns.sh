@@ -215,22 +215,57 @@ sd_accounts_create() {
     ah_err "Account setup failed; partial account was removed."
     return 1
   fi
-  # Optionally install the customer's own public key. Their matching private
-  # key stays on their device and is never generated or stored by this server.
-  read -r -p "Add customer's SSH public key now? [y/N]: " key_choice
-  if [[ "$key_choice" =~ ^[Yy]$ ]]; then
-    read -r -p "Paste one-line SSH public key: " public_key
-    if ssh-keygen -lf <(printf '%s\n' "$public_key") >/dev/null 2>&1; then
+  # Generate a fresh Ed25519 keypair for the customer by default. The public
+  # key is installed in authorized_keys; the private key is displayed once and
+  # never saved in the account directory or repository.
+  read -r -p "Generate an SSH keypair for this customer now? [Y/n]: " key_choice
+  if [[ ! "$key_choice" =~ ^[Nn]$ ]]; then
+    local key_tmp
+    key_tmp="$(mktemp -d /run/africhome-slowdns-key.XXXXXX)" || {
+      userdel --remove "$username" 2>/dev/null || true
+      unset password
+      ah_err "Could not create a secure temporary directory for the SSH key."
+      return 1
+    }
+    chmod 700 "$key_tmp"
+    if ssh-keygen -q -t ed25519 -N "" -C "$username@africhome-slowdns" -f "$key_tmp/id_ed25519"; then
+      public_key="$(cat "$key_tmp/id_ed25519.pub")"
       install -d -m 700 -o "$username" -g "$username" "/home/$username/.ssh"
       printf '%s\n' "$public_key" > "/home/$username/.ssh/authorized_keys"
       chown "$username:$username" "/home/$username/.ssh/authorized_keys"
       chmod 600 "/home/$username/.ssh/authorized_keys"
-      ah_ok "SSH public key installed for $username."
+      echo
+      ah_ok "SSH keypair generated and public key installed for $username."
+      echo "PRIVATE SSH KEY — copy it now and keep it secret:"
+      cat "$key_tmp/id_ed25519"
+      echo
+      echo "PUBLIC SSH KEY:"
+      printf '%s\n' "$public_key"
+      echo
+      echo "The private key is not saved on this VPS. Import it into the customer's SSH client."
+      rm -rf -- "$key_tmp"
     else
+      rm -rf -- "$key_tmp"
       userdel --remove "$username" 2>/dev/null || true
       unset password
-      ah_err "Invalid public key. Account creation was rolled back; try again with a valid OpenSSH public key."
+      ah_err "SSH key generation failed. Account creation was rolled back."
       return 1
+    fi
+  else
+    read -r -p "Paste customer's one-line SSH public key (leave blank to skip): " public_key
+    if [[ -n "$public_key" ]]; then
+      if ssh-keygen -lf <(printf '%s\n' "$public_key") >/dev/null 2>&1; then
+        install -d -m 700 -o "$username" -g "$username" "/home/$username/.ssh"
+        printf '%s\n' "$public_key" > "/home/$username/.ssh/authorized_keys"
+        chown "$username:$username" "/home/$username/.ssh/authorized_keys"
+        chmod 600 "/home/$username/.ssh/authorized_keys"
+        ah_ok "SSH public key installed for $username."
+      else
+        userdel --remove "$username" 2>/dev/null || true
+        unset password
+        ah_err "Invalid public key. Account creation was rolled back."
+        return 1
+      fi
     fi
   fi
 
