@@ -33,4 +33,7 @@ cp "$TMP/wrong.key" "$DM_LE_DIR/vpn.example.com/privkey.pem"
 if dm_cert_check vpn.example.com >/dev/null 2>&1; then
   echo "Mismatched certificate/key pair was accepted." >&2; exit 1
 fi
+if dm_update_status unknown.example.com valid >/dev/null 2>&1; then
+  echo "Unregistered domain status update was accepted." >&2; exit 1
+fi
 echo "Domain manager validation passed."
