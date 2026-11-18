@@ -46,8 +46,8 @@ xray_setup_vless_reality() {
   read -r -p "VLESS REALITY TCP port [443]: " port
   port="${port:-443}"
   [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || { ah_err "Invalid TCP port."; return 1; }
-  read -r -p "REALITY server name [www.microsoft.com]: " server_name
-  server_name="${server_name:-www.microsoft.com}"
+  read -r -p "REALITY SNI / server name (a hostname with a valid TLS service): " server_name
+  [[ -n "$server_name" ]] || { ah_err "A REALITY SNI hostname is required."; return 1; }
   [[ "$server_name" =~ ^[A-Za-z0-9.-]+$ ]] || { ah_err "Invalid server name."; return 1; }
 
   uuid="$(xray uuid)" || { ah_err "Could not generate a client UUID."; return 1; }
@@ -57,11 +57,8 @@ xray_setup_vless_reality() {
   public_key="$(awk -F': *' '/^Password[[:space:]]*[(]PublicKey[)]:|^PublicKey:|^Public key:/ {print $2; exit}' <<< "$key_output" | awk '{print $1}')"
   [[ -n "$private_key" && -n "$public_key" ]] || { ah_err "Could not parse REALITY key output from this Xray version."; return 1; }
   short_id="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
-  public_ip="$(curl -4fsS --max-time 8 https://api.ipify.org 2>/dev/null || true)"
-  if [[ -z "$public_ip" ]]; then
-    read -r -p "Enter VPS public IP or DNS name: " public_ip
-  fi
-  [[ "$public_ip" =~ ^[A-Za-z0-9.-]+$ ]] || { ah_err "Invalid endpoint host."; return 1; }
+  read -r -p "Server address (your own domain or VPS public IP; never shared by Africhome): " public_ip
+  [[ -n "$public_ip" && "$public_ip" =~ ^[A-Za-z0-9.-]+$ ]] || { ah_err "Enter a valid domain name or IPv4 address."; return 1; }
 
   install -d -m 755 /usr/local/etc/xray /etc/africhome
   umask 077
