@@ -67,7 +67,7 @@ get_backend_cn() {
 }
 a_subject="$(get_backend_cn sni-a.test)"
 b_subject="$(get_backend_cn sni-b.test)"
-[[ "$a_subject" == *"CN = sni-a.test"* ]] || { echo "SNI route A failed: $a_subject" >&2; exit 1; }
-[[ "$b_subject" == *"CN = sni-b.test"* ]] || { echo "SNI route B failed: $b_subject" >&2; exit 1; }
+[[ "$a_subject" == *"CN=sni-a.test"* ]] || { echo "SNI route A failed: $a_subject" >&2; exit 1; }
+[[ "$b_subject" == *"CN=sni-b.test"* ]] || { echo "SNI route B failed: $b_subject" >&2; exit 1; }
 echo "HAProxy ordinary-TLS SNI passthrough tests passed."
 echo "NOTE: This does not test Xray REALITY, Trojan, SSH TLS wrappers, or OpenVPN wrappers."
