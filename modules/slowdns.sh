@@ -7,6 +7,7 @@ SD_UNIT="/etc/systemd/system/africhome-slowdns.service"
 SD_SERVER_IP="10.77.0.1/24"
 SD_GROUP="africhome-slowdns"
 SD_SPEED_MTU="1130"
+SD_ACCOUNTS_DIR="/etc/africhome/slowdns-accounts"
 
 sd_valid_domain() {
   [[ "$1" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]
@@ -205,6 +206,7 @@ sd_accounts_create() {
   expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry."; return 1; }
 
   getent group "$SD_GROUP" >/dev/null || groupadd --system "$SD_GROUP"
+  install -d -m 700 "$SD_ACCOUNTS_DIR"
   useradd --create-home --shell /bin/bash --groups "$SD_GROUP" "$username" || { ah_err "Could not create Linux account."; return 1; }
   password="$(openssl rand -hex 10)"
   if ! printf '%s:%s\n' "$username" "$password" | chpasswd || ! chage --expiredate "$expiry" "$username"; then
@@ -213,6 +215,15 @@ sd_accounts_create() {
     ah_err "Account setup failed; partial account was removed."
     return 1
   fi
+  # Keep the customer SSH password in a root-only file so it can be displayed
+  # again from the management menu. It is never committed to the repository.
+  umask 077
+  {
+    printf "USERNAME=%s\n" "$username"
+    printf "PASSWORD=%s\n" "$password"
+    printf "EXPIRY=%s\n" "$expiry"
+  } > "$SD_ACCOUNTS_DIR/$username.cred"
+  chmod 600 "$SD_ACCOUNTS_DIR/$username.cred"
 
   local domain ns
   domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
@@ -234,8 +245,10 @@ sd_accounts_create() {
   echo "Tunnel command (iodine shared tunnel password required): sudo iodine -f -L 1 -M 255 $domain"
   echo "Then connect: ssh $username@10.77.0.1"
   echo "Keep the SSH password private. Give the shared iodine password to authorised customers only."
+  echo
+  echo "Credentials are also saved root-only at: $SD_ACCOUNTS_DIR/$username.cred"
+  echo "Use SlowDNS option 12 to display this account again for copying."
   unset password
-  ah_warn "Copy and save the username and password now. The SSH password is shown only at creation."
   ah_warn "SSH password authentication must be enabled in your sshd policy for password login to work."
 }
 
@@ -259,6 +272,32 @@ sd_accounts_list() {
     status="$(passwd -S "$name" 2>/dev/null | awk '{print $2}')"
     printf '%-22s %-12s %-14s %-12s\n' "$name" "Managed" "$expiry" "${status:-unknown}"
   done
+}
+
+sd_accounts_credentials() {
+  ah_require_root || return 1
+  [[ -d "$SD_ACCOUNTS_DIR" ]] || { ah_warn "No saved SlowDNS credentials found."; return 1; }
+  local username cred saved_user saved_pass saved_expiry
+  read -r -p "Customer username: " username
+  [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return 1; }
+  cred="$SD_ACCOUNTS_DIR/$username.cred"
+  if [[ ! -r "$cred" ]]; then
+    ah_warn "No saved password is available for $username. Passwords created before this update cannot be recovered."
+    return 1
+  fi
+  saved_user="$(sed -n 's/^USERNAME=//p' "$cred" | head -n1)"
+  saved_pass="$(sed -n 's/^PASSWORD=//p' "$cred" | head -n1)"
+  saved_expiry="$(sed -n 's/^EXPIRY=//p' "$cred" | head -n1)"
+  echo
+  echo "========================================"
+  echo "       COPY SLOWDNS ACCOUNT LOGIN"
+  echo "========================================"
+  printf 'USERNAME: %s\n' "$saved_user"
+  printf 'PASSWORD: %s\n' "$saved_pass"
+  printf 'EXPIRES:  %s\n' "$saved_expiry"
+  echo "========================================"
+  echo
+  ah_warn "Keep these credentials private."
 }
 
 sd_accounts_change() {
@@ -352,6 +391,7 @@ slowdns_menu() {
     echo "9) Create Trial/Normal customer account"
     echo "10) List customer accounts"
     echo "11) Manage/renew/lock/delete customer account"
+    echo "12) Show customer username/password"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -375,6 +415,7 @@ slowdns_menu() {
       9) sd_accounts_create; ah_pause ;;
       10) sd_accounts_list; ah_pause ;;
       11) sd_accounts_change; ah_pause ;;
+      12) sd_accounts_credentials; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
