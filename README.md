@@ -110,3 +110,13 @@ License to be determined.
 - The Fail2ban action creates an Africhome SSH jail only when one does not already exist, detects the active SSH daemon port (falling back to 22), validates the Fail2ban configuration, and enables the service.
 - UFW is not enabled automatically. If an administrator chooses to enable it, the script allows the detected SSH TCP port before enabling UFW; additional protocol ports must still be opened deliberately.
 - The optional nftables BitTorrent filter is a common-port block only. It is not comprehensive detection and is runtime-only unless an administrator configures persistence separately.
+
+
+## DNSTT bootstrap (experimental)
+
+- Build the official DNSTT server/client and create a protected server keypair with `sudo bash scripts/install-dnstt.sh`.
+- The bootstrap verifies the pinned Go 1.27.4 archive checksum when a Go 1.21+ toolchain is not already available, builds both binaries, and preserves an existing complete keypair.
+- The bootstrap does not stop iodine, bind public UDP 53, change DNS records or firewall rules, or start a DNSTT service.
+- See [docs/dnstt-migration.md](docs/dnstt-migration.md) for the local SSH-forwarding test, safe migration procedure, and domain-length MTU limitation.
+- DNSTT client payload capacity depends on the tunnel domain length. Keep the operator's existing domain when requested; do not promise improved performance without a real throughput test.
+- Current verification covers a local DNSTT client/server stream reaching the SSH banner. External DNS delegation, UDP 53 reachability, and mobile/HTTP Injector compatibility remain unverified.
