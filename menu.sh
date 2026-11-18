@@ -8,6 +8,7 @@ REQUIRED_FILES=(
   "$BASE_DIR/modules/ssh_users.sh"
   "$BASE_DIR/modules/wireguard.sh"
   "$BASE_DIR/modules/slowdns.sh"
+  "$BASE_DIR/modules/dnstt_users.sh"
   "$BASE_DIR/modules/xray.sh"
   "$BASE_DIR/modules/vmess.sh"
   "$BASE_DIR/modules/trojan.sh"
@@ -29,6 +30,7 @@ done
 . "$BASE_DIR/modules/ssh_users.sh"
 . "$BASE_DIR/modules/wireguard.sh"
 . "$BASE_DIR/modules/slowdns.sh"
+. "$BASE_DIR/modules/dnstt_users.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
 . "$BASE_DIR/modules/trojan.sh"
@@ -54,8 +56,9 @@ while true; do
   echo "11) DNSTT installation / key setup"
   echo "12) DNSTT domain configuration (BYOD)"
   echo "13) DNSTT server service configuration"
-  echo "14) Other protocols (under development)"
-  echo "15) Installation information"
+  echo "14) DNSTT customer accounts / custom DNS resolver"
+  echo "15) Other protocols (under development)"
+  echo "16) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -92,8 +95,9 @@ while true; do
       bash "$BASE_DIR/scripts/install-dnstt-service.sh"
       ah_pause
       ;;
-    14) echo "Other protocols are not implemented yet."; ah_pause ;;
-    15) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    14) dnstt_users_menu; ah_pause ;;
+    15) echo "Other protocols are not implemented yet."; ah_pause ;;
+    16) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
