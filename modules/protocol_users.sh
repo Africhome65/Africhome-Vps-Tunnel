@@ -148,7 +148,8 @@ pu_add() {
     return 1
   fi
   ah_ok "Account created and registered."
-  echo "Account ID: $account_id"\n  echo "Protocol: $protocol"
+  echo "Account ID: $account_id"
+  echo "Protocol: $protocol"
   echo "Inbound port: $port"
   echo "Account name: $username"
   echo "Client credential: $credential"
@@ -171,7 +172,7 @@ pu_renew() {
   pu_lock || return 1
   pu_list
   read -r -p "Account name to renew: " name
-  local record expires expires_at tmp
+  local record expires expires_at tmp account_id protocol email db_backup
   record="$(jq -c --arg n "$name" '[.[] | select(.name == $n)] | .[0] // empty' "$PU_DB")"
   [[ -n "$record" ]] || { ah_err "Account not found."; return 1; }
   read -r -p "Additional days to add (0 = never expires): " days
@@ -190,12 +191,22 @@ pu_renew() {
       expires_at=$(( base_time + days * 86400 ))
     fi
   fi
+  account_id="$(jq -r '.account_id // empty' <<< "$record")"
+  protocol="$(jq -r '.protocol' <<< "$record")"
+  email="$(jq -r '.email' <<< "$record")"
+  account_id="$(jq -r '.account_id // empty' <<< "$record")"
+  db_backup="${PU_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  cp -a "$PU_DB" "$db_backup"
   tmp="$(mktemp)"
   if ! jq --arg n "$name" --argjson expiry "$expires_at" 'map(if .name == $n then .expires_at = $expiry else . end)' "$PU_DB" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update account expiry."; return 1
   fi
   install -m 600 "$tmp" "$PU_DB"
   rm -f "$tmp"
+  if [[ -n "$account_id" ]] && ! ar_register_service "$account_id" "$name" "$protocol" "$email" "$expires_at"; then
+    cp -a "$db_backup" "$PU_DB"
+    ah_err "Registry renewal failed; local expiry was restored."; return 1
+  fi
   ah_ok "Account $name renewed by $days day(s)."
 }
 
@@ -218,7 +229,7 @@ pu_remove() {
   pu_lock || return 1
   pu_list
   read -r -p "Account name to remove: " name
-  local record protocol port email backup tmp
+  local record protocol port email account_id backup tmp
   record="$(jq -c --arg n "$name" '[.[] | select(.name == $n)] | .[0] // empty' "$PU_DB")"
   [[ -n "$record" ]] || { ah_err "Account not found."; return 1; }
   protocol="$(jq -r '.protocol' <<< "$record")"
@@ -236,6 +247,9 @@ pu_remove() {
     ah_err "Xray restart failed; previous config restored."; return 1
   fi
   install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
+  if [[ -n "$account_id" ]] && ! ar_set_service_status "$account_id" "$protocol" "$email" "revoked"; then
+    ah_warn "Service account was removed, but registry status could not be updated."
+  fi
   ah_ok "Account $name removed."
 }
 
