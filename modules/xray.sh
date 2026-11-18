@@ -122,6 +122,62 @@ EOF
   ah_warn "Keep the client UUID and server details private. Test from an external network."
 }
 
+
+xray_add_sni() {
+  ah_require_root || return 1
+  [[ -r "$XRAY_ENV" && -r "$XRAY_CONFIG" ]] || { ah_warn "Configure VLESS + REALITY first."; return 1; }
+  command -v python3 >/dev/null 2>&1 || { ah_err "Python 3 is required to safely update the REALITY SNI list."; return 1; }
+  read -r -p "Additional REALITY SNI hostname (DNS name only): " new_sni
+  new_sni="${new_sni,,}"
+  [[ "$new_sni" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$new_sni" != *..* ]] || { ah_err "Enter a valid DNS hostname."; return 1; }
+  # shellcheck disable=SC1090
+  . "$XRAY_ENV"
+  local backup_config
+  backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
+  cp -a "$XRAY_CONFIG" "$backup_config" || { ah_err "Could not back up the current Xray configuration."; return 1; }
+  if ! python3 - "$XRAY_CONFIG" "$new_sni" <<'PY'
+import json, sys
+path, name = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as f:
+    config = json.load(f)
+settings = config["inbounds"][0]["streamSettings"]["realitySettings"]
+names = settings.get("serverNames", [])
+if name not in names:
+    names.append(name)
+settings["serverNames"] = names
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(config, f, indent=2)
+    f.write("\\n")
+PY
+  then
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    ah_err "Could not update the SNI list; the previous configuration was restored."
+    return 1
+  fi
+  chown root:xray "$XRAY_CONFIG"
+  chmod 640 "$XRAY_CONFIG"
+  if ! xray run -test -config "$XRAY_CONFIG"; then
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    ah_err "Xray rejected the updated SNI list; the previous configuration was restored."
+    return 1
+  fi
+  if ! systemctl restart xray; then
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    systemctl restart xray >/dev/null 2>&1 || true
+    ah_err "Xray failed to restart; the previous configuration was restored."
+    return 1
+  fi
+  if grep -q '^XRAY_SERVER_NAME=' "$XRAY_ENV"; then
+    sed -i "s/^XRAY_SERVER_NAME=.*/XRAY_SERVER_NAME=$new_sni/" "$XRAY_ENV"
+  else
+    printf 'XRAY_SERVER_NAME=%s\\n' "$new_sni" >> "$XRAY_ENV"
+  fi
+  chmod 600 "$XRAY_ENV"
+  ah_ok "SNI hostname added and selected: $new_sni"
+  ah_info "The client URI will now use this SNI. The REALITY destination remains unchanged."
+  ah_warn "This hostname is accepted by Xray only; it must also be compatible with the configured REALITY destination to connect successfully."
+}
+
 xray_status() {
   ah_require_root || return 1
   systemctl --no-pager --full status xray || true
@@ -146,6 +202,7 @@ xray_menu() {
     echo "1) Install Xray"
     echo "2) Configure VLESS + REALITY"
     echo "3) Show client import URI"
+    echo "7) Add/select an additional REALITY SNI"
     echo "4) Service status and logs"
     echo "5) Start Xray"
     echo "6) Stop Xray"
@@ -156,6 +213,7 @@ xray_menu() {
       2) xray_setup_vless_reality; ah_pause ;;
       3) xray_show_client; ah_pause ;;
       4) xray_status; ah_pause ;;
+      7) xray_add_sni; ah_pause ;;
       5) ah_require_root && systemctl enable --now xray; ah_pause ;;
       6) ah_require_root && systemctl disable --now xray; ah_pause ;;
       0) return ;;
