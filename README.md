@@ -11,7 +11,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
 - SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
-- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
+- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Hysteria 2 server management with a user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
 ## Planned / not yet implemented
 
@@ -110,3 +110,13 @@ License to be determined.
 - The Fail2ban action creates an Africhome SSH jail only when one does not already exist, detects the active SSH daemon port (falling back to 22), validates the Fail2ban configuration, and enables the service.
 - UFW is not enabled automatically. If an administrator chooses to enable it, the script allows the detected SSH TCP port before enabling UFW; additional protocol ports must still be opened deliberately.
 - The optional nftables BitTorrent filter is a common-port block only. It is not comprehensive detection and is runtime-only unless an administrator configures persistence separately.
+
+## Hysteria 2 notes
+
+- Use menu option 11 to install/update Hysteria 2 and configure the server.
+- Each VPS administrator supplies their own domain. Its DNS A/AAAA records must point to the VPS before requesting a certificate. The module obtains a Let's Encrypt certificate using the HTTP-01 standalone challenge, so inbound TCP 80 must be reachable and not occupied during issuance.
+- Choose one UDP port (1-65535), or a port-hopping range such as 20000-30000. Hysteria's native Linux port hopping listens on the first port and redirects the rest of the range using nftables or iptables. The service needs NET_ADMIN capability for this feature.
+- The module adds the selected UDP port/range to UFW only when UFW is already active. The same UDP port/range must also be allowed in the VPS provider firewall/security group. Avoid ports already used by other services; a range must not overlap other listeners or firewall-managed services.
+- A Let's Encrypt deploy hook copies renewed certificates into the Hysteria certificate directory with restricted ownership and permissions, then restarts Hysteria.
+- Hysteria client URIs contain credentials. Keep them private. Port-hopping clients must be configured with the same port range and must support Hysteria 2 port hopping.
+- This module backs up an existing Hysteria config before replacement. It does not alter Xray, DNSTT, WireGuard, or unrelated service configurations.
