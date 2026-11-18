@@ -72,11 +72,13 @@ sd_setup() {
     fi
   fi
 
-  # Follow the standard iodine DNS layout: the delegated tunnel subdomain
-  # is the NS record NAME; the nameserver host is the A record NAME.
-  read -r -p "Tunnel subdomain (NS record name, e.g. ns-tunnel.example.com): " domain
+  # Africhome DNS layout: the tunnel subdomain is the NS record NAME;
+  # the nameserver host is the A record NAME. For the user's DNS:
+  # NS ns-smarty.uk.afriko2.co.uk -> smarty.uk.afriko2.co.uk
+  # A  smarty.uk.afriko2.co.uk    -> VPS public IPv4
+  read -r -p "Tunnel subdomain (NS record NAME; e.g. ns-smarty.uk.afriko2.co.uk): " domain
   sd_valid_domain "$domain" || { ah_err "Enter a valid fully-qualified tunnel subdomain."; return 1; }
-  read -r -p "Nameserver host (A record name, e.g. tunnel.example.com): " ns_host
+  read -r -p "Nameserver host (A record NAME; e.g. smarty.uk.afriko2.co.uk): " ns_host
   sd_valid_domain "$ns_host" || { ah_err "Enter a valid fully-qualified nameserver hostname."; return 1; }
 
   if [[ -n "$old_password" ]]; then
@@ -135,8 +137,8 @@ EOF
     ufw allow 53/udp || ah_warn "Could not add UDP 53 to UFW; open it manually."
   fi
 
-  ah_info "DNS records required at the domain provider:"
-  echo "  A record:  $ns_host -> this VPS public IPv4"
+  ah_info "DNS records expected by this SlowDNS configuration:"
+  echo "  A record:  $ns_host -> this VPS public IPv4 (DNS-only)"
   echo "  NS record: $domain -> $ns_host"
   echo "  Both records must be in the parent zone managed by your DNS provider."
   echo "  Firewall: allow UDP 53 at the VPS provider and UFW"
