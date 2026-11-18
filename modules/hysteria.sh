@@ -45,6 +45,7 @@ hy2_setup() {
   [[ -n "$port_spec" ]] || port_spec="443"
   hy2_valid_port_spec "$port_spec" || { ah_err "Use a UDP port 1-65535 or range such as 20000-30000."; return 1; }
   first_port="$(printf '%s' "$port_spec" | cut -d- -f1)"
+  last_port="$(printf '%s' "$port_spec" | awk -F- '{print $NF}')"
   read -r -p "Email for Let's Encrypt: " email
   [[ "$email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { ah_err "Enter a valid email address."; return 1; }
   read -r -p "Hysteria username [africhome]: " username
@@ -59,8 +60,12 @@ hy2_setup() {
     read -r -p "Replace existing Hysteria config? [y/N]: " replace
     [[ "$replace" =~ ^[Yy]$ ]] || { ah_info "Existing config left unchanged."; return 1; }
   fi
-  if ss -H -lunp 2>/dev/null | awk -v p=":$first_port" '$4 ~ p"$" {found=1} END{exit !found}'; then
-    ah_err "UDP port $first_port is already in use. Choose another port."
+  if ss -H -lunp 2>/dev/null | awk -v first="$first_port" -v last="$last_port" '
+    /hysteria/ {next}
+    { localport=$4; sub(/^.*:/, "", localport); if (localport ~ /^[0-9]+$/ && localport >= first && localport <= last) found=1 }
+    END {exit !found}
+  '; then
+    ah_err "A UDP listener already uses a port in $port_spec. Choose another range."
     return 1
   fi
   if ss -H -ltn 2>/dev/null | awk '$4 ~ /:80$/ {found=1} END{exit !found}'; then
@@ -141,7 +146,7 @@ hy2_show_client() {
   # shellcheck disable=SC1090
   . "$HY2_STATE"
   echo
-  printf 'hysteria2://%s:%s@%s:%s/?sni=%s#Africhome-Hysteria2\n' "$HY2_USERNAME" "$HY2_PASSWORD" "$HY2_DOMAIN" "$(printf '%s' "$HY2_PORT_SPEC" | cut -d- -f1)" "$HY2_DOMAIN"
+  printf 'hysteria2://%s:%s@%s:%s/?sni=%s#Africhome-Hysteria2\n' "$HY2_USERNAME" "$HY2_PASSWORD" "$HY2_DOMAIN" "$HY2_PORT_SPEC" "$HY2_DOMAIN"
   ah_warn "This URI contains the account password. Keep it private. Configure the same port range in a compatible client when using port hopping."
 }
 hy2_status() {
