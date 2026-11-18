@@ -26,10 +26,12 @@ jobs:
         run: bash tests/port-routing-validation.sh
       - name: Test protocol account config permissions
         run: bash tests/protocol-users-validation.sh
+      - name: Test central account registry
+        run: bash tests/account-registry-validation.sh
       - name: Install isolated routing test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck haproxy openssl iproute2
+          sudo apt-get install -y shellcheck haproxy openssl iproute2 jq
       - name: Test HAProxy ordinary TLS SNI passthrough
         run: bash tests/haproxy-sni-validation.sh
       - name: Run ShellCheck errors
