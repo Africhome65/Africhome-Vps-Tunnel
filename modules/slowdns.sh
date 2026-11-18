@@ -72,10 +72,12 @@ sd_setup() {
     fi
   fi
 
-  read -r -p "Tunnel domain you own (example tunnel.example.com): " domain
-  sd_valid_domain "$domain" || { ah_err "Enter a valid fully-qualified domain name."; return 1; }
-  read -r -p "Nameserver hostname (example ns1.example.com): " ns_host
-  sd_valid_domain "$ns_host" || { ah_err "Enter a valid nameserver hostname."; return 1; }
+  # Follow the standard iodine DNS layout: the delegated tunnel subdomain
+  # is the NS record NAME; the nameserver host is the A record NAME.
+  read -r -p "Tunnel subdomain (NS record name, e.g. ns-tunnel.example.com): " domain
+  sd_valid_domain "$domain" || { ah_err "Enter a valid fully-qualified tunnel subdomain."; return 1; }
+  read -r -p "Nameserver host (A record name, e.g. tunnel.example.com): " ns_host
+  sd_valid_domain "$ns_host" || { ah_err "Enter a valid fully-qualified nameserver hostname."; return 1; }
 
   if [[ -n "$old_password" ]]; then
     read -r -s -p "Keep the existing shared tunnel password? [Y/n]: " keep
@@ -134,9 +136,9 @@ EOF
   fi
 
   ah_info "DNS records required at the domain provider:"
-  echo "  Nameserver host: $ns_host -> this VPS public IPv4 (A record)"
-  echo "  Registrar glue: register $ns_host as a child nameserver with this VPS IP"
-  echo "  Delegation: set NS for $domain to $ns_host"
+  echo "  A record:  $ns_host -> this VPS public IPv4"
+  echo "  NS record: $domain -> $ns_host"
+  echo "  Both records must be in the parent zone managed by your DNS provider."
   echo "  Firewall: allow UDP 53 at the VPS provider and UFW"
   echo "  Do not proceed until the records are saved and have propagated."
   read -r -p "Have you completed and opened UDP 53? Run public DNS verification now? [Y/n]: " ready
@@ -207,8 +209,8 @@ sd_accounts_create() {
   echo "Expires: $expiry"
   echo
   echo "CLIENT CONNECTION DETAILS"
-  echo "Tunnel domain: $domain"
-  echo "Nameserver host: $ns"
+  echo "Tunnel subdomain (NS record name): $domain"
+  echo "Nameserver host (A record name): $ns"
   echo "Tunnel command (iodine shared tunnel password required): sudo iodine -f -L 1 -M 255 $domain"
   echo "Then connect: ssh $username@10.77.0.1"
   echo "Keep the SSH password private. Give the shared iodine password to authorised customers only."
@@ -280,7 +282,7 @@ sd_status() {
   if [[ ! -f "$SD_UNIT" ]]; then
     if command -v iodined >/dev/null 2>&1; then
       ah_info "Iodine is installed, but the Africhome SlowDNS server is not configured yet."
-      echo "Next step: choose option 2 (Configure domain and nameserver)."
+      echo "Next step: choose option 2 (Configure tunnel DNS records)."
     else
       ah_warn "Iodine is not installed. Choose option 1 (Install iodine) first."
     fi
@@ -296,8 +298,8 @@ sd_client_help() {
   local domain ns
   domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
   ns="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
-  echo "Tunnel domain: $domain"
-  echo "Nameserver host: $ns"
+  echo "Tunnel subdomain (NS record name): $domain"
+  echo "Nameserver host (A record name): $ns"
   echo "Client command: sudo iodine -f -L 1 -M 255 $domain"
   echo "Then connect using a managed SSH username: ssh USERNAME@10.77.0.1"
   echo "The iodine password is shared by the tunnel and is stored in the root-only server config."
@@ -320,7 +322,7 @@ slowdns_menu() {
     echo
     echo "----- SlowDNS SSH (iodine) -----"
     echo "1) Install iodine"
-    echo "2) Add/change tunnel domain and nameserver"
+    echo "2) Configure tunnel DNS (NS subdomain + A nameserver)"
     echo "3) Start service"
     echo "4) Stop service"
     echo "5) Service status and logs"
