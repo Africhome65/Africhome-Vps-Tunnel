@@ -2,15 +2,14 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/hysteria.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/hysteria.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
 . "$BASE_DIR/lib/common.sh"
 . "$BASE_DIR/modules/security.sh"
 . "$BASE_DIR/modules/ssh_users.sh"
-. "$BASE_DIR/modules/wireguard.sh"
-. "$BASE_DIR/modules/slowdns.sh"
+. "$BASE_DIR/modules/port_routing.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
 . "$BASE_DIR/modules/trojan.sh"
@@ -27,15 +26,14 @@ while true; do
   echo "1) System information"
   echo "2) Security management"
   echo "3) SSH account management"
-  echo "4) WireGuard management"
-  echo "5) SlowDNS SSH management"
-  echo "6) Xray management (VLESS REALITY)"
-  echo "7) VMess management (WebSocket + TLS)"
-  echo "8) Trojan management (TLS)"
-  echo "9) Shadowsocks management"
-  echo "10) Protocol account management (expiry)"
-  echo "11) Hysteria 2 management (custom domain + UDP port)"
-  echo "12) Installation information"
+  echo "4) Xray management (VLESS REALITY)"
+  echo "5) VMess management (WebSocket + TLS)"
+  echo "6) Trojan management (TLS)"
+  echo "7) Shadowsocks management"
+  echo "8) Protocol account management (expiry)"
+  echo "9) Hysteria 2 management (custom domain + UDP port)"
+  echo "10) Port & routing manager (read-only discovery)"
+  echo "11) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -49,15 +47,14 @@ while true; do
       ;;
     2) security_menu ;;
     3) ssh_users_menu ;;
-    4) wg_menu ;;
-    5) slowdns_menu ;;
-    6) xray_menu ;;
-    7) vmess_menu ;;
-    8) trojan_menu ;;
-    9) shadowsocks_menu ;;
-    10) pu_menu ;;
-    11) hy2_menu ;;
-    12) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    4) xray_menu ;;
+    5) vmess_menu ;;
+    6) trojan_menu ;;
+    7) shadowsocks_menu ;;
+    8) pu_menu ;;
+    9) hy2_menu ;;
+    10) pr_port_routing_menu ;;
+    11) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
