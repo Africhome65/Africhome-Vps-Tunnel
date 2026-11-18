@@ -115,6 +115,92 @@ dt_accounts_create() {
   unset password
 }
 
+
+dt_trial_account_create() {
+  dt_require_root || return 1
+  command -v systemctl >/dev/null 2>&1 || { echo "systemd is required for timed trial expiry." >&2; return 1; }
+
+  local hours seconds username password expiry_at service_file timer_file
+  echo "Trial duration:"
+  echo "1) 1 hour"
+  echo "2) 3 hours"
+  echo "3) 6 hours"
+  echo "4) 24 hours"
+  read -r -p "Choose trial duration [1-4]: " choice
+  case "$choice" in
+    1) hours=1 ;;
+    2) hours=3 ;;
+    3) hours=6 ;;
+    4) hours=24 ;;
+    *) echo "Invalid trial duration." >&2; return 1 ;;
+  esac
+
+  while :; do
+    username="trial$(openssl rand -hex 3)" || return 1
+    id "$username" >/dev/null 2>&1 || break
+  done
+  password="$(openssl rand -hex 8)" || return 1
+  expiry_at="$(date -d "+${hours} hours" '+%Y-%m-%d %H:%M:%S')" || return 1
+  service_file="/etc/systemd/system/africhome-trial-${username}.service"
+  timer_file="/etc/systemd/system/africhome-trial-${username}.timer"
+
+  if ! useradd --create-home --shell /bin/bash --groups "$DT_GROUP" "$username"; then
+    unset password
+    echo "Could not create trial account." >&2
+    return 1
+  fi
+  if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
+    userdel --remove "$username" 2>/dev/null || true
+    unset password
+    echo "Trial password setup failed; account rolled back." >&2
+    return 1
+  fi
+
+  cat > "$service_file" <<EOF
+[Unit]
+Description=Expire Africhome DNSTT trial account $username
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/usermod --lock --expiredate=1970-01-02 $username
+ExecStartPost=-/usr/bin/pkill -KILL -u $username
+EOF
+  cat > "$timer_file" <<EOF
+[Unit]
+Description=Timed expiry for Africhome DNSTT trial account $username
+
+[Timer]
+OnCalendar=$expiry_at
+Persistent=true
+Unit=africhome-trial-$username.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  if ! systemd-analyze verify "$service_file" "$timer_file" >/dev/null 2>&1 ||
+     ! systemctl daemon-reload ||
+     ! systemctl enable --now "africhome-trial-$username.timer"; then
+    rm -f "$service_file" "$timer_file"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    userdel --remove "$username" 2>/dev/null || true
+    unset password
+    echo "Could not schedule automatic trial expiry; account creation was rolled back." >&2
+    return 1
+  fi
+
+  echo
+  echo "Africhome DNSTT trial account created."
+  printf 'Username: %s\n' "$username"
+  printf 'Password (copy it now): %s\n' "$password"
+  printf 'Trial duration: %s hour(s)\n' "$hours"
+  printf 'Automatic expiry: %s (VPS local time)\n' "$expiry_at"
+  echo "The account will be locked and its active SSH sessions terminated at expiry."
+  echo "SSH host: this VPS public IP or configured SSH hostname"
+  echo "SSH port: 22 (unless your sshd uses another port)"
+  unset password
+}
+
 dt_accounts_list() {
   dt_require_root || return 1
   local members username status
@@ -224,6 +310,7 @@ dnstt_users_menu() {
     echo
     echo "----- DNSTT Customer Accounts / DNS Resolver -----"
     echo "1) Create customer SSH username/password with expiry"
+    echo "5) Generate timed trial account (1/3/6/24 hours)"
     echo "2) List DNSTT customer accounts"
     echo "3) Manage / renew / disable / reset / delete account"
     echo "4) Show client command with custom DNS resolver"
@@ -234,6 +321,7 @@ dnstt_users_menu() {
       2) dt_accounts_list ;;
       3) dt_accounts_manage ;;
       4) dt_client_help ;;
+      5) dt_trial_account_create ;;
       0) return ;;
       *) echo "Invalid choice." ;;
     esac
