@@ -73,6 +73,9 @@ hy2_setup() {
     return 1
   fi
 
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
+    ufw allow 80/tcp || ah_warn "Could not add TCP 80 to UFW; certificate issuance/renewal may fail."
+  fi
   ah_info "Requesting a certificate. DNS must point to this VPS and inbound TCP 80 must be reachable."
   certbot certonly --standalone --non-interactive --agree-tos --email "$email" -d "$domain" || {
     ah_err "Certificate issuance failed. Check DNS and TCP 80 in UFW/provider firewall."; return 1;
