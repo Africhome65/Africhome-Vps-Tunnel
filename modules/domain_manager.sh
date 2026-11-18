@@ -20,7 +20,7 @@ dm_valid_domain() {
 dm_init() {
   command -v jq >/dev/null 2>&1 || { ah_err "jq is required."; return 1; }
   if [[ ! -e "$DM_DB" ]]; then
-    install -d -o root -g root -m 700 "$DM_STATE_DIR"
+    install -d -m 700 "$DM_STATE_DIR"
     printf '[]\n' > "$DM_DB"; chmod 600 "$DM_DB"
   fi
   jq -e 'type == "array"' "$DM_DB" >/dev/null 2>&1 || { ah_err "Domain inventory is invalid; refusing to overwrite."; return 1; }
@@ -35,7 +35,7 @@ dm_register_domain() {
   jq --arg d "$domain" --arg now "$(date -u +%FT%TZ)" \
     '. + [{domain:$d,added_at:$now,dns_checked_at:$now,certificate_checked_at:null,certificate_status:"not_checked"}]' \
     "$DM_DB" > "$tmp" || { rm -f "$tmp"; return 1; }
-  install -o root -g root -m 600 "$tmp" "$DM_DB"; rm -f "$tmp"
+  install -m 600 "$tmp" "$DM_DB"; rm -f "$tmp"
 }
 
 dm_dns_check() {
