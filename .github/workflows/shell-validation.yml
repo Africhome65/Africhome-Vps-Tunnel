@@ -28,10 +28,12 @@ jobs:
         run: bash tests/protocol-users-validation.sh
       - name: Test central account registry
         run: bash tests/account-registry-validation.sh
+      - name: Test Hysteria userpass account adapter
+        run: bash tests/hysteria-users-validation.sh
       - name: Install isolated routing test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck haproxy openssl iproute2 jq
+          sudo apt-get install -y shellcheck haproxy openssl iproute2 jq python3-yaml
       - name: Test HAProxy ordinary TLS SNI passthrough
         run: bash tests/haproxy-sni-validation.sh
       - name: Run ShellCheck errors
