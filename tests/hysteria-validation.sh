@@ -60,5 +60,40 @@ check_invalid "non-numeric port" hy2_valid_port_spec "https"
 check_invalid "too many digits" hy2_valid_port_spec "123456"
 check_invalid "malformed range" hy2_valid_port_spec "1000-2000-3000"
 
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+config_file="$tmp_dir/config.yaml"
+hook_file="$tmp_dir/renewal-hook.sh"
+test_password="unit-test-only-not-a-real-secret"
+
+hy2_write_config "$config_file" "24000-25000" "/tmp/hysteria-certs" "testuser" "$test_password"
+grep -Fxq 'listen: :24000-25000' "$config_file" || { echo "FAIL: generated config listen range"; ((fail+=1)); }
+grep -Fxq '  cert: /tmp/hysteria-certs/fullchain.pem' "$config_file" || { echo "FAIL: generated config certificate path"; ((fail+=1)); }
+grep -Fxq '  key: /tmp/hysteria-certs/privkey.pem' "$config_file" || { echo "FAIL: generated config key path"; ((fail+=1)); }
+grep -Fxq '    testuser: unit-test-only-not-a-real-secret' "$config_file" || { echo "FAIL: generated config auth"; ((fail+=1)); }
+if grep -q 'unit-test-only-not-a-real-secret' "$ROOT_DIR"/README.md; then
+  echo "FAIL: test credential leaked into README" >&2
+  ((fail+=1))
+else
+  echo "PASS: test credential absent from README"
+  ((pass+=1))
+fi
+
+hy2_write_renewal_hook "$hook_file" "vpn.example.com"
+bash -n "$hook_file" || { echo "FAIL: generated renewal hook syntax"; ((fail+=1)); }
+grep -Fxq 'DOMAIN="vpn.example.com"' "$hook_file" || { echo "FAIL: renewal hook domain"; ((fail+=1)); }
+grep -Fq 'install -o hysteria -g hysteria -m 640' "$hook_file" || { echo "FAIL: renewal hook certificate permissions"; ((fail+=1)); }
+grep -Fq 'mv -f "$tmp_cert" "$DEST/fullchain.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic certificate replacement"; ((fail+=1)); }
+grep -Fq 'mv -f "$tmp_key" "$DEST/privkey.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic key replacement"; ((fail+=1)); }
+grep -Fq 'systemctl restart hysteria-server.service' "$hook_file" || { echo "FAIL: renewal hook service restart"; ((fail+=1)); }
+if [[ -x "$hook_file" ]]; then
+  echo "PASS: renewal hook is executable"
+  ((pass+=1))
+else
+  echo "FAIL: renewal hook is not executable" >&2
+  ((fail+=1))
+fi
+
 printf '\nHysteria validation tests: %d passed, %d failed\n' "$pass" "$fail"
 (( fail == 0 ))
