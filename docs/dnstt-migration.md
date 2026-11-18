@@ -124,3 +124,55 @@ never silently substitute another domain.
 
 Local DNSTT build and SSH-banner forwarding are verified on Ubuntu 22.04.5
 x86_64. External DNS-path and mobile-client testing remain outstanding.
+
+
+## Individual customer accounts
+
+DNSTT is a TCP-over-DNS transport, not a username/password account server.
+For individual credentials, keep the DNSTT server upstream pointed at the
+local SSH daemon (normally `127.0.0.1:22`) and authenticate each customer
+with a separate non-root Linux SSH account.
+
+The Africhome menu option **14) DNSTT customer accounts / custom DNS resolver**
+loads `modules/dnstt_users.sh`. It creates accounts in the
+`africhome-dnstt` group, generates a unique SSH password, and applies a Linux
+account expiry using `chage`. Passwords are displayed once and are not written
+to a plaintext credential database. Administrators can list, renew, disable,
+re-enable, reset, and delete managed accounts.
+
+The public DNSTT server key is not a customer password. Clients need the
+server's public key to authenticate the DNSTT server, then use their own SSH
+username/password to log in through the tunnel. Never give customers the VPS
+root password or private server key.
+
+Password authentication still depends on the existing sshd policy. The account
+module does not globally enable password authentication or change firewall,
+DNS, DNSTT service, or SSH daemon configuration automatically. If the server
+uses key-only SSH authentication, a password-only client will not log in until
+an administrator deliberately configures a suitable SSH policy.
+
+## Custom recursive DNS resolver on the client
+
+The DNSTT client chooses a recursive resolver for its encoded DNS queries.
+The account menu generates client command guidance for:
+
+- UDP DNS, such as `8.8.8.8:53`, `1.1.1.1:53`, or a custom
+  `resolver.example.net:53` using `-udp`.
+- DNS-over-TLS resolver addresses using `-dot`.
+- DNS-over-HTTPS URLs using `-doh`.
+
+This resolver is distinct from the authoritative nameserver hostname in the
+operator's DNS delegation. Keep the existing delegated tunnel domain and
+authoritative nameserver unchanged unless the operator explicitly requests a
+DNS migration.
+
+These options change the resolver used by a compatible DNSTT client; they do
+not convert DNSTT into a general UDP tunnel. DNSTT's upstream remains a TCP
+endpoint, normally the local SSH service. Do not configure the server upstream
+as `8.8.8.8:53` when SSH customer accounts are required: a DNSTT server
+instance forwards its TCP stream to its configured upstream, so that would
+replace SSH rather than provide SSH and DNS simultaneously.
+
+Validate the generated command with the exact client build and test from an
+external network. Android apps may expose different resolver and key fields;
+do not assume every app supports the same flags or credential layout.
