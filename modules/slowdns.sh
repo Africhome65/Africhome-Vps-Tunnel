@@ -28,19 +28,19 @@ sd_dns_check() {
     return 1
   fi
 
-  a_records="$(dig +time=3 +tries=1 +short A "$ns_host" @"$resolver" 2>/dev/null | awk '/^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$/')"
-  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" @"$resolver" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\\.$//' )"
-  normalized_ns="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]' | sed 's/\\.$//')"
+  a_records="$(dig +time=3 +tries=1 +short A "$ns_host" @"$resolver" 2>/dev/null | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/')"
+  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" @"$resolver" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\.$//' )"
+  normalized_ns="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')"
 
   if [[ -z "$a_records" ]]; then
     ah_err "DNS check failed: $ns_host has no public IPv4 A record at $resolver."
     return 1
   fi
-  if ! printf '%s\\n' "$ns_records" | grep -Fxq "$normalized_ns"; then
+  if ! printf '%s\n' "$ns_records" | grep -Fxq "$normalized_ns"; then
     ah_err "DNS check failed: $domain is not publicly delegated to $ns_host."
     if [[ -n "$ns_records" ]]; then
       echo "  Public NS records currently returned:"
-      printf '  %s\\n' "$ns_records"
+      printf '  %s\n' "$ns_records"
     else
       echo "  No public NS records were returned for $domain."
     fi
