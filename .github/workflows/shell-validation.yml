@@ -24,8 +24,12 @@ jobs:
         run: bash tests/hysteria-validation.sh
       - name: Test read-only port routing inventory
         run: bash tests/port-routing-validation.sh
-      - name: Run ShellCheck errors
+      - name: Install isolated routing test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck
+          sudo apt-get install -y shellcheck haproxy openssl iproute2
+      - name: Test HAProxy ordinary TLS SNI passthrough
+        run: bash tests/haproxy-sni-validation.sh
+      - name: Run ShellCheck errors
+        run: |
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck --severity=error
