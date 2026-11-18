@@ -49,9 +49,9 @@ dm_dns_check() {
   while IFS= read -r actual; do
     [[ -n "$actual" ]] || continue
     if grep -Fxq "$actual" <<< "$expected"; then matched=1
-    else ah_warn "DNS address does not match detected VPS public IP: $actual"; fi
+    else ah_warn "DNS address does not match detected VPS public IP: $actual"; mismatch=1; fi
   done <<< "$records"
-  (( matched == 1 )) || { ah_err "No DNS address for $domain matches this VPS. Fix DNS before issuing a certificate."; return 1; }
+  (( matched == 1 && mismatch == 0 )) || { ah_err "Every DNS address must match this VPS before issuing a certificate. Fix DNS first."; return 1; }
   printf '%s\n' "$records"
 }
 
