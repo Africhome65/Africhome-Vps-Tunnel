@@ -14,39 +14,55 @@ sd_valid_domain() {
 
 sd_install() {
   ah_require_root || return 1
-  ah_apt_install iodine openssh-client openssl dnsutils || return 1
+  ah_apt_install iodine openssh-client openssl dnsutils curl || return 1
   ah_ok "Iodine, SSH client and password generator installed."
 }
 
 # Check public DNS before starting iodine. The NS hostname may use any valid
 # label (including ns-, ns1-, dns-, etc.); it is compared as a DNS name.
 sd_dns_check() {
-  local domain="$1" ns_host="$2" resolver="1.1.1.1"
-  local a_records ns_records normalized_ns
+  local domain="$1" ns_host="$2"
+  local a_records ns_records normalized_ns public_ip
   if ! command -v dig >/dev/null 2>&1; then
     ah_warn "dig is unavailable; install dnsutils to verify DNS."
     return 1
   fi
+  if ! command -v curl >/dev/null 2>&1; then
+    ah_warn "curl is unavailable; install curl to detect this VPS public IPv4."
+    return 1
+  fi
 
-  a_records="$(dig +time=3 +tries=1 +short A "$ns_host" @"$resolver" 2>/dev/null | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/')"
-  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" @"$resolver" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\.$//' )"
+  # Use the VPS's own detected public IPv4 and the system-configured DNS
+  # resolver. No provider-specific resolver or administrator IP is hardcoded.
+  public_ip="$(curl -4fsS --connect-timeout 5 --max-time 10 https://api.ipify.org 2>/dev/null || true)"
+  if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    ah_err "Could not detect this VPS public IPv4. Check outbound internet access and retry."
+    return 1
+  fi
+  a_records="$(dig +time=4 +tries=1 +short A "$ns_host" 2>/dev/null | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/')"
+  ns_records="$(dig +time=4 +tries=1 +short NS "$domain" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')"
   normalized_ns="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]' | sed 's/\.$//')"
 
   if [[ -z "$a_records" ]]; then
-    ah_err "DNS check failed: $ns_host has no public IPv4 A record at $resolver."
+    ah_err "DNS check failed: $ns_host has no visible IPv4 A record."
+    return 1
+  fi
+  if ! printf '%s\n' "$a_records" | grep -Fxq "$public_ip"; then
+    ah_err "DNS check failed: $ns_host does not point to this VPS public IPv4 ($public_ip)."
+    echo "  A record address(es) returned: $(printf '%s' "$a_records" | paste -sd, -)"
     return 1
   fi
   if ! printf '%s\n' "$ns_records" | grep -Fxq "$normalized_ns"; then
     ah_err "DNS check failed: $domain is not publicly delegated to $ns_host."
     if [[ -n "$ns_records" ]]; then
-      echo "  Public NS records currently returned:"
+      echo "  NS record target(s) returned:"
       printf '  %s\n' "$ns_records"
     else
       echo "  No public NS records were returned for $domain."
     fi
     return 1
   fi
-  ah_ok "Public DNS records found: $ns_host -> $(printf '%s' "$a_records" | paste -sd, -)"
+  ah_ok "A record matches this VPS public IPv4: $ns_host -> $public_ip"
   ah_ok "$domain is delegated to $ns_host."
 }
 
