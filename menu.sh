@@ -15,6 +15,7 @@ REQUIRED_FILES=(
   "$BASE_DIR/modules/protocol_users.sh"
   "$BASE_DIR/scripts/install-dnstt.sh"
   "$BASE_DIR/scripts/configure-dnstt-domain.sh"
+  "$BASE_DIR/scripts/install-dnstt-service.sh"
 )
 for required_file in "${REQUIRED_FILES[@]}"; do
   [[ -f "$required_file" ]] || {
@@ -52,8 +53,9 @@ while true; do
   echo "10) Protocol account management (expiry)"
   echo "11) DNSTT installation / key setup"
   echo "12) DNSTT domain configuration (BYOD)"
-  echo "13) Other protocols (under development)"
-  echo "14) Installation information"
+  echo "13) DNSTT server service configuration"
+  echo "14) Other protocols (under development)"
+  echo "15) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -85,8 +87,13 @@ while true; do
       bash "$BASE_DIR/scripts/configure-dnstt-domain.sh"
       ah_pause
       ;;
-    13) echo "Other protocols are not implemented yet."; ah_pause ;;
-    14) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    13)
+      echo "Prepare the DNSTT server service without stopping existing DNS tunnels."
+      bash "$BASE_DIR/scripts/install-dnstt-service.sh"
+      ah_pause
+      ;;
+    14) echo "Other protocols are not implemented yet."; ah_pause ;;
+    15) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
