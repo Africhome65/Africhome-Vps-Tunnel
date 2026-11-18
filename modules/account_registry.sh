@@ -64,12 +64,13 @@ ar_register_service() {
         map(if .id == $id then
           .label = $label
           | .expires_at = $expiry
+          | (.services // []) as $services
           | .services = (
-              if any(.[]; .service == $service and .ref == $ref) then
-                map(if .service == $service and .ref == $ref then
+              if any($services[]; .service == $service and .ref == $ref) then
+                ($services | map(if .service == $service and .ref == $ref then
                   .status = "active" | .updated_at = $now
-                else . end)
-              else . + [{service:$service, ref:$ref, status:"active", updated_at:$now}]
+                else . end))
+              else $services + [{service:$service, ref:$ref, status:"active", updated_at:$now}]
               end
             )
         else . end)
