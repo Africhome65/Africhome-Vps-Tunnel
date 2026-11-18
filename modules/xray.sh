@@ -45,8 +45,9 @@ xray_setup_vless_reality() {
 
   uuid="$(xray uuid)" || { ah_err "Could not generate a client UUID."; return 1; }
   key_output="$(xray x25519 2>&1)" || { ah_err "Could not generate REALITY keys: $key_output"; return 1; }
-  private_key="$(awk -F': *' '/PrivateKey:/ {print $2; exit}' <<< "$key_output")"
-  public_key="$(awk -F': *' '/Password:|PublicKey:/ {print $2; exit}' <<< "$key_output")"
+  # Xray 26.x may label the client public key as "Password (PublicKey):".
+  private_key="$(awk -F': *' '/PrivateKey:|Private key:/ {print $2; exit}' <<< "$key_output" | awk '{print $1}')"
+  public_key="$(awk -F': *' '/Password([[:space:]]*\\(PublicKey\\))?:|PublicKey:|Public key:/ {print $2; exit}' <<< "$key_output" | awk '{print $1}')"
   [[ -n "$private_key" && -n "$public_key" ]] || { ah_err "Could not parse REALITY key output from this Xray version."; return 1; }
   short_id="$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
   public_ip="$(curl -4fsS --max-time 8 https://api.ipify.org 2>/dev/null || true)"
