@@ -305,6 +305,122 @@ dt_client_help() {
   cat "$DT_PUBLIC_KEY"
 }
 
+
+dt_config_export() {
+  dt_require_root || return 1
+  dt_read_domain || return 1
+  [[ -s "$DT_PUBLIC_KEY" ]] || { echo "DNSTT public key is missing; install DNSTT first." >&2; return 1; }
+
+  local username resolver mode option ssh_host ssh_port entered export_root export_dir config_file archive_file expiry
+  read -r -p "DNSTT customer username: " username
+  dt_valid_username "$username" || { echo "Invalid username." >&2; return 1; }
+  id "$username" >/dev/null 2>&1 || { echo "User does not exist." >&2; return 1; }
+  id -nG "$username" | tr ' ' '\n' | grep -qx "$DT_GROUP" || {
+    echo "That user is not managed as a DNSTT customer." >&2
+    return 1
+  }
+  [[ "$(passwd -S "$username" 2>/dev/null | awk '{print $2}')" == "P" ]] || {
+    echo "This account does not currently have an active password. Reset/set its password first." >&2
+    return 1
+  }
+
+  ssh_host="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
+  read -r -p "SSH host (public VPS IP or hostname) [${ssh_host:-required}]: " entered
+  ssh_host="${entered:-$ssh_host}"
+  [[ "$ssh_host" =~ ^[A-Za-z0-9.-]+$ && "$ssh_host" != .* && "$ssh_host" != *. ]] || {
+    echo "Enter a valid public IP address or hostname." >&2
+    return 1
+  }
+  ssh_port="$(sshd -T 2>/dev/null | awk '$1=="port" {print $2; exit}')"
+  ssh_port="${ssh_port:-22}"
+  read -r -p "SSH port [${ssh_port}]: " entered
+  ssh_port="${entered:-$ssh_port}"
+  [[ "$ssh_port" =~ ^[0-9]{1,5}$ ]] && (( 10#$ssh_port >= 1 && 10#$ssh_port <= 65535 )) || {
+    echo "SSH port must be between 1 and 65535." >&2
+    return 1
+  }
+
+  echo "Choose the recursive DNS resolver for dnstt-client:"
+  echo "1) UDP resolver (8.8.8.8:53)"
+  echo "2) Custom UDP resolver (hostname-or-IP:port)"
+  echo "3) DNS-over-TLS resolver (hostname:port)"
+  echo "4) DNS-over-HTTPS resolver (https:// URL)"
+  read -r -p "Resolver type [1-4]: " mode
+  case "$mode" in
+    1) resolver="8.8.8.8:53"; option="-udp" ;;
+    2)
+      read -r -p "Custom UDP resolver address (hostname-or-IP:port): " resolver
+      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname-or-IP:port." >&2; return 1; }
+      local udp_port="${resolver##*:}"
+      (( 10#$udp_port >= 1 && 10#$udp_port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
+      option="-udp"
+      ;;
+    3)
+      read -r -p "DoT resolver address (hostname:port): " resolver
+      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname:port." >&2; return 1; }
+      local dot_port="${resolver##*:}"
+      (( 10#$dot_port >= 1 && 10#$dot_port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
+      option="-dot"
+      ;;
+    4)
+      read -r -p "DoH URL (https:// URL): " resolver
+      [[ "$resolver" == https://* && "$resolver" != *[[:space:]]* ]] || { echo "Enter a valid https:// URL." >&2; return 1; }
+      option="-doh"
+      ;;
+    *) echo "Invalid resolver type." >&2; return 1 ;;
+  esac
+
+  export_root="/root/africhome-client-configs"
+  export_dir="$export_root/$username"
+  config_file="$export_dir/$username-dnstt.txt"
+  archive_file="$export_dir/$username-dnstt-config.tar.gz"
+  install -d -m 700 "$export_root" "$export_dir" || return 1
+  cp "$DT_PUBLIC_KEY" "$export_dir/server.pub" || return 1
+  chmod 644 "$export_dir/server.pub"
+  expiry="$(dt_expiry_label "$username")"
+
+  cat > "$config_file" <<EOF
+AFRICHOME VPS TUNNEL - CUSTOMER DNSTT CONFIGURATION
+===================================================
+Username: $username
+Password: Enter the password supplied separately by the server administrator.
+Account expiry: $expiry
+
+SSH HOST: $ssh_host
+SSH PORT: $ssh_port
+SSH USERNAME: $username
+
+RECURSIVE DNS RESOLVER: $resolver
+DNSTT TUNNEL DOMAIN: $DT_DOMAIN
+DNSTT PUBLIC KEY FILE: server.pub
+DNSTT PUBLIC KEY:
+$(cat "$DT_PUBLIC_KEY")
+
+DNSTT CLIENT COMMAND (run on a compatible device with dnstt-client installed):
+dnstt-client $option "$resolver" -pubkey-file server.pub "$DT_DOMAIN" 127.0.0.1:7001
+
+After the DNSTT client reports that its local listener is ready, configure your SSH client to connect to 127.0.0.1 port 7001 using the SSH host account details above.
+The recursive resolver is not the authoritative nameserver. DNS delegation is configured separately on the domain.
+
+IMPORTANT:
+- This is a generic DNSTT client profile, not a verified ZIVPN import file.
+- Use only a client application/mode that explicitly supports DNSTT.
+- The SSH password is not stored in this export; obtain it separately from the administrator.
+- Never share the DNSTT server private key. The included server.pub is public.
+EOF
+  chmod 600 "$config_file"
+  tar -czf "$archive_file" -C "$export_dir" "$username-dnstt.txt" server.pub || return 1
+  chmod 600 "$archive_file"
+
+  echo
+  echo "Customer configuration export created."
+  printf 'Text configuration: %s\n' "$config_file"
+  printf 'Bundle (TXT + server.pub): %s\n' "$archive_file"
+  echo "The export contains no SSH password or DNSTT private key."
+  echo "Use an authorized secure file-transfer method to deliver the bundle."
+}
+
+
 dnstt_users_menu() {
   while true; do
     echo
@@ -314,6 +430,7 @@ dnstt_users_menu() {
     echo "2) List DNSTT customer accounts"
     echo "3) Manage / renew / disable / reset / delete account"
     echo "4) Show client command with custom DNS resolver"
+    echo "6) Generate customer configuration export (TXT + public key)"
     echo "0) Back"
     read -r -p "Select: " choice
     case "$choice" in
@@ -322,6 +439,7 @@ dnstt_users_menu() {
       3) dt_accounts_manage ;;
       4) dt_client_help ;;
       5) dt_trial_account_create ;;
+      6) dt_config_export ;;
       0) return ;;
       *) echo "Invalid choice." ;;
     esac
