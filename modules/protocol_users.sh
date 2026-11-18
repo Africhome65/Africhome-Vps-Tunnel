@@ -7,6 +7,7 @@ PU_DB="/etc/africhome-protocol-users.json"
 PU_LOCK="/run/lock/africhome-protocol-users.lock"
 PU_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$PU_BASE_DIR/lib/common.sh"
+. "$PU_BASE_DIR/modules/account_registry.sh"
 
 pu_require_tools() {
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
@@ -68,8 +69,9 @@ pu_add() {
 
   read -r -p "Account name (letters, numbers, dash, underscore): " username
   [[ "$username" =~ ^[A-Za-z0-9_-]{1,24}$ ]] || { ah_err "Invalid account name."; return 1; }
-  local email credential expires expires_at backup tmp
+  local email credential expires expires_at backup tmp account_id db_backup
   email="afh-${protocol}-${username}-$(date +%s)"
+  account_id="$(openssl rand -hex 16)" || return 1
   if jq -e --arg p "$protocol" --arg n "$username" --argjson port "$port" 'any(.[]; .protocol == $p and .name == $n and .port == $port)' "$PU_DB" >/dev/null; then
     ah_err "An account with that name already exists on this protocol and inbound."; return 1
   fi
@@ -88,6 +90,8 @@ pu_add() {
   fi
 
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  db_backup="${PU_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  cp -a "$PU_DB" "$db_backup"
   tmp="$(mktemp)"
   cp -a "$PU_CONFIG" "$backup"
   if ! jq --arg p "$protocol" --arg email "$email" --arg credential "$credential" --argjson port "$port" '
@@ -118,8 +122,8 @@ pu_add() {
   fi
 
   tmp="$(mktemp)"
-  if ! jq --arg p "$protocol" --arg name "$username" --arg email "$email" --arg credential "$credential" --argjson port "$port" --argjson expiry "$expires_at" \
-    '. + [{protocol:$p, name:$name, email:$email, credential:$credential, port:$port, expires_at:$expiry, created_at:(now|floor)}]' "$PU_DB" > "$tmp"; then
+  if ! jq --arg id "$account_id" --arg p "$protocol" --arg name "$username" --arg email "$email" --arg credential "$credential" --argjson port "$port" --argjson expiry "$expires_at" \
+    '. + [{account_id:$id, protocol:$p, name:$name, email:$email, credential:$credential, port:$port, expires_at:$expiry, created_at:(now|floor)}]' "$PU_DB" > "$tmp"; then
     rm -f "$tmp"; cp -a "$backup" "$PU_CONFIG"; ah_err "Could not prepare account database update."; return 1
   fi
   if ! systemctl restart xray; then
@@ -127,10 +131,24 @@ pu_add() {
     systemctl restart xray || true
     ah_err "Xray restart failed; previous config restored."; return 1
   fi
-  install -m 600 "$tmp" "$PU_DB"
+  if ! install -m 600 "$tmp" "$PU_DB"; then
+    cp -a "$backup" "$PU_CONFIG"
+    cp -a "$db_backup" "$PU_DB"
+    rm -f "$tmp"
+    systemctl restart xray || true
+    ah_err "Could not commit local account database; Xray config was rolled back."
+    return 1
+  fi
   rm -f "$tmp"
-  ah_ok "Account created."
-  echo "Protocol: $protocol"
+  if ! ar_register_service "$account_id" "$username" "$protocol" "$email" "$expires_at"; then
+    cp -a "$backup" "$PU_CONFIG"
+    cp -a "$db_backup" "$PU_DB"
+    systemctl restart xray || true
+    ah_err "Central registry update failed; account creation was rolled back."
+    return 1
+  fi
+  ah_ok "Account created and registered."
+  echo "Account ID: $account_id"\n  echo "Protocol: $protocol"
   echo "Inbound port: $port"
   echo "Account name: $username"
   echo "Client credential: $credential"
