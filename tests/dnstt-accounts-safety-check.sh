@@ -19,7 +19,7 @@ bash -c '
 
 grep -q 'useradd --create-home --shell /bin/bash --groups "$DT_GROUP"' "$MODULE"
 grep -q 'chage --expiredate' "$MODULE"
-grep -q 'usermod --lock --expiredate 1' "$MODULE"
+grep -q 'usermod --lock --expiredate 1970-01-02' "$MODULE"
 grep -q 'openssl rand -hex 16' "$MODULE"
 grep -q 'option="-udp"' "$MODULE"
 grep -q 'option="-dot"' "$MODULE"
