@@ -190,7 +190,7 @@ sd_domain_info() {
 sd_accounts_create() {
   ah_require_root || return 1
   [[ -r "$SD_ENV" ]] || { ah_warn "Configure the SlowDNS domain first."; return 1; }
-  local username kind days expiry password public_key key_choice
+  local username kind days expiry password public_key key_choice key_enabled=0
   read -r -p "New customer username (lowercase, digits, _ or -): " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return 1; }
   id "$username" >/dev/null 2>&1 && { ah_err "That Linux username already exists."; return 1; }
@@ -235,6 +235,7 @@ sd_accounts_create() {
       chown "$username:$username" "/home/$username/.ssh/authorized_keys"
       chmod 600 "/home/$username/.ssh/authorized_keys"
       echo
+      key_enabled=1
       ah_ok "SSH keypair generated and public key installed for $username."
       echo "PRIVATE SSH KEY — copy it now and keep it secret:"
       cat "$key_tmp/id_ed25519"
@@ -259,6 +260,7 @@ sd_accounts_create() {
         printf '%s\n' "$public_key" > "/home/$username/.ssh/authorized_keys"
         chown "$username:$username" "/home/$username/.ssh/authorized_keys"
         chmod 600 "/home/$username/.ssh/authorized_keys"
+        key_enabled=1
         ah_ok "SSH public key installed for $username."
       else
         userdel --remove "$username" 2>/dev/null || true
@@ -297,7 +299,7 @@ sd_accounts_create() {
   echo "Nameserver host (A record name): $ns"
   echo "Tunnel command (iodine shared tunnel password required): sudo iodine -f -L 1 -M 255 $domain"
   echo "Then connect: ssh $username@10.77.0.1"
-  if [[ "$key_choice" =~ ^[Yy]$ ]]; then
+  if (( key_enabled )); then
     echo "SSH public-key login: enabled; customer must use the matching private key on their device."
   else
     echo "SSH public-key login: not configured; use the generated SSH password."
