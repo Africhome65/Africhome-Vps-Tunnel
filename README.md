@@ -60,6 +60,10 @@ sudo africhome
 
 Review scripts before running them. Keep VPS console access available when changing firewall/network settings. Torrent-port filtering is only a basic port rule and can be bypassed; it is not application-level torrent detection. These modules have not been tested on every VPS provider or network configuration. Do not treat publication or JSON validation as proof of live service operation.
 
+## Unified account, domain, and security roadmap
+
+The planned unified account manager, centralized domain/certificate manager, Fail2ban hardening, and optional BitTorrent firewall policy are specified in [the account/domain/security roadmap](docs/ACCOUNT-DOMAIN-SECURITY-ROADMAP.md). This is a staged implementation plan, not a claim that every listed feature is already available. In particular, torrent port filtering is not comprehensive torrent detection, and each protocol must pass its own account lifecycle tests before it is advertised as supported.
+
 ## License
 
 License to be determined.
