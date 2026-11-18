@@ -190,7 +190,7 @@ sd_domain_info() {
 sd_accounts_create() {
   ah_require_root || return 1
   [[ -r "$SD_ENV" ]] || { ah_warn "Configure the SlowDNS domain first."; return 1; }
-  local username kind days expiry password
+  local username kind days expiry password public_key key_choice
   read -r -p "New customer username (lowercase, digits, _ or -): " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return 1; }
   id "$username" >/dev/null 2>&1 && { ah_err "That Linux username already exists."; return 1; }
@@ -215,6 +215,236 @@ sd_accounts_create() {
     ah_err "Account setup failed; partial account was removed."
     return 1
   fi
+  # Optionally install the customer's own public key. Their matching private
+  # key stays on their device and is never generated or stored by this server.
+  read -r -p "Add customer's SSH public key now? [y/N]: " key_choice
+  if [[ "$key_choice" =~ ^[Yy]$ ]]; then
+    read -r -p "Paste one-line SSH public key: " public_key
+    if [[ "$public_key" != *
+  # again from the management menu. It is never committed to the repository.
+  umask 077
+  {
+    printf "USERNAME=%s\n" "$username"
+    printf "PASSWORD=%s\n" "$password"
+    printf "EXPIRY=%s\n" "$expiry"
+  } > "$SD_ACCOUNTS_DIR/$username.cred"
+  chmod 600 "$SD_ACCOUNTS_DIR/$username.cred"
+
+  local domain ns
+  domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
+  ns="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
+  echo
+  ah_ok "SlowDNS SSH account created."
+  echo "========================================"
+  echo "       COPY SLOWDNS ACCOUNT LOGIN"
+  echo "========================================"
+  printf 'USERNAME: %s\n' "$username"
+  printf 'PASSWORD: %s\n' "$password"
+  echo "========================================"
+  echo "Account type: $([[ "$kind" == 1 ]] && echo Trial || echo Normal)"
+  echo "Expires: $expiry"
+  echo
+  echo "CLIENT CONNECTION DETAILS"
+  echo "Tunnel subdomain (NS record name): $domain"
+  echo "Nameserver host (A record name): $ns"
+  echo "Tunnel command (iodine shared tunnel password required): sudo iodine -f -L 1 -M 255 $domain"
+  echo "Then connect: ssh $username@10.77.0.1"
+  if [[ "$key_choice" =~ ^[Yy]$ ]]; then
+    echo "SSH public-key login: enabled; customer must use the matching private key on their device."
+  else
+    echo "SSH public-key login: not configured; use the generated SSH password."
+  fi
+  echo "Keep the SSH password private. Give the shared iodine password to authorised customers only."
+  echo
+  echo "Credentials are also saved root-only at: $SD_ACCOUNTS_DIR/$username.cred"
+  echo "Use SlowDNS option 12 to display this account again for copying."
+  unset password
+  ah_warn "SSH password authentication must be enabled in your sshd policy for password login to work."
+}
+
+sd_accounts_list() {
+  ah_require_root || return 1
+  if ! getent group "$SD_GROUP" >/dev/null; then ah_info "No Africhome SlowDNS customer accounts yet."; return 0; fi
+  printf '%-22s %-12s %-14s %-12s\n' USERNAME TYPE REMAINING STATUS
+  local members name expiry status
+  members="$(getent group "$SD_GROUP" | awk -F: '{print $4}' | tr ',' ' ')"
+  for name in $members; do
+    id "$name" >/dev/null 2>&1 || continue
+    expiry="$(chage -l "$name" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
+    if [[ "$expiry" == "never" || "$expiry" == "Never" ]]; then expiry="Never"
+    elif [[ -n "$expiry" ]]; then
+      local expiry_ts now
+      expiry_ts="$(date -d "$expiry" +%s 2>/dev/null || echo 0)"; now="$(date +%s)"
+      if (( expiry_ts == 0 )); then expiry="Unknown"
+      elif (( expiry_ts <= now )); then expiry="Expired"
+      else expiry="$(( (expiry_ts - now + 86399) / 86400 )) days"; fi
+    else expiry="Unknown"; fi
+    status="$(passwd -S "$name" 2>/dev/null | awk '{print $2}')"
+    printf '%-22s %-12s %-14s %-12s\n' "$name" "Managed" "$expiry" "${status:-unknown}"
+  done
+}
+
+sd_accounts_credentials() {
+  ah_require_root || return 1
+  [[ -d "$SD_ACCOUNTS_DIR" ]] || { ah_warn "No saved SlowDNS credentials found."; return 1; }
+  local username cred saved_user saved_pass saved_expiry
+  read -r -p "Customer username: " username
+  [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return 1; }
+  cred="$SD_ACCOUNTS_DIR/$username.cred"
+  if [[ ! -r "$cred" ]]; then
+    ah_warn "No saved password is available for $username. Passwords created before this update cannot be recovered."
+    return 1
+  fi
+  saved_user="$(sed -n 's/^USERNAME=//p' "$cred" | head -n1)"
+  saved_pass="$(sed -n 's/^PASSWORD=//p' "$cred" | head -n1)"
+  saved_expiry="$(sed -n 's/^EXPIRY=//p' "$cred" | head -n1)"
+  echo
+  echo "========================================"
+  echo "       COPY SLOWDNS ACCOUNT LOGIN"
+  echo "========================================"
+  printf 'USERNAME: %s\n' "$saved_user"
+  printf 'PASSWORD: %s\n' "$saved_pass"
+  printf 'EXPIRES:  %s\n' "$saved_expiry"
+  echo "========================================"
+  echo
+  ah_warn "Keep these credentials private."
+}
+
+sd_accounts_change() {
+  ah_require_root || return 1
+  local username days expiry
+  read -r -p "Managed customer username: " username
+  id "$username" >/dev/null 2>&1 || { ah_err "User does not exist."; return 1; }
+  id -nG "$username" | tr ' ' '\n' | grep -qx "$SD_GROUP" || { ah_err "That user is not an Africhome SlowDNS account."; return 1; }
+  echo "1) Renew/change expiry  2) Lock account  3) Unlock account  4) Delete account"
+  read -r -p "Select: " action
+  case "$action" in
+    1)
+      read -r -p "Additional days to add (1-36500): " days
+      [[ "$days" =~ ^[0-9]+$ ]] && (( days >= 1 && days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
+      local current_expiry base_date
+      current_expiry="$(chage -l "$username" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
+      if [[ "$current_expiry" == "never" || "$current_expiry" == "Never" ]]; then
+        base_date="$(date +%F)"
+      else
+        base_date="$current_expiry"
+        [[ -n "$base_date" ]] || base_date="$(date +%F)"
+        if ! date -d "$base_date" +%F >/dev/null 2>&1; then ah_err "Could not read current expiry."; return 1; fi
+        if [[ "$(date -d "$base_date" +%s)" -lt "$(date +%s)" ]]; then base_date="$(date +%F)"; fi
+      fi
+      expiry="$(date -d "$base_date +${days} days" +%F)" || return 1
+      chage --expiredate "$expiry" "$username" && ah_ok "Account $username renewed by $days day(s)."
+      ;;
+    2) passwd -l "$username" && ah_ok "Account locked: $username" ;;
+    3) passwd -u "$username" && ah_ok "Account unlocked: $username" ;;
+    4)
+      read -r -p "Delete $username and its home directory? [y/N]: " confirm
+      [[ "$confirm" =~ ^[Yy]$ ]] || return 0
+      userdel --remove "$username" && ah_ok "Deleted $username"
+      ;;
+    *) ah_warn "Invalid choice." ;;
+  esac
+}
+
+sd_status() {
+  ah_require_root || return 1
+  if [[ ! -f "$SD_UNIT" ]]; then
+    if command -v iodined >/dev/null 2>&1; then
+      ah_info "Iodine is installed, but the Africhome SlowDNS server is not configured yet."
+      echo "Next step: choose option 2 (Configure tunnel DNS records)."
+    else
+      ah_warn "Iodine is not installed. Choose option 1 (Install iodine) first."
+    fi
+    return 0
+  fi
+  systemctl --no-pager --full status africhome-slowdns || true
+  echo
+  journalctl -u africhome-slowdns -n 20 --no-pager 2>/dev/null || true
+}
+
+sd_client_help() {
+  [[ -r "$SD_ENV" ]] || { ah_warn "Configure the SlowDNS server first."; return 1; }
+  local domain ns
+  domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
+  ns="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
+  echo "Tunnel subdomain (NS record name): $domain"
+  echo "Nameserver host (A record name): $ns"
+  echo "Client command: sudo iodine -f -L 1 -M 255 $domain"
+  echo "Then connect using a managed SSH username: ssh USERNAME@10.77.0.1"
+  echo "The iodine password is shared by the tunnel and is stored in the root-only server config."
+  echo "Individual SSH passwords and account expiry are managed separately in this menu."
+  echo "Iodine lazy mode is enabled by default; -M 255 retains the maximum upstream hostname length."
+}
+
+sd_remove() {
+  ah_require_root || return 1
+  read -r -p "Remove the Africhome SlowDNS service and its saved tunnel password? [y/N]: " confirm
+  [[ "$confirm" =~ ^[Yy]$ ]] || return 0
+  systemctl disable --now africhome-slowdns 2>/dev/null || true
+  rm -f "$SD_UNIT" "$SD_ENV"
+  systemctl daemon-reload
+  ah_ok "SlowDNS service files removed. Customer Linux accounts were left unchanged."
+}
+
+slowdns_menu() {
+  while true; do
+    echo
+    echo "----- SlowDNS SSH (iodine) -----"
+    echo "1) Install iodine"
+    echo "2) Configure tunnel DNS (NS subdomain + A nameserver)"
+    echo "3) Start service"
+    echo "4) Stop service"
+    echo "5) Service status and logs"
+    echo "6) Show client connection instructions"
+    echo "7) Remove tunnel configuration"
+    echo "8) Show configured domain/nameserver"
+    echo "9) Create Trial/Normal customer account"
+    echo "10) List customer accounts"
+    echo "11) Manage/renew/lock/delete customer account"
+    echo "12) Show customer username/password"
+    echo "0) Back"
+    read -r -p "Select an option: " choice
+    case "$choice" in
+      1) sd_install; ah_pause ;;
+      2) sd_setup; ah_pause ;;
+      3)
+        if ah_require_root && [[ -r "$SD_ENV" ]]; then
+          domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
+          ns_host="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
+          if sd_dns_check "$domain" "$ns_host"; then systemctl enable --now africhome-slowdns; fi
+        else
+          ah_warn "Configure SlowDNS first (option 2)."
+        fi
+        ah_pause
+        ;;
+      4) ah_require_root && systemctl disable --now africhome-slowdns; ah_pause ;;
+      5) sd_status; ah_pause ;;
+      6) sd_client_help; ah_pause ;;
+      7) sd_remove; ah_pause ;;
+      8) sd_domain_info; ah_pause ;;
+      9) sd_accounts_create; ah_pause ;;
+      10) sd_accounts_list; ah_pause ;;
+      11) sd_accounts_change; ah_pause ;;
+      12) sd_accounts_credentials; ah_pause ;;
+      0) return ;;
+      *) ah_warn "Invalid choice." ;;
+    esac
+  done
+}
+\\n'* ]] && ssh-keygen -lf <(printf '%s\\n' "$public_key") >/dev/null 2>&1; then
+      install -d -m 700 -o "$username" -g "$username" "/home/$username/.ssh"
+      printf '%s\\n' "$public_key" > "/home/$username/.ssh/authorized_keys"
+      chown "$username:$username" "/home/$username/.ssh/authorized_keys"
+      chmod 600 "/home/$username/.ssh/authorized_keys"
+      ah_ok "SSH public key installed for $username."
+    else
+      userdel --remove "$username" 2>/dev/null || true
+      unset password
+      ah_err "Invalid public key. Account creation was rolled back."
+      return 1
+    fi
+  fi
+
   # Keep the customer SSH password in a root-only file so it can be displayed
   # again from the management menu. It is never committed to the repository.
   umask 077
