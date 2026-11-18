@@ -29,15 +29,15 @@ ssh_users_create(){
   fi
   echo "Set a strong, unique password for $username."
   read -r -s -p "New password: " password
-  printf '\\n'
+  printf '\n'
   read -r -s -p "Confirm password: " password_confirm
-  printf '\\n'
+  printf '\n'
   if [[ -z "$password" || "$password" == *:* || "$password" != "$password_confirm" ]]; then
     unset password password_confirm
     userdel "$username" || true
     ah_err "Password was empty, unsupported, or did not match; account creation was rolled back."; return
   fi
-  if ! printf '%s:%s\\n' "$username" "$password" | chpasswd; then
+  if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
     unset password password_confirm
     userdel "$username" || true
     ah_err "Password setup failed; account creation was rolled back."; return
