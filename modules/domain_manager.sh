@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Central domain inventory and ACME certificate validation. Does not deploy certificates.
 set -Eeuo pipefail
-DM_STATE_DIR="\${DM_STATE_DIR:-/var/lib/africhome/domains}"
-DM_DB="\${DM_DB:-$DM_STATE_DIR/domains.json}"
-DM_LE_DIR="\${DM_LE_DIR:-/etc/letsencrypt/live}"
+DM_STATE_DIR="${DM_STATE_DIR:-/var/lib/africhome/domains}"
+DM_DB="${DM_DB:-$DM_STATE_DIR/domains.json}"
+DM_LE_DIR="${DM_LE_DIR:-/etc/letsencrypt/live}"
 
 dm_valid_domain() {
-  local domain="\${1,,}" label
+  local domain="${1,,}" label
   local -a labels
   [[ $(printf '%s' "$domain" | wc -c) -le 254 && "$domain" == *.* && "$domain" != .* && "$domain" != *. && "$domain" != *..* ]] || return 1
   [[ "$domain" =~ ^[a-z0-9.-]+$ ]] || return 1
   IFS='.' read -r -a labels <<< "$domain"
-  for label in "\${labels[@]}"; do
-    [[ \${#label} -ge 1 && \${#label} -le 63 ]] || return 1
+  for label in "${labels[@]}"; do
+    [[ ${#label} -ge 1 && ${#label} -le 63 ]] || return 1
     [[ "$label" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || return 1
   done
 }
@@ -27,7 +27,7 @@ dm_init() {
 }
 
 dm_register_domain() {
-  local domain="\${1,,}" tmp
+  local domain="${1,,}" tmp
   dm_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
   dm_init || return 1
   jq -e --arg d "$domain" 'any(.[]; .domain == $d)' "$DM_DB" >/dev/null && { ah_warn "$domain is already registered."; return 1; }
@@ -39,7 +39,7 @@ dm_register_domain() {
 }
 
 dm_dns_check() {
-  local domain="\${1,,}" records expected actual matched=0
+  local domain="${1,,}" records expected actual matched=0 mismatch=0
   dm_valid_domain "$domain" || { ah_err "Invalid domain."; return 1; }
   command -v getent >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 || { ah_err "getent and curl are required."; return 1; }
   records="$(getent ahosts "$domain" 2>/dev/null | awk '{print $1}' | sort -u || true)"
@@ -56,7 +56,7 @@ dm_dns_check() {
 }
 
 dm_cert_check() {
-  local domain="\${1,,}" cert key cert_pub key_pub enddate
+  local domain="${1,,}" cert key cert_pub key_pub enddate
   dm_valid_domain "$domain" || { ah_err "Invalid domain."; return 1; }
   cert="$DM_LE_DIR/$domain/fullchain.pem"; key="$DM_LE_DIR/$domain/privkey.pem"
   [[ -s "$cert" && -s "$key" ]] || { ah_warn "No Let's Encrypt certificate found for $domain."; return 1; }
@@ -70,19 +70,19 @@ dm_cert_check() {
 }
 
 dm_update_status() {
-  local domain="\${1,,}" status="$2" tmp
+  local domain="${1,,}" status="$2" tmp
   dm_init || return 1
   tmp="$(mktemp "$DM_STATE_DIR/.domains.XXXXXX")" || return 1
   jq --arg d "$domain" --arg s "$status" --arg now "$(date -u +%FT%TZ)" \
     'map(if .domain == $d then .certificate_status=$s | .certificate_checked_at=$now else . end)' "$DM_DB" > "$tmp" || { rm -f "$tmp"; return 1; }
-  install -o root -g root -m 600 "$tmp" "$DM_DB"; rm -f "$tmp"
+  install -m 600 "$tmp" "$DM_DB"; rm -f "$tmp"
 }
 
 dm_add() {
   ah_require_root || return 1
   local domain
   read -r -p "Domain to register (DNS must point to this VPS): " domain
-  domain="\${domain,,}"
+  domain="${domain,,}"
   dm_valid_domain "$domain" && dm_dns_check "$domain" >/dev/null || return 1
   dm_register_domain "$domain" || return 1
   ah_ok "$domain registered and DNS validated against this VPS."
@@ -92,7 +92,7 @@ dm_issue() {
   ah_require_root || return 1
   local domain email output
   read -r -p "Registered domain for certificate: " domain
-  domain="\${domain,,}"
+  domain="${domain,,}"
   dm_valid_domain "$domain" || { ah_err "Invalid domain."; return 1; }
   dm_init || return 1
   jq -e --arg d "$domain" 'any(.[]; .domain == $d)' "$DM_DB" >/dev/null || { ah_err "Register and DNS-validate the domain first."; return 1; }
@@ -128,7 +128,7 @@ dm_check() {
   ah_require_root || return 1
   local domain
   read -r -p "Domain to check: " domain
-  domain="\${domain,,}"
+  domain="${domain,,}"
   dm_dns_check "$domain" >/dev/null || return 1
   dm_cert_check "$domain" || { dm_update_status "$domain" "invalid" || true; return 1; }
   dm_update_status "$domain" "valid" || return 1
