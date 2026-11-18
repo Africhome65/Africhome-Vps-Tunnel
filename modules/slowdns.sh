@@ -277,6 +277,7 @@ sd_accounts_create() {
     printf "USERNAME=%s\n" "$username"
     printf "PASSWORD=%s\n" "$password"
     printf "EXPIRY=%s\n" "$expiry"
+    printf "PUBKEY=%s\n" "${public_key:-}"
   } > "$SD_ACCOUNTS_DIR/$username.cred"
   chmod 600 "$SD_ACCOUNTS_DIR/$username.cred"
 
@@ -292,7 +293,17 @@ sd_accounts_create() {
   printf 'PASSWORD: %s\n' "$password"
   echo "========================================"
   echo "Account type: $([[ "$kind" == 1 ]] && echo Trial || echo Normal)"
-  echo "Expires: $expiry"
+  echo "EXPIRED ON: $expiry"
+  echo "IP: 10.77.0.1"
+  echo "HOST: $ns"
+  if (( key_enabled )); then
+    printf "PUBKEY: %s\n" "$public_key"
+  else
+    echo "PUBKEY: Not configured"
+  fi
+  echo "NAMESERVER: $domain"
+  echo "OpenSSH: 22"
+  echo "DNS: 53/UDP"
   echo
   echo "CLIENT CONNECTION DETAILS"
   echo "Tunnel subdomain (NS record name): $domain"
@@ -337,7 +348,7 @@ sd_accounts_list() {
 sd_accounts_credentials() {
   ah_require_root || return 1
   [[ -d "$SD_ACCOUNTS_DIR" ]] || { ah_warn "No saved SlowDNS credentials found."; return 1; }
-  local username cred saved_user saved_pass saved_expiry
+  local username cred saved_user saved_pass saved_expiry saved_pubkey
   read -r -p "Customer username: " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return 1; }
   cred="$SD_ACCOUNTS_DIR/$username.cred"
@@ -348,6 +359,7 @@ sd_accounts_credentials() {
   saved_user="$(sed -n 's/^USERNAME=//p' "$cred" | head -n1)"
   saved_pass="$(sed -n 's/^PASSWORD=//p' "$cred" | head -n1)"
   saved_expiry="$(sed -n 's/^EXPIRY=//p' "$cred" | head -n1)"
+  saved_pubkey="$(sed -n 's/^PUBKEY=//p' "$cred" | head -n1)"
   echo
   echo "========================================"
   echo "       COPY SLOWDNS ACCOUNT LOGIN"
@@ -355,6 +367,12 @@ sd_accounts_credentials() {
   printf 'USERNAME: %s\n' "$saved_user"
   printf 'PASSWORD: %s\n' "$saved_pass"
   printf 'EXPIRES:  %s\n' "$saved_expiry"
+  echo "IP:       10.77.0.1"
+  printf 'HOST:     %s\n' "$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
+  printf 'PUBKEY:   %s\n' "${saved_pubkey:-Not configured}"
+  printf 'NAMESERVER: %s\n' "$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
+  echo "OpenSSH:  22"
+  echo "DNS:      53/UDP"
   echo "========================================"
   echo
   ah_warn "Keep these credentials private."
