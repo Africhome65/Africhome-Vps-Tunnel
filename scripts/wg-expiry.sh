@@ -6,15 +6,18 @@ CLIENT_DIR="/root/africhome-wireguard-clients"
 EXPORT_DIR="/home/africhome-wireguard-clients"
 EXPIRY_DIR="/etc/africhome/wireguard-expiry"
 [[ -d "$EXPIRY_DIR" && -s "$WG_CONF" ]] || exit 0
-today="$(date +%F)"
+now="$(date +%s)"
 for meta in "$EXPIRY_DIR"/*.expiry; do
   [[ -f "$meta" ]] || continue
   name="${meta##*/}"; name="${name%.expiry}"
   [[ "$name" =~ ^[A-Za-z0-9_-]{1,32}$ ]] || continue
   expiry="$(sed -n '1p' "$meta")"
   pub="$(sed -n '2p' "$meta")"
-  [[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && "$pub" =~ ^[A-Za-z0-9+/]{43}=$ ]] || continue
-  [[ "$today" > "$expiry" || "$today" == "$expiry" ]] || continue
+  [[ "$pub" =~ ^[A-Za-z0-9+/]{43}=$ ]] || continue
+  if [[ "$expiry" =~ ^[0-9]+$ ]]; then expiry_ts="$expiry"
+  elif [[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then expiry_ts="$(date -d "$expiry 23:59:59" +%s 2>/dev/null || echo 0)"
+  else continue; fi
+  (( expiry_ts > 0 && expiry_ts <= now )) || continue
   grep -Fq "# client:$name" "$WG_CONF" || { rm -f "$meta"; continue; }
   backup="$(mktemp)"
   tmp="$(mktemp /etc/wireguard/wg0expireXXXXXX.conf)"
