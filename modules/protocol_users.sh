@@ -24,6 +24,32 @@ pu_lock() {
   exec 9>"$PU_LOCK"
   flock -n 9 || { ah_warn "Another Africhome protocol account operation is running."; return 1; }
 }
+# Replace Xray config atomically while preserving service-readable ownership and mode.
+pu_install_config() {
+  local source_file="$1" owner group mode staged
+  read -r owner group mode < <(stat -c "%U %G %a" "$PU_CONFIG") || return 1
+  staged="$(mktemp "${PU_CONFIG}.africhome.XXXXXX")" || return 1
+  if ! install -o "$owner" -g "$group" -m "$mode" "$source_file" "$staged"; then
+    rm -f "$staged"
+    return 1
+  fi
+  if ! mv -f "$staged" "$PU_CONFIG"; then
+    rm -f "$staged"
+    return 1
+  fi
+}
+
+pu_xray_can_read_config() {
+  local service_user
+  service_user="$(systemctl show -p User --value xray 2>/dev/null || true)"
+  [[ -n "$service_user" ]] || service_user=root
+  if [[ "$service_user" != root ]] && command -v runuser >/dev/null 2>&1; then
+    runuser -u "$service_user" -- test -r "$PU_CONFIG" || {
+      ah_err "Xray service user $service_user cannot read $PU_CONFIG."
+      return 1
+    }
+  fi
+}
 
 pu_add() {
   ah_require_root || return 1
@@ -44,8 +70,8 @@ pu_add() {
   [[ "$username" =~ ^[A-Za-z0-9_-]{1,24}$ ]] || { ah_err "Invalid account name."; return 1; }
   local email credential expires expires_at backup tmp
   email="afh-${protocol}-${username}-$(date +%s)"
-  if jq -e --arg e "$email" 'any(.[]; .email == $e)' "$PU_DB" >/dev/null; then
-    ah_err "Account identifier already exists."; return 1
+  if jq -e --arg p "$protocol" --arg n "$username" --argjson port "$port" 'any(.[]; .protocol == $p and .name == $n and .port == $port)' "$PU_DB" >/dev/null; then
+    ah_err "An account with that name already exists on this protocol and inbound."; return 1
   fi
   case "$protocol" in
     vless|vmess) credential="$(xray uuid)" || return 1 ;;
@@ -55,8 +81,10 @@ pu_add() {
   [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
   if (( days == 0 )); then
     expires_at=0
+    expires="Never"
   else
     expires_at=$(( $(date +%s) + days * 86400 ))
+    expires="$(date -u -d "@$expires_at" '+%Y-%m-%d %H:%M UTC')"
   fi
 
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
@@ -78,8 +106,12 @@ pu_add() {
   ' "$PU_CONFIG" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update Xray config."; return 1
   fi
-  install -m 600 "$tmp" "$PU_CONFIG"
+  if ! pu_install_config "$tmp"; then
+    rm -f "$tmp"; cp -a "$backup" "$PU_CONFIG"
+    ah_err "Could not safely install the updated Xray config."; return 1
+  fi
   rm -f "$tmp"
+  pu_xray_can_read_config || { cp -a "$backup" "$PU_CONFIG"; return 1; }
   if ! xray run -test -config "$PU_CONFIG"; then
     cp -a "$backup" "$PU_CONFIG"
     ah_err "Xray validation failed; previous config restored."; return 1
@@ -158,7 +190,7 @@ pu_remove_one() {
       .settings.clients = [.settings.clients[]? | select(.email != $e)]
     else . end)
   ' "$PU_CONFIG" > "$tmp"; then rm -f "$tmp"; return 1; fi
-  install -m 600 "$tmp" "$PU_CONFIG"
+  pu_install_config "$tmp" || { rm -f "$tmp"; return 1; }
   rm -f "$tmp"
 }
 
