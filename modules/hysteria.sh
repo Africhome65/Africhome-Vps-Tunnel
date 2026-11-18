@@ -196,6 +196,7 @@ hy2_menu() {
     echo "3) Show client import URI"
     echo "4) Service status and logs"
     echo "5) Restart Hysteria 2"
+    echo "6) Hysteria user account management"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -204,6 +205,7 @@ hy2_menu() {
       3) hy2_show_client; ah_pause ;;
       4) hy2_status; ah_pause ;;
       5) ah_require_root && systemctl restart hysteria-server.service; ah_pause ;;
+      6) hy2u_menu ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
