@@ -14,6 +14,9 @@ ar_register_service "acct_test_0001" "alice" "vless" "vless-email-001" 0
 ar_register_service "acct_test_0001" "alice" "trojan" "trojan-email-001" 0
 [[ "$(jq '.accounts | length' "$AR_REGISTRY")" == "1" ]]
 [[ "$(jq '.accounts[0].services | length' "$AR_REGISTRY")" == "2" ]]
+ar_register_service "acct_test_0001" "alice" "vless" "vless-email-001" 12345
+[[ "$(jq '.accounts[0].services | length' "$AR_REGISTRY")" == "2" ]]
+[[ "$(jq -r '.accounts[0].expires_at' "$AR_REGISTRY")" == "12345" ]]
 ar_set_service_status "acct_test_0001" "vless" "vless-email-001" "suspended"
 [[ "$(jq -r '.accounts[0].services[] | select(.service == "vless") | .status' "$AR_REGISTRY")" == "suspended" ]]
 [[ "$(stat -c '%a' "$AR_REGISTRY")" == "600" ]]
