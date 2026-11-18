@@ -9,7 +9,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
 - WireGuard installation, server setup, client profile creation, peer listing, and client removal
-- SlowDNS SSH using iodine, with systemd service management and client instructions
+- Legacy SlowDNS SSH using iodine, retained for controlled migration/rollback
+- DNSTT server/client bootstrap, protected key management, operator-owned domain/nameserver setup, and systemd service preparation
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
@@ -23,7 +24,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
 - For WireGuard: UDP 51820 (or chosen port)
-- For SlowDNS: delegated DNS subdomain and UDP 53
+- For DNSTT: delegated DNS subdomain, authoritative nameserver hostname, and UDP 53
 - For VLESS REALITY: chosen TCP port (default 443)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key\n- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
 
@@ -112,12 +113,13 @@ License to be determined.
 - The optional nftables BitTorrent filter is a common-port block only. It is not comprehensive detection and is runtime-only unless an administrator configures persistence separately.
 
 
-## DNSTT bootstrap (experimental)
+## DNSTT primary tunnel (migration in progress)
 
-- Build the official DNSTT server/client and create a protected server keypair with `sudo bash scripts/install-dnstt.sh`.
+- DNSTT is the intended primary DNS tunnel. Build the official DNSTT server/client and create a protected server keypair with `sudo bash scripts/install-dnstt.sh`.
 - The bootstrap verifies the pinned Go 1.27.4 archive checksum when a Go 1.21+ toolchain is not already available, builds both binaries, and preserves an existing complete keypair.
-- The bootstrap does not stop iodine, bind public UDP 53, change DNS records or firewall rules, or start a DNSTT service.
-- See [docs/dnstt-migration.md](docs/dnstt-migration.md) for the local SSH-forwarding test, safe migration procedure, and domain-length MTU limitation.
+- Configure each operator's own domain and authoritative nameserver with `sudo bash scripts/configure-dnstt-domain.sh`, then prepare the systemd unit with `sudo bash scripts/install-dnstt-service.sh`.
+- Service preparation does not stop iodine, bind public UDP 53, change DNS records or firewall rules, enable the service, or start it. The public port switch must be a separate controlled migration.
+- See [docs/dnstt-migration.md](docs/dnstt-migration.md) for DNS setup, service preparation, safe migration procedure, and domain-length MTU limitation.
 - DNSTT client payload capacity depends on the tunnel domain length. Keep the operator's existing domain when requested; do not promise improved performance without a real throughput test.
 - Current verification covers a local DNSTT client/server stream reaching the SSH banner. External DNS delegation, UDP 53 reachability, and mobile/HTTP Injector compatibility remain unverified.
 
