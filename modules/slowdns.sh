@@ -72,13 +72,11 @@ sd_setup() {
     fi
   fi
 
-  # Africhome DNS layout: the tunnel subdomain is the NS record NAME;
-  # the nameserver host is the A record NAME. For the user's DNS:
-  # NS ns-smarty.uk.afriko2.co.uk -> smarty.uk.afriko2.co.uk
-  # A  smarty.uk.afriko2.co.uk    -> VPS public IPv4
-  read -r -p "Tunnel subdomain (NS record NAME; e.g. ns-smarty.uk.afriko2.co.uk): " domain
+  # Each administrator supplies their own tunnel domain and nameserver host.
+  # The tunnel subdomain is the NS record NAME; the nameserver host is the A record NAME.
+  read -r -p "Tunnel subdomain (NS record NAME, e.g. tunnel.example.com): " domain
   sd_valid_domain "$domain" || { ah_err "Enter a valid fully-qualified tunnel subdomain."; return 1; }
-  read -r -p "Nameserver host (A record NAME; e.g. smarty.uk.afriko2.co.uk): " ns_host
+  read -r -p "Nameserver host (A record NAME, e.g. ns-tunnel.example.com): " ns_host
   sd_valid_domain "$ns_host" || { ah_err "Enter a valid fully-qualified nameserver hostname."; return 1; }
 
   if [[ -n "$old_password" ]]; then
