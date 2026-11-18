@@ -14,8 +14,40 @@ sd_valid_domain() {
 
 sd_install() {
   ah_require_root || return 1
-  ah_apt_install iodine openssh-client openssl || return 1
+  ah_apt_install iodine openssh-client openssl dnsutils || return 1
   ah_ok "Iodine, SSH client and password generator installed."
+}
+
+# Check public DNS before starting iodine. The NS hostname may use any valid
+# label (including ns-, ns1-, dns-, etc.); it is compared as a DNS name.
+sd_dns_check() {
+  local domain="$1" ns_host="$2" resolver="1.1.1.1"
+  local a_records ns_records normalized_ns
+  if ! command -v dig >/dev/null 2>&1; then
+    ah_warn "dig is unavailable; install dnsutils to verify DNS."
+    return 1
+  fi
+
+  a_records="$(dig +time=3 +tries=1 +short A "$ns_host" @"$resolver" 2>/dev/null | awk '/^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$/')"
+  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" @"$resolver" 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\\.$//' )"
+  normalized_ns="$(printf '%s' "$ns_host" | tr '[:upper:]' '[:lower:]' | sed 's/\\.$//')"
+
+  if [[ -z "$a_records" ]]; then
+    ah_err "DNS check failed: $ns_host has no public IPv4 A record at $resolver."
+    return 1
+  fi
+  if ! printf '%s\\n' "$ns_records" | grep -Fxq "$normalized_ns"; then
+    ah_err "DNS check failed: $domain is not publicly delegated to $ns_host."
+    if [[ -n "$ns_records" ]]; then
+      echo "  Public NS records currently returned:"
+      printf '  %s\\n' "$ns_records"
+    else
+      echo "  No public NS records were returned for $domain."
+    fi
+    return 1
+  fi
+  ah_ok "Public DNS records found: $ns_host -> $(printf '%s' "$a_records" | paste -sd, -)"
+  ah_ok "$domain is delegated to $ns_host."
 }
 
 sd_setup() {
@@ -107,8 +139,12 @@ EOF
   echo "  Delegation: set NS for $domain to $ns_host"
   echo "  Firewall: allow UDP 53 at the VPS provider and UFW"
   echo "  Do not proceed until the records are saved and have propagated."
-  read -r -p "Have you completed and verified DNS delegation and opened UDP 53? [y/N]: " ready
-  if [[ "$ready" =~ ^[Yy]$ ]]; then
+  read -r -p "Have you completed and opened UDP 53? Run public DNS verification now? [Y/n]: " ready
+  if [[ ! "$ready" =~ ^[Nn]$ ]]; then
+    sd_dns_check "$domain" "$ns_host" || {
+      ah_warn "DNS verification did not pass. Configuration is saved, but the service will not be started."
+      return 1
+    }
     systemctl enable --now africhome-slowdns
     if systemctl is-active --quiet africhome-slowdns; then
       ah_ok "SlowDNS service is running."
@@ -299,7 +335,16 @@ slowdns_menu() {
     case "$choice" in
       1) sd_install; ah_pause ;;
       2) sd_setup; ah_pause ;;
-      3) ah_require_root && systemctl enable --now africhome-slowdns; ah_pause ;;
+      3)
+        if ah_require_root && [[ -r "$SD_ENV" ]]; then
+          domain="$(sed -n 's/^DNS_DOMAIN=//p' "$SD_ENV" | head -n1)"
+          ns_host="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
+          if sd_dns_check "$domain" "$ns_host"; then systemctl enable --now africhome-slowdns; fi
+        else
+          ah_warn "Configure SlowDNS first (option 2)."
+        fi
+        ah_pause
+        ;;
       4) ah_require_root && systemctl disable --now africhome-slowdns; ah_pause ;;
       5) sd_status; ah_pause ;;
       6) sd_client_help; ah_pause ;;
