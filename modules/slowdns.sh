@@ -219,9 +219,13 @@ sd_accounts_create() {
   ns="$(sed -n 's/^DNS_NS_HOST=//p' "$SD_ENV" | head -n1)"
   echo
   ah_ok "SlowDNS SSH account created."
+  echo "========================================"
+  echo "       COPY SLOWDNS ACCOUNT LOGIN"
+  echo "========================================"
+  printf 'USERNAME: %s\n' "$username"
+  printf 'PASSWORD: %s\n' "$password"
+  echo "========================================"
   echo "Account type: $([[ "$kind" == 1 ]] && echo Trial || echo Normal)"
-  echo "Username: $username"
-  echo "SSH password: $password"
   echo "Expires: $expiry"
   echo
   echo "CLIENT CONNECTION DETAILS"
@@ -231,7 +235,7 @@ sd_accounts_create() {
   echo "Then connect: ssh $username@10.77.0.1"
   echo "Keep the SSH password private. Give the shared iodine password to authorised customers only."
   unset password
-  ah_warn "The generated SSH password is shown once. Save it securely now."
+  ah_warn "Copy and save the username and password now. The SSH password is shown only at creation."
   ah_warn "SSH password authentication must be enabled in your sshd policy for password login to work."
 }
 
