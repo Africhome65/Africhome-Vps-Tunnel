@@ -184,14 +184,22 @@ sd_accounts_create() {
 sd_accounts_list() {
   ah_require_root || return 1
   if ! getent group "$SD_GROUP" >/dev/null; then ah_info "No Africhome SlowDNS customer accounts yet."; return 0; fi
-  printf '%-22s %-12s %-14s %-12s\n' USERNAME TYPE EXPIRY STATUS
+  printf '%-22s %-12s %-14s %-12s\n' USERNAME TYPE REMAINING STATUS
   local members name expiry status
   members="$(getent group "$SD_GROUP" | awk -F: '{print $4}' | tr ',' ' ')"
   for name in $members; do
     id "$name" >/dev/null 2>&1 || continue
     expiry="$(chage -l "$name" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
+    if [[ "$expiry" == "never" || "$expiry" == "Never" ]]; then expiry="Never"
+    elif [[ -n "$expiry" ]]; then
+      local expiry_ts now
+      expiry_ts="$(date -d "$expiry" +%s 2>/dev/null || echo 0)"; now="$(date +%s)"
+      if (( expiry_ts == 0 )); then expiry="Unknown"
+      elif (( expiry_ts <= now )); then expiry="Expired"
+      else expiry="$(( (expiry_ts - now + 86399) / 86400 )) days"; fi
+    else expiry="Unknown"; fi
     status="$(passwd -S "$name" 2>/dev/null | awk '{print $2}')"
-    printf '%-22s %-12s %-14s %-12s\n' "$name" "Managed" "${expiry:-unknown}" "${status:-unknown}"
+    printf '%-22s %-12s %-14s %-12s\n' "$name" "Managed" "$expiry" "${status:-unknown}"
   done
 }
 
