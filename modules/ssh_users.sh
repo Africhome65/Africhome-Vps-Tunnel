@@ -1,8 +1,11 @@
+SSH_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$SSH_USERS_BASE_DIR/modules/account_registry.sh"
+
 #!/usr/bin/env bash
 
 ssh_users_create(){
   ah_require_root || return
-  local username expiry
+  local username expiry days expires_at account_id password password_confirm
   read -r -p "New SSH username (letters, digits, _ or -): " username
   [[ "$username" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || { ah_err "Invalid username."; return; }
   if id "$username" >/dev/null 2>&1; then ah_err "That username already exists."; return; fi
@@ -13,6 +16,7 @@ ssh_users_create(){
   expiry=""
   if (( days > 0 )); then
     expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
+    expires_at="$(date -u -d "$expiry" +%s)" || { ah_err "Could not calculate expiry timestamp."; return; }
   fi
   if ! useradd --create-home --shell /bin/bash "$username"; then
     ah_err "Could not create account."; return
@@ -23,22 +27,29 @@ ssh_users_create(){
       ah_err "Could not set expiry; account creation was rolled back."; return
     fi
   fi
-  local password
   echo "Set a strong, unique password for $username."
-  echo "WARNING: Password characters will be visible while you type."
-  read -r -p "New password (visible): " password
-  if [[ -z "$password" || "$password" == *:* ]]; then
-    unset password
+  read -r -s -p "New password: " password
+  printf '\\n'
+  read -r -s -p "Confirm password: " password_confirm
+  printf '\\n'
+  if [[ -z "$password" || "$password" == *:* || "$password" != "$password_confirm" ]]; then
+    unset password password_confirm
     userdel "$username" || true
-    ah_err "Password was empty or contained an unsupported colon; account creation was rolled back."; return
+    ah_err "Password was empty, unsupported, or did not match; account creation was rolled back."; return
   fi
-  if ! printf '%s:%s\n' "$username" "$password" | chpasswd; then
-    unset password
+  if ! printf '%s:%s\\n' "$username" "$password" | chpasswd; then
+    unset password password_confirm
     userdel "$username" || true
     ah_err "Password setup failed; account creation was rolled back."; return
   fi
-  unset password
-  ah_ok "SSH system account '$username' created."
+  unset password password_confirm
+  account_id="$(openssl rand -hex 16)" || { userdel "$username" || true; ah_err "Could not create account ID."; return; }
+  if ! ar_register_service "$account_id" "$username" "ssh" "$username" "$expires_at"; then
+    userdel "$username" || true
+    ah_err "Could not register SSH account; account creation was rolled back."; return
+  fi
+  ah_ok "SSH system account '$username' created and registered."
+  echo "Account ID: $account_id"
   [[ -n "$expiry" ]] && ah_info "Account expiry: $expiry"
   ah_warn "This creates a Linux account; SSH daemon policy, key-only authentication, and network access still depend on your server configuration."
 }
