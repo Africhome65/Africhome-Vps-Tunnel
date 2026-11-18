@@ -129,3 +129,16 @@ License to be determined.
 - Every operator supplies their own delegated tunnel domain and authoritative nameserver hostname; the project must never hard-code the maintainer's domain or nameserver.
 - Configure these values interactively with `sudo bash scripts/configure-dnstt-domain.sh`. They are stored locally in `/etc/africhome-dnstt/server.env` with restrictive permissions.
 - The script does not create DNS records. Operators must configure the A record, NS delegation, and registrar glue (if required) with their own DNS provider.
+
+
+## DNSTT customer accounts and custom DNS resolvers
+
+- DNSTT transports TCP streams over DNS. It does not implement customer username/password authentication itself; Africhome authenticates each customer at the SSH service using a separate Linux account.
+- Use menu option **14) DNSTT customer accounts / custom DNS resolver** to create, list, renew, disable, re-enable, reset, or delete customer SSH accounts.
+- New customer accounts are placed in the `africhome-dnstt` group, use a non-root username, receive a generated password shown once, and can have a Linux account-expiry date. Passwords are not saved in plaintext by this module.
+- Customer accounts use the SSH upstream configured for DNSTT (normally `127.0.0.1:22`). They do not use the VPS root login. The SSH daemon must permit password authentication for these accounts; Africhome does not silently weaken the server's SSH policy.
+- The DNSTT public key authenticates the tunnel server. The customer's SSH username/password authenticates the individual login. These are separate credentials.
+- Client resolver guidance supports recursive DNS over UDP (for example `8.8.8.8:53` or a custom `resolver.example:53`), DNS-over-TLS (`-dot`), and DNS-over-HTTPS (`-doh`). The resolver is selected by the DNSTT client; it is not the authoritative nameserver hostname in the DNS delegation.
+- The DNS domain and authoritative nameserver remain the operator's own values saved in `/etc/africhome-dnstt/server.env`. Existing domain settings and server keys are not replaced by the account/resolver menu.
+- The recursive resolver option affects how the client sends DNSTT DNS queries. It does not turn DNSTT into a general UDP tunnel or make arbitrary UDP applications work.
+- External Android-client compatibility must be tested with the exact app and selected resolver before declaring a profile production-ready.
