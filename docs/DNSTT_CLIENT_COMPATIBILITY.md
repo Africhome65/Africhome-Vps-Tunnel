@@ -1,69 +1,79 @@
 # DNSTT Client Compatibility
 
-Africhome DNSTT is a transport layer, not a standalone VPN protocol or a universal
-VPN-app import format. The DNSTT client creates a local TCP listener; an SSH
-client or another application that can use that listener must connect to it.
+Africhome DNSTT is a transport layer, not a standalone VPN server or a
+universal VPN-app import format. Compatibility depends on the client app's
+implementation of the DNSTT wire protocol and its account/configuration model.
 
-## Shared connection architecture
+## Shared server architecture
 
-1. The device runs a compatible `dnstt-client` binary.
-2. The client sends DNS tunnel traffic to a recursive resolver and reaches the
-   configured DNSTT tunnel domain.
-3. DNSTT exposes a local TCP listener on the device (the examples use
-   `127.0.0.1:7001`).
-4. A local SSH client connects to that listener using the customer's Linux
-   username and password. The server's SSH daemon authenticates the customer.
-5. The DNSTT server forwards the tunnel stream to the configured SSH service.
+1. Africhome runs the DNSTT server and forwards the tunnel stream to SSH on
+   `127.0.0.1:22`.
+2. A client app resolves the configured tunnel domain through a recursive DNS
+   resolver and establishes the DNSTT session.
+3. The client exposes the tunnel to its SSH/network stack.
+4. The VPS SSH daemon authenticates the customer's individual Linux username
+   and password. DNSTT's public key authenticates the tunnel server.
 
 The recursive resolver (for example `8.8.8.8:53`) is not the authoritative
-nameserver. The authoritative DNS delegation and DNSTT tunnel domain must be
-configured separately.
+nameserver. DNS delegation and the tunnel domain are configured separately.
 
-## App compatibility status
+## App compatibility status (research, not device certification)
 
-No app below should be advertised as DNSTT-compatible until a real end-to-end
-test has been completed with the named app version, Android version, and
-connection mode.
+Official app listings currently advertise DNSTT support in these apps:
 
-| Application | Current status | What must be verified |
+| Application | Published protocol claim | Africhome status |
 |---|---|---|
-| ZIVPN | Not yet verified | Whether the selected mode can use an externally running DNSTT client/local TCP or SOCKS proxy, and whether its SSH fields map to the local listener |
-| HTTP Injector | Not yet verified | Whether its SSH/proxy mode can target the local DNSTT listener without trying to establish a separate incompatible transport |
-| HTTP Custom | Not yet verified | Whether its supported SSH/custom payload mode can use a local tunnel endpoint |
-| NapsternetV | Not yet verified | Whether the app supports an external local TCP/SOCKS endpoint or a compatible import format |
-| TLS Tunnel | Not yet verified | Whether the app can use an external DNSTT local listener; TLS Tunnel's own transport must not be assumed to be DNSTT |
+| ZIVPN Tunnel | Lists “Slow DNS Tunnel (DNSTT)” and V2Ray over Slow DNS | Native DNSTT feature advertised; test against this server and confirm fields/export format |
+| HTTP Injector | Lists “DNS Tunnel (DNSTT / SlowDNS)” | Native DNSTT feature advertised; test server interoperability and customer profile format |
+| NapsternetV / NPV Tunnel | Lists DNSTT among supported protocols and supports file/QR/link/clipboard imports | Native DNSTT feature advertised; identify exact config schema and test import |
+| HTTP Custom | Lists “SlowDNS” but does not explicitly identify DNSTT in the current published protocol list | Do not assume DNSTT wire compatibility; investigate whether its SlowDNS implementation is compatible |
+| TLS Tunnel | Published listing confirms SSH/private-server features, but no DNSTT claim was found | No confirmed DNSTT support; do not advertise as compatible |
+
+Sources:
+- ZIVPN Google Play listing: https://play.google.com/store/apps/details?id=com.zi.zivpn
+- HTTP Injector Google Play listing: https://play.google.com/store/apps/details?id=com.evozi.injector
+- NapsternetV / NPV Tunnel Google Play listing: https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv
+- HTTP Custom Google Play listing: https://play.google.com/store/apps/details?id=xyz.easypro.httpcustom
+- TLS Tunnel Google Play listing: https://play.google.com/store/apps/details?id=com.tlsvpn.tlstunnel
+
+A published protocol claim is not proof that a particular app version interoperates
+with Africhome's server settings. Record the app version, Android version, exact
+mode, and successful end-to-end test before marking it verified.
 
 ## Required implementation approach
 
 - Keep DNSTT server installation, keys, DNS delegation, and customer SSH
   accounts independent of any one Android VPN application.
-- Distribute the DNSTT client binary separately for each supported platform,
-  with checksums and platform-specific installation instructions.
-- Generate a generic profile containing the tunnel domain, recursive resolver,
-  public key, local listener address, SSH host/port, customer username, and
-  account expiry. Never include the DNSTT private key.
+- Prefer each app's native DNSTT implementation where it is documented. Do not
+  assume every app requires an external `dnstt-client` process.
+- Maintain a generic DNSTT profile with tunnel domain, recursive resolver,
+  public key, SSH host/port, customer username, and account expiry.
+- Build app-specific exports only from the app's documented import schema.
+  NapsternetV's `.npv4` format must not be guessed or fabricated.
 - Do not put SSH passwords in exported files by default. Deliver credentials
   separately through a secure channel.
-- Treat app-specific configuration exports as separate adapters. Only add an
-  adapter after confirming the app's documented import schema and testing it
-  on a real device.
-- If an app cannot launch or connect to an external DNSTT client/local listener,
-  mark it unsupported for this architecture rather than claiming compatibility.
+- Never distribute the DNSTT private key or VPS root credentials.
+- If an app's SlowDNS mode is not proven to use the same DNSTT protocol, mark
+  it unverified rather than treating “SlowDNS” and “DNSTT” as synonyms.
 
-## Acceptance tests before claiming support
+## Acceptance tests before claiming Africhome support
 
-1. Verify DNS delegation and reachability of the DNSTT server from an external
-   network.
-2. Start the platform's DNSTT client and confirm the local listener is created.
-3. Connect an SSH client through the listener using a non-root customer account.
-4. Confirm wrong credentials are rejected and the correct account is accepted.
-5. Confirm account expiry/disable actions prevent new SSH sessions.
-6. For each Android app, record app version, Android version, selected mode,
-   exact local endpoint configuration, and a successful end-to-end test.
-7. Test on mobile data and Wi-Fi; do not infer success from a server-side test.
+1. Verify DNS delegation and reachability of the VPS DNSTT listener from an
+   external network.
+2. Test the official DNSTT client with the public key, tunnel domain, and
+   selected recursive resolver.
+3. For each native app, import/create a profile using its documented DNSTT
+   mode and the Africhome server details.
+4. Confirm the app establishes a tunnel and that SSH authenticates a non-root
+   customer account.
+5. Confirm wrong credentials are rejected and account disable/expiry prevents
+   new SSH sessions.
+6. Record app version, Android version, exact settings, logs, and a successful
+   end-to-end test on mobile data and Wi-Fi.
+7. Only then mark that app/server combination as verified.
 
 ## Security
 
-The DNSTT public key authenticates the tunnel server. SSH username/password
-authenticates the customer. Never distribute the DNSTT private key or VPS root
-credentials. A public key is not a customer credential.
+The DNSTT public key authenticates the tunnel server. SSH credentials
+authenticate each customer. The public key is safe to distribute; the private
+key and root credentials are not.
