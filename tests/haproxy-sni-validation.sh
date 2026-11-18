@@ -8,9 +8,9 @@ tmp="$(mktemp -d)"
 haproxy_pid=""
 backend_a_pid=""
 backend_b_pid=""
-proxy_port="\${AFRICHOME_TEST_PROXY_PORT:-19443}"
-backend_a_port="\${AFRICHOME_TEST_BACKEND_A_PORT:-19444}"
-backend_b_port="\${AFRICHOME_TEST_BACKEND_B_PORT:-19445}"
+proxy_port="${AFRICHOME_TEST_PROXY_PORT:-19443}"
+backend_a_port="${AFRICHOME_TEST_BACKEND_A_PORT:-19444}"
+backend_b_port="${AFRICHOME_TEST_BACKEND_B_PORT:-19445}"
 cleanup() {
   [[ -z "$haproxy_pid" ]] || kill "$haproxy_pid" 2>/dev/null || true
   [[ -z "$backend_a_pid" ]] || kill "$backend_a_pid" 2>/dev/null || true
