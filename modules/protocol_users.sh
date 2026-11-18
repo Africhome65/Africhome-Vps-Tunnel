@@ -51,13 +51,12 @@ pu_add() {
     vless|vmess) credential="$(xray uuid)" || return 1 ;;
     trojan) credential="$(openssl rand -hex 24)" || return 1 ;;
   esac
-  read -r -p "Expiry date YYYY-MM-DD (or 'never'): " expires
-  if [[ "$expires" == "never" ]]; then
+  read -r -p "Validity in days (0 = never expires): " days
+  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
+  if (( days == 0 )); then
     expires_at=0
   else
-    [[ "$expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { ah_err "Use YYYY-MM-DD or never."; return 1; }
-    expires_at="$(date -d "$expires 23:59:59" +%s 2>/dev/null)" || { ah_err "Invalid expiry date."; return 1; }
-    (( expires_at > $(date +%s) )) || { ah_err "Expiry must be in the future."; return 1; }
+    expires_at=$(( $(date +%s) + days * 86400 ))
   fi
 
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
@@ -111,7 +110,7 @@ pu_list() {
   ah_require_root || return 1
   pu_require_tools || return 1
   printf '\n%-10s %-18s %-8s %-22s %s\n' "PROTOCOL" "NAME" "PORT" "EXPIRES" "STATUS"
-  jq -r '.[] | [.protocol,.name,(.port|tostring),(if .expires_at == 0 then "Never" else (.expires_at|todate) end),(if .expires_at == 0 or .expires_at > now then "Active" else "Expired (pending cleanup)" end)] | @tsv' "$PU_DB" |
+  jq -r '.[] | [.protocol,.name,(.port|tostring),(if .expires_at == 0 then "Never" elif .expires_at <= now then "0 days" else (((.expires_at - now) / 86400) | ceil | tostring) + " days" end),(if .expires_at == 0 or .expires_at > now then "Active" else "Expired (pending cleanup)" end)] | @tsv' "$PU_DB" |
   while IFS=$'\t' read -r p n port expiry status; do printf '%-10s %-18s %-8s %-22s %s\n' "$p" "$n" "$port" "$expiry" "$status"; done
 }
 
@@ -125,13 +124,21 @@ pu_renew() {
   local record expires expires_at tmp
   record="$(jq -c --arg n "$name" '[.[] | select(.name == $n)] | .[0] // empty' "$PU_DB")"
   [[ -n "$record" ]] || { ah_err "Account not found."; return 1; }
-  read -r -p "New expiry date YYYY-MM-DD (or 'never'): " expires
-  if [[ "$expires" == "never" ]]; then
+  read -r -p "Additional days to add (0 = never expires): " days
+  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
+  if (( days == 0 )); then
     expires_at=0
   else
-    [[ "$expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { ah_err "Use YYYY-MM-DD or never."; return 1; }
-    expires_at="$(date -d "$expires 23:59:59" +%s 2>/dev/null)" || { ah_err "Invalid expiry date."; return 1; }
-    (( expires_at > $(date +%s) )) || { ah_err "Expiry must be in the future."; return 1; }
+    local current_expiry
+    current_expiry="$(jq -r '.expires_at // 0' <<< "$record")"
+    if (( current_expiry == 0 )); then
+      expires_at=$(( $(date +%s) + days * 86400 ))
+    else
+      local base_time
+      base_time="$current_expiry"
+      (( base_time < $(date +%s) )) && base_time="$(date +%s)"
+      expires_at=$(( base_time + days * 86400 ))
+    fi
   fi
   tmp="$(mktemp)"
   if ! jq --arg n "$name" --argjson expiry "$expires_at" 'map(if .name == $n then .expires_at = $expiry else . end)' "$PU_DB" > "$tmp"; then
@@ -139,7 +146,7 @@ pu_renew() {
   fi
   install -m 600 "$tmp" "$PU_DB"
   rm -f "$tmp"
-  ah_ok "Account $name expiry updated to $expires."
+  ah_ok "Account $name renewed by $days day(s)."
 }
 
 pu_remove_one() {
@@ -247,10 +254,10 @@ pu_menu() {
   while true; do
     echo
     echo "----- Protocol Account Management -----"
-    echo "1) Add VLESS / VMess / Trojan account with expiry"
+    echo "1) Add VLESS / VMess / Trojan account (validity in days)"
     echo "2) List managed accounts"
     echo "3) Remove managed account"
-    echo "4) Renew account expiry"
+    echo "4) Renew account (add days)"
     echo "5) Run expiry cleanup now"
     echo "6) Enable daily automatic expiry"
     echo "0) Back"
