@@ -20,6 +20,8 @@ jobs:
             echo "Checking $file"
             bash -n "$file"
           done < <(find . -type f -name '*.sh' -print0)
+      - name: Test Hysteria input validation
+        run: bash tests/hysteria-validation.sh
       - name: Run ShellCheck errors
         run: |
           sudo apt-get update
