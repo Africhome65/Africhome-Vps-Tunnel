@@ -72,6 +72,7 @@ dm_cert_check() {
 dm_update_status() {
   local domain="${1,,}" status="$2" tmp
   dm_init || return 1
+  jq -e --arg d "$domain" 'any(.[]; .domain == $d)' "$DM_DB" >/dev/null || { ah_err "Domain is not registered."; return 1; }
   tmp="$(mktemp "$DM_STATE_DIR/.domains.XXXXXX")" || return 1
   jq --arg d "$domain" --arg s "$status" --arg now "$(date -u +%FT%TZ)" \
     'map(if .domain == $d then .certificate_status=$s | .certificate_checked_at=$now else . end)' "$DM_DB" > "$tmp" || { rm -f "$tmp"; return 1; }
