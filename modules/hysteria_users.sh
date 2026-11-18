@@ -6,6 +6,7 @@ HY2_USERS_CONFIG="${HY2_USERS_CONFIG:-/etc/hysteria/config.yaml}"
 HY2_USERS_DB="${HY2_USERS_DB:-/etc/africhome-hysteria-users.json}"
 HY2_USERS_LOCK="${HY2_USERS_LOCK:-/run/lock/africhome-hysteria-users.lock}"
 HY2_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$HY2_USERS_BASE_DIR/lib/common.sh"
 . "$HY2_USERS_BASE_DIR/modules/account_registry.sh"
 
 hy2u_require() {
