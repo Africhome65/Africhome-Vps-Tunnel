@@ -85,7 +85,7 @@ hy2_setup() {
   cat > "$hook_tmp" <<'HOOK'
 #!/usr/bin/env bash
 set -Eeuo pipefail
-DOMAIN="$DOMAIN"
+DOMAIN="@@DOMAIN@@"
 DEST="/etc/hysteria/certs"
 SRC="/etc/letsencrypt/live/$DOMAIN"
 [[ -s "$SRC/fullchain.pem" && -s "$SRC/privkey.pem" ]] || exit 1
