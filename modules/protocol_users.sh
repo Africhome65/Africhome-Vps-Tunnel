@@ -257,7 +257,7 @@ pu_expire() {
   ah_require_root || return 1
   pu_require_tools || return 1
   pu_lock || return 1
-  local expired record protocol port email tmp backup changed=0
+  local expired record protocol port email account_id tmp backup changed=0
   expired="$(jq -c '.[] | select(.expires_at != 0 and .expires_at <= now)' "$PU_DB")"
   [[ -n "$expired" ]] || { ah_info "No expired protocol accounts."; return 0; }
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
@@ -267,6 +267,7 @@ pu_expire() {
     protocol="$(jq -r '.protocol' <<< "$record")"
     port="$(jq -r '.port' <<< "$record")"
     email="$(jq -r '.email' <<< "$record")"
+    account_id="$(jq -r '.account_id // empty' <<< "$record")"
     pu_remove_one "$protocol" "$port" "$email" || { cp -a "$backup" "$PU_CONFIG"; ah_err "Expiry cleanup failed; config restored."; return 1; }
     changed=1
   done <<< "$expired"
@@ -280,6 +281,15 @@ pu_expire() {
       ah_err "Xray restart failed; previous config restored. Expiry records were retained."; return 1
     fi
     install -m 600 "$tmp" "$PU_DB"; rm -f "$tmp"
+    while IFS= read -r record; do
+      [[ -n "$record" ]] || continue
+      account_id="$(jq -r '.account_id // empty' <<< "$record")"
+      protocol="$(jq -r '.protocol' <<< "$record")"
+      email="$(jq -r '.email' <<< "$record")"
+      if [[ -n "$account_id" ]] && ! ar_set_service_status "$account_id" "$protocol" "$email" "expired"; then
+        ah_warn "An expired Xray account was removed, but its registry status could not be updated."
+      fi
+    done <<< "$expired"
     ah_ok "Expired protocol accounts have been removed."
   fi
 }
