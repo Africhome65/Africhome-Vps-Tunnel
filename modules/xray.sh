@@ -25,7 +25,7 @@ xray_install() {
 xray_setup_vless_reality() {
   ah_require_root || return 1
   command -v xray >/dev/null 2>&1 || { ah_warn "Install Xray first."; return 1; }
-  local backup_config="" port server_name public_ip uuid key_output private_key public_key short_id
+  local backup_config="" backup_env="" port server_name public_ip uuid key_output private_key public_key short_id
   if [[ -e "$XRAY_CONFIG" ]]; then
     ah_warn "$XRAY_CONFIG already exists."
     read -r -p "Back it up and replace it with a new Africhome VLESS + REALITY configuration? [y/N]: " replace_config
@@ -34,7 +34,14 @@ xray_setup_vless_reality() {
     cp -a "$XRAY_CONFIG" "$backup_config" || { ah_err "Could not back up the existing Xray configuration."; return 1; }
     ah_ok "Existing configuration backed up to $backup_config"
   fi
-  [[ ! -e "$XRAY_ENV" ]] || { ah_warn "$XRAY_ENV already exists. Existing Africhome credentials were not changed."; return 1; }
+  if [[ -e "$XRAY_ENV" ]]; then
+    ah_warn "$XRAY_ENV already exists."
+    read -r -p "Back up the existing Africhome credentials and generate fresh credentials? [y/N]: " rotate_env
+    [[ "$rotate_env" =~ ^[Yy]$ ]] || { ah_info "Existing Africhome credentials were left unchanged."; return 1; }
+    backup_env="${XRAY_ENV}.africhome-backup-$(date +%Y%m%d%H%M%S)"
+    cp -a "$XRAY_ENV" "$backup_env" || { ah_err "Could not back up the existing credentials."; return 1; }
+    ah_ok "Existing credentials backed up securely."
+  fi
 
   read -r -p "VLESS REALITY TCP port [443]: " port
   port="${port:-443}"
@@ -85,7 +92,8 @@ xray_setup_vless_reality() {
   "outbounds": [{ "protocol": "freedom", "tag": "direct" }]
 }
 EOF
-  chmod 600 "$XRAY_CONFIG"
+  chown root:xray "$XRAY_CONFIG"
+  chmod 640 "$XRAY_CONFIG"
   if ! xray run -test -config "$XRAY_CONFIG"; then
     rm -f "$XRAY_CONFIG"
     [[ -z "$backup_config" ]] || cp -a "$backup_config" "$XRAY_CONFIG"
@@ -98,6 +106,7 @@ EOF
   if ! systemctl enable xray || ! systemctl restart xray; then
     rm -f "$XRAY_CONFIG" "$XRAY_ENV"
     [[ -z "$backup_config" ]] || cp -a "$backup_config" "$XRAY_CONFIG"
+    [[ -z "$backup_env" ]] || cp -a "$backup_env" "$XRAY_ENV"
     systemctl restart xray >/dev/null 2>&1 || true
     ah_err "Xray could not start with the new configuration. The previous configuration was restored when available."
     return 1
