@@ -11,6 +11,24 @@ SYSTEMCTL_BIN="${AFRICHOME_SYSTEMCTL_BIN:-systemctl}"
 SS_BIN="${AFRICHOME_SS_BIN:-ss}"
 fail(){ printf '[ERROR] %s\n' "$*" >&2; }
 info(){ printf '[INFO] %s\n' "$*"; }
+safe_root_directory(){
+  local path="${1:-}" metadata owner mode
+  [[ -n "$path" && -d "$path" && ! -L "$path" ]] || return 1
+  metadata="$(stat -c '%u:%a' -- "$path" 2>/dev/null)" || return 1
+  owner="${metadata%%:*}"
+  mode="${metadata#*:}"
+  [[ "$owner" == 0 && "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 0022) == 0 ))
+}
+safe_root_file(){
+  local path="${1:-}" metadata owner mode
+  [[ -n "$path" && -f "$path" && ! -L "$path" ]] || return 1
+  metadata="$(stat -c '%u:%a' -- "$path" 2>/dev/null)" || return 1
+  owner="${metadata%%:*}"
+  mode="${metadata#*:}"
+  [[ "$owner" == 0 && "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 0022) == 0 ))
+}
 [[ "$#" -eq 1 && "$1" == "--apply" ]] || { fail "Usage: $0 --apply (interactive APPLY confirmation required)"; exit 2; }
 (( EUID == 0 )) || { fail "Run as root."; exit 1; }
 for cmd in "$HAPROXY_BIN" "$SYSTEMCTL_BIN" "$SS_BIN" flock install stat awk grep cp; do
@@ -22,15 +40,19 @@ grep -Eq '^[[:space:]]*bind[[:space:]]+0\.0\.0\.0:80([[:space:]]|$)' "$CANDIDATE
 grep -Eq '^[[:space:]]*bind[[:space:]]+0\.0\.0\.0:443([[:space:]]|$)' "$CANDIDATE" || {
   fail "Candidate must contain the expected public TCP 80 and 443 listeners."; exit 1;
 }
-[[ -d "$CONFIG_DIR" && ! -L "$CONFIG_DIR" && "$(stat -c '%u' -- "$CONFIG_DIR")" == "0" ]] || {
-  fail "HAProxy config directory must exist, be root-owned, and not be a symlink."; exit 1;
+safe_root_directory "$CONFIG_DIR" || {
+  fail "HAProxy config directory must be root-owned, not a symlink, and not group/world-writable."; exit 1;
 }
 if [[ -e "$CONFIG_FILE" || -L "$CONFIG_FILE" ]]; then
-  [[ -f "$CONFIG_FILE" && ! -L "$CONFIG_FILE" && "$(stat -c '%u' -- "$CONFIG_FILE")" == "0" ]] || {
-    fail "Existing HAProxy config must be a root-owned regular file, not a symlink."; exit 1;
+  safe_root_file "$CONFIG_FILE" || {
+    fail "Existing HAProxy config must be root-owned, non-symlinked, and not group/world-writable."; exit 1;
   }
 fi
-install -d -o root -g root -m 0755 "$(dirname -- "$LOCK_FILE")"
+LOCK_DIR="$(dirname -- "$LOCK_FILE")"
+install -d -o root -g root -m 0755 "$LOCK_DIR"
+safe_root_directory "$LOCK_DIR" || {
+  fail "Lock directory must be root-owned, not a symlink, and not group/world-writable."; exit 1;
+}
 exec 9>"$LOCK_FILE"
 flock -n 9 || { fail "Another HAProxy apply transaction is running."; exit 1; }
 if "$SYSTEMCTL_BIN" is-active --quiet haproxy 2>/dev/null; then
