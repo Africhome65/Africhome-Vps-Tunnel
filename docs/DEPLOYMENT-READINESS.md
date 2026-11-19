@@ -13,7 +13,7 @@
 
 ## Still required before production
 
-- SSH TLS backend and actual SSH payload/proxy gateway, with supported client-app interoperability tests.
+- SSH TLS loopback backend is implemented; central SNI activation and supported client-app interoperability tests remain. Actual SSH payload/proxy gateway is still required.
 - OpenVPN WebSocket, payload/proxy, and SNI wrapper backends.
 - Safe central-router activation, port ownership checks, staged backup, service rollback, and migration plan for the existing VLESS REALITY listener.
 - End-to-end tests for each requested mode, including reconnects, invalid credentials, certificate renewal/revocation, and TCP/UDP conflict cases.
