@@ -24,6 +24,9 @@ grep -q 'openssl rand -hex 16' "$MODULE"
 grep -q 'option="-udp"' "$MODULE"
 grep -q 'option="-dot"' "$MODULE"
 grep -q 'option="-doh"' "$MODULE"
+grep -Fq 'DNSTT SSH upstream (server-side): 127.0.0.1:22 by default.' "$MODULE"
+grep -Fq 'AFTER DNSTT CONNECTS, SSH CLIENT TARGET: 127.0.0.1:7001' "$MODULE"
+grep -Fq 'direct SSH fallback host/port above are not the DNSTT connection target' "$MODULE"
 
 # Customer passwords must never be written to a persistent credential file.
 if grep -E -q 'PASSWORD=.*>|\.cred|africhome.*password.*\.db' "$MODULE"; then
