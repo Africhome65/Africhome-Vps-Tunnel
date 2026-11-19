@@ -8,6 +8,17 @@ security_detect_ssh_ports(){
   printf '%s\n' "$ports"
 }
 
+security_detect_ssh_log_path(){
+  local candidate
+  for candidate in /var/log/auth.log /var/log/secure; do
+    if [[ -r "$candidate" ]] && grep -Eq 'sshd\\[[0-9]+\\]:' "$candidate"; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 security_fail2ban_rollback_new_jail(){
   local jail_file="$1"
   rm -f -- "$jail_file"
@@ -22,8 +33,13 @@ security_fail2ban_install(){
     return 1
   }
 
-  ah_info "Installing Fail2ban and systemd journal support..."
-  ah_apt_install fail2ban python3-systemd || {
+  ssh_log_path="$(security_detect_ssh_log_path)" || {
+    ah_err "No readable auth log containing SSH daemon records was found. Refusing to enable an unverified Fail2ban backend."
+    return 1
+  }
+
+  ah_info "Installing Fail2ban..."
+  ah_apt_install fail2ban || {
     ah_err "Fail2ban package installation failed."
     return 1
   }
