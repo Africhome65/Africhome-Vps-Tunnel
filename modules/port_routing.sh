@@ -63,7 +63,7 @@ pr_check_port_available(){
   command -v ss >/dev/null 2>&1 || return 2
   if [[ "$protocol" == tcp ]]; then output="$(ss -H -lnt 2>/dev/null)" || return 2
   else output="$(ss -H -lun 2>/dev/null)" || return 2; fi
-  awk -v p="$port" '{ endpoint=$4; sub(/^.*:/,"",endpoint); if(endpoint==p) found=1 } END{exit !found}' <<< "$output"
+  awk -v p="$port" '{ endpoint=$4; sub(/^.*:/,"",endpoint); if(endpoint==p) found=1 } END{exit (found ? 1 : 0)}' <<< "$output"
 }
 
 pr_route_plan(){
