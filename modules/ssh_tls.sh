@@ -24,6 +24,7 @@ ssh_tls_check_certificate(){
   [[ "$key" =~ ^/[A-Za-z0-9._/-]+$ ]] || { ssh_tls_error "Private-key path contains unsupported characters."; return 1; }
   [[ -f "$cert" && ! -L "$cert" && -r "$cert" ]] || { ssh_tls_error "Certificate must be a readable regular file, not a symlink."; return 1; }
   [[ -f "$key" && ! -L "$key" && -r "$key" ]] || { ssh_tls_error "Private key must be a readable regular file, not a symlink."; return 1; }
+  [[ "$(stat -c '%u:%a' -- "$key" 2>/dev/null)" == "0:600" ]] || { ssh_tls_error "Private key must be root-owned with mode 0600."; return 1; }
   openssl x509 -in "$cert" -noout -checkhost "$host" >/dev/null 2>&1 || { ssh_tls_error "Certificate does not cover SNI hostname $host."; return 1; }
   openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1 || { ssh_tls_error "Certificate is expired or invalid."; return 1; }
   openssl pkey -in "$key" -passin pass: -noout >/dev/null 2>&1 || { ssh_tls_error "Private key must be an unencrypted PEM key readable by root."; return 1; }
