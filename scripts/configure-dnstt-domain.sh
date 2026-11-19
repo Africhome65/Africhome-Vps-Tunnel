@@ -76,7 +76,7 @@ chmod 0600 "$tmp"
   printf 'DNS_NS_HOST=%q\n' "$DNS_NS_HOST"
 } > "$tmp"
 if [[ -f "$CONFIG_FILE" ]]; then
-  cp -a -- "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S).$"
+  cp -a -- "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S).$$"
 fi
 mv -f -- "$tmp" "$CONFIG_FILE"
 tmp=""
