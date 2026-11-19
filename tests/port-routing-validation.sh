@@ -63,4 +63,35 @@ if ! printf 'tcp\n443\nexample.com\n' | pr_route_plan >/dev/null 2>&1; then
   exit 1
 fi
 
+
+# Hostname validation rejects empty labels, leading/trailing hyphens, and bad characters.
+for hostname in example.com sub-domain.example.org localhost 192.0.2.1 a; do
+  pr_valid_hostname "$hostname" || {
+    echo "Valid hostname rejected: $hostname" >&2
+    exit 1
+  }
+done
+for hostname in .example.com example..com example.com. -example.com example-.com 'bad host' _service.example.com; do
+  if pr_valid_hostname "$hostname"; then
+    echo "Invalid hostname accepted: $hostname" >&2
+    exit 1
+  fi
+done
+long_label="$(printf '%064d' 0 | tr '0' 'a')"
+if pr_valid_hostname "$long_label.example"; then
+  echo "Hostname label longer than 63 characters was accepted." >&2
+  exit 1
+fi
+
+# Ensure the route planner prints real line breaks rather than literal backslash-n text.
+route_output="$(printf 'tcp\n443\nexample.com\n' | pr_route_plan 2>/dev/null)"
+grep -Fq 'Proposed route: tcp/443' <<< "$route_output" || {
+  echo "Route planner did not print its proposed route." >&2
+  exit 1
+}
+grep -Fq 'Hostname/SNI: example.com' <<< "$route_output" || {
+  echo "Route planner did not print the validated hostname." >&2
+  exit 1
+}
+
 echo "Port-routing read-only validation passed."
