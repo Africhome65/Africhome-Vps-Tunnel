@@ -31,6 +31,43 @@ hy2_valid_port_spec() {
 }
 
 
+# Check both listener inventories before certificate issuance or UDP binding.
+# A failed ss invocation is not evidence that a port is free.
+hy2_check_listener_conflicts() {
+  local first_port="$1" last_port="$2" udp_sockets tcp_sockets
+  if ! udp_sockets="$(ss -H -lunp 2>/dev/null)"; then
+    ah_err "Could not inspect UDP listeners; refusing to assume the requested port range is free."
+    return 1
+  fi
+  if ! tcp_sockets="$(ss -H -ltn 2>/dev/null)"; then
+    ah_err "Could not inspect TCP listeners; refusing to assume port 80 is free."
+    return 1
+  fi
+  if awk -v first="$first_port" -v last="$last_port" '
+    {
+      endpoint=$4
+      sub(/^.*:/, "", endpoint)
+      if (endpoint ~ /^[0-9]+$/ && (endpoint + 0) >= (first + 0) && (endpoint + 0) <= (last + 0)) found=1
+    }
+    END {exit !found}
+  ' <<< "$udp_sockets"; then
+    ah_err "A UDP listener already uses a port in the requested range. Choose another range."
+    return 1
+  fi
+  if awk '
+    {
+      endpoint=$4
+      sub(/^.*:/, "", endpoint)
+      if (endpoint == "80") found=1
+    }
+    END {exit !found}
+  ' <<< "$tcp_sockets"; then
+    ah_err "TCP port 80 is busy. Stop the conflicting web server before requesting a certificate."
+    return 1
+  fi
+  return 0
+}
+
 hy2_write_config() {
   local output="$1" port_spec="$2" cert_dir="$3" username="$4" password="$5"
   cat > "$output" <<EOF
@@ -115,18 +152,7 @@ hy2_setup() {
     read -r -p "Replace existing Hysteria config? [y/N]: " replace
     [[ "$replace" =~ ^[Yy]$ ]] || { ah_info "Existing config left unchanged."; return 1; }
   fi
-  if ss -H -lunp 2>/dev/null | awk -v first="$first_port" -v last="$last_port" '
-    /hysteria/ {next}
-    { localport=$4; sub(/^.*:/, "", localport); if (localport ~ /^[0-9]+$/ && localport >= first && localport <= last) found=1 }
-    END {exit !found}
-  '; then
-    ah_err "A UDP listener already uses a port in $port_spec. Choose another range."
-    return 1
-  fi
-  if ss -H -ltn 2>/dev/null | awk '$4 ~ /:80$/ {found=1} END{exit !found}'; then
-    ah_err "TCP port 80 is busy. Stop the conflicting web server before requesting a certificate."
-    return 1
-  fi
+  hy2_check_listener_conflicts "$first_port" "$last_port" || return 1
 
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
     ufw allow 80/tcp || ah_warn "Could not add TCP 80 to UFW; certificate issuance/renewal may fail."
