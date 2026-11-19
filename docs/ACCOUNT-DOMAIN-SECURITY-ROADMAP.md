@@ -117,7 +117,7 @@ Add optional connection/rate limits for supported services, with safe defaults a
 
 ### Current development implementation
 
-The security menu now includes a read-only audit covering effective SSH settings, listening sockets, security service states, firewall summaries, recent SSH authentication failures, and the Africhome torrent filter. It does not alter system configuration.
+The security menu now includes a read-only audit covering effective SSH settings, listening sockets, security service states (including Xray, Hysteria, DNSTT, OpenVPN, Nginx, and HAProxy units), firewall summaries, recent SSH authentication failures, the Africhome torrent filter, and expiry checks for the configured Xray/Hysteria certificate paths. It does not alter system configuration.
 
 Fail2ban integration detects effective SSH ports, preserves an existing Africhome jail drop-in, validates configuration before restart, checks service/jail health, and exposes status, banned IP listing, and confirmed IP unban. The SSH jail now requires a readable auth log containing actual sshd records, then uses Fail2ban's auto backend with that detected log path and conservative thresholds. If neither supported auth log contains SSH records, the module refuses to create or enable the jail.
 
@@ -147,11 +147,17 @@ The optional torrent filter is limited to common host INPUT/OUTPUT ports. It is 
 - Provide a security audit command that reports findings without automatically changing settings.
 - Avoid claiming any VPS script is impossible to hack; document residual risks and keep dependencies updated.
 
+## 4A. Administrative activity log
+
+The shared `ah_audit_log` helper appends UTC timestamped event codes and outcomes to `/var/log/africhome/admin-actions.log`. The directory is root-owned mode 0700 and the log is root-owned mode 0600. Only fixed event identifiers and `success`, `failure`, or `cancelled` outcomes are accepted; raw prompts, account names, passwords, tokens, client URIs, and private-key material must not be passed to it. Current event coverage includes selected Fail2ban/UFW/torrent operations and backup create/stage/retention actions. This is an application-level audit trail, not tamper-proof logging; administrators with root access can alter it. Log rotation and forwarding to a protected remote collector remain future work.
+
 ## 5. Backups and staged restore
 
 `modules/backup.sh` now creates root-only configuration archives under `/var/backups/africhome`, with SHA-256 sidecar checksums. The backup scope is a fixed list of relevant SSH, Fail2ban, UFW/nftables, Africhome, Xray, Hysteria, Let's Encrypt, and Africhome systemd paths. Archives can contain credentials and private keys; they are not encrypted, so operators must protect and copy them to secure off-host storage.
 
 Restore currently verifies the checksum and archive integrity, then extracts only allowlisted regular files, directories, and safe relative symlinks into a root-only staging directory under `/var/lib/africhome/restore-staging`. It rejects path traversal, absolute/escaping symlinks, hard links, and special files. It never overwrites live system files. A separate service-aware restore workflow and rollback validation remain future work.
+
+Manual retention preview/pruning is available as an opt-in menu action. It defaults to retaining the newest 10 archives and considers only archives at least 90 days old; the administrator can choose bounded keep-count and age values, review a preview, and type `PRUNE`. Only regular `africhome-*.tar.gz` files and their regular `.sha256` sidecars directly inside the canonical backup root are eligible. No automatic pruning or timer is installed.
 
 ## 6. Unified menu experience
 
