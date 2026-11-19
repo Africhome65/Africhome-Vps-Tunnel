@@ -56,6 +56,25 @@ class RealitySniUpdateTests(unittest.TestCase):
                 MODULE.update(str(path), "-bad.example")
             self.assertEqual(path.read_text(encoding="utf-8"), original)
 
+    def test_rejects_overlong_dns_label(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            original = json.dumps(self.fixture())
+            path.write_text(original, encoding="utf-8")
+            with self.assertRaises(ValueError):
+                MODULE.update(str(path), ("a" * 64) + ".example")
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+    def test_rejects_overlong_dns_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            original = json.dumps(self.fixture())
+            path.write_text(original, encoding="utf-8")
+            long_name = ".".join(["a" * 63] * 4)
+            with self.assertRaises(ValueError):
+                MODULE.update(str(path), long_name)
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+
     def test_requires_exactly_one_reality_inbound(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "config.json"
