@@ -23,6 +23,7 @@ ar_set_service_status "acct_test_0001" "vless" "vless-email-001" "suspended"
 if ar_register_service "bad id" "alice" "vless" "vless-email-002" 0; then
   echo "Invalid account ID was accepted." >&2; exit 1
 fi
+echo "PASS: invalid account ID rejected"
 if grep -Eiq 'password|private_key|client_uri|credential' "$AR_REGISTRY"; then
   echo "Registry unexpectedly contains a secret-like field." >&2; exit 1
 fi
@@ -41,7 +42,9 @@ EOF
 chmod 700 "$tmp_dir/bin/systemctl"
 PATH="$tmp_dir/bin:$PATH"
 ar_register_service "acct_test_0001" "alice" "hysteria" "hy2-user-001" 12345
+echo "PASS: Hysteria registry fixture added"
 ar_register_service "acct_test_0001" "alice" "ssh" "alice" 12345
+echo "PASS: SSH registry fixture added"
 dashboard="$(ar_dashboard)"
 grep -Fq "AFRICHOME ACCOUNT DASHBOARD" <<< "$dashboard"
 grep -Fq "Registered accounts: 1" <<< "$dashboard"
