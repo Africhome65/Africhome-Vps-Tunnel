@@ -110,6 +110,16 @@ ar_set_service_status() {
 }
 
 
+ar_validate_readonly() {
+  command -v jq >/dev/null 2>&1 || { echo "[FAIL] jq is required." >&2; return 1; }
+  [[ -f "$AR_REGISTRY" && ! -L "$AR_REGISTRY" ]] || {
+    echo "[FAIL] Registry is missing or is not a regular non-symlink file." >&2; return 1;
+  }
+  jq -e '.schema_version == 1 and (.accounts | type == "array")' "$AR_REGISTRY" >/dev/null 2>&1 || {
+    echo "[FAIL] Registry is invalid; refusing to modify it." >&2; return 1;
+  }
+}
+
 ar_host_service_state() {
   local service="${1:-}" unit=""
   case "$service" in
@@ -133,7 +143,7 @@ ar_host_service_state() {
 }
 
 ar_dashboard() {
-  ar_init || return 1
+  ar_validate_readonly || return 1
   local account_count service_count expired_count id label service expiry status host_state expiry_display
   account_count="$(jq '.accounts | length' "$AR_REGISTRY")" || return 1
   service_count="$(jq '[.accounts[].services[]] | length' "$AR_REGISTRY")" || return 1
@@ -156,7 +166,7 @@ ar_dashboard() {
 # Compare registry metadata with local account metadata. This function is
 # strictly read-only and deliberately never reads credential fields.
 ar_reconcile() {
-  ar_init || return 1
+  ar_validate_readonly || return 1
   local protocol_db="${AR_PROTOCOL_DB:-/etc/africhome-protocol-users.json}"
   local hysteria_db="${AR_HYSTERIA_DB:-/etc/africhome-hysteria-users.json}"
   local account_id service name ref status display_name
