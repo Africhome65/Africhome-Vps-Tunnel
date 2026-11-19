@@ -180,7 +180,7 @@ ovpn_configure_server(){
   if [[ ! -d "$OVPN_CONFIG_DIR" ]]; then install -d -m 0755 "$OVPN_CONFIG_DIR" || return 1; fi
   install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
-    ovpn_easyrsa gen-req server nopass || return 1
+    ovpn_easyrsa --req-cn=server gen-req server nopass || return 1
   fi
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/issued/server.crt" ]]; then
     [[ -s "$OVPN_EASYRSA_DIR/pki/reqs/server.req" && ! -L "$OVPN_EASYRSA_DIR/pki/reqs/server.req" ]] || {
