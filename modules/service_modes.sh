@@ -5,7 +5,7 @@ set -Eeuo pipefail
 
 af_mode_rows(){
   cat <<'ROWS'
-SSH|Direct SSL|tcp|443|TLS wrapper required; raw sshd is not SNI-routable
+SSH|Direct SSL|tcp|443|Loopback stunnel backend available; central SNI frontend and client wrapper still required
 SSH|Payload Direct|tcp|80|Payload handler and documented client payload required
 SSH|Payload Proxy|tcp|80|Authenticated proxy handler; 443 may be used only with TLS wrapper
 SSH|Payload + Proxy + SNI|tcp|443|TLS wrapper with unique SNI; port 80 requires HTTP payload routing
