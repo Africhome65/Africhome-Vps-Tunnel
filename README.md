@@ -66,14 +66,15 @@ The planned unified account manager, centralized domain/certificate manager, Fai
 
 ## Licence system
 
-- Installation requires a valid, digitally signed Africhome licence key before package installation or persistent system changes.
-- Each licence is bound to one VPS using the SHA-256 hash of `/etc/machine-id` and includes a UTC expiry date.
-- Get the target VPS fingerprint by cloning the repository and running `sudo bash scripts/license.sh fingerprint`. Send that fingerprint to the Africhome licence administrator.
-- The administrator issues the key offline with `bash admin/issue-license.sh /secure/path/private.pem LICENCE_ID YYYY-MM-DD VPS_FINGERPRINT`. The generated one-line key is then supplied to the installer.
-- The installer stores the accepted signed token at `/etc/africhome/license.token` with root-only access (directory mode 0700; file mode 0600).
-- The Ed25519 private signing key is never included in this repository or installed on customer VPSs. Keep the administrator private key offline and backed up securely.
-- VPS binding is a practical clone deterrent, not hardware-backed anti-tamper protection. A root administrator can alter local identifiers or patch local scripts.
-- The installer needs OpenSSL already present to verify the key. It deliberately does not install dependencies before licence verification.
+- Installation requires a valid, digitally signed **lifetime licence key** before package installation or persistent system changes.
+- Each key is issued offline for one specific VPS fingerprint (the SHA-256 hash of `/etc/machine-id`) and has no expiry date.
+- On the target VPS, run `sudo bash scripts/license.sh fingerprint` and send the resulting fingerprint to the licence administrator.
+- The administrator issues a key offline with `bash admin/issue-license.sh /secure/path/license-private.pem LICENCE_ID VPS_FINGERPRINT`. Supply the generated one-line key privately to the customer.
+- The installer verifies the Ed25519 signature and VPS fingerprint locally, then stores the accepted key at `/etc/africhome/license.token` with root-only access. Later installer runs reuse and recheck the saved key without asking the customer to enter it again.
+- No Cloudflare account, web dashboard, hosting, domain, API token, online database, or recurring payment is required for licence verification.
+- Keep the Ed25519 private signing key offline and never commit it or install it on customer VPSs. The matching public key is stored at `keys/license-public.pem`.
+- VPS binding is a practical clone deterrent, not hardware-backed anti-tamper protection. A root administrator can alter local identifiers or patch local scripts. Offline keys cannot be globally revoked or centrally checked after issuance.
+- OpenSSL must already be available for the initial verification; the installer deliberately verifies the key before installing packages.
 
 ## Trojan TLS notes
 
