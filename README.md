@@ -32,6 +32,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 
 - Per-client connection/concurrency limits (not implemented)
 
+See [deployment readiness](docs/DEPLOYMENT-READINESS.md) for the current implementation boundary and remaining work before production use.
+
 ## Requirements
 
 - Ubuntu 22.04 or newer, or Debian 11 or newer
