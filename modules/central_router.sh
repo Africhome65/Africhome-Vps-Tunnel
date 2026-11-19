@@ -183,3 +183,56 @@ cr_render_candidate(){
   ah_ok "Candidate configuration saved: $output"
   ah_warn "This file has not been applied. Do not replace /etc/haproxy/haproxy.cfg until all backends, listeners, backups and rollback steps are reviewed."
 }
+
+
+# Render a loopback-only VLESS REALITY backend candidate. The active config is
+# read-only; output is a separate root-only file and no service is restarted.
+cr_render_reality_backend_candidate(){
+  ah_require_root || return 1
+  command -v python3 >/dev/null 2>&1 || { ah_err "python3 is required."; return 1; }
+  local source port output tmp
+  source="/usr/local/etc/xray/config.json"
+  output="/root/africhome-xray-reality-backend-candidate.json"
+  [[ ! -e "$output" && ! -L "$output" ]] || {
+    ah_err "Candidate already exists at $output. Review or move it manually before generating another."
+    return 1
+  }
+  read -r -p "Source Xray config [$source]: " answer
+  source="\${answer:-$source}"
+  [[ -f "$source" && ! -L "$source" ]] || {
+    ah_err "Source must be an existing regular file, not a symlink."
+    return 1
+  }
+  read -r -p "Loopback backend port [1443]: " port
+  port="\${port:-1443}"
+  [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1024 && 10#$port <= 65535 )) || {
+    ah_err "Backend port must be between 1024 and 65535."
+    return 1
+  }
+  [[ -f "$BASE_DIR/scripts/render-reality-backend.py" ]] || {
+    ah_err "REALITY backend candidate renderer is missing."
+    return 1
+  }
+  tmp="$(mktemp /root/.africhome-xray-reality-backend.XXXXXX)" || return 1
+  if ! python3 "$BASE_DIR/scripts/render-reality-backend.py" "$source" --port "$port" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod 0600 "$tmp" || { rm -f "$tmp"; return 1; }
+  if command -v xray >/dev/null 2>&1; then
+    if ! xray run -test -config "$tmp"; then
+      rm -f "$tmp"
+      ah_err "Xray rejected the candidate; the active config was not changed."
+      return 1
+    fi
+  else
+    ah_warn "Xray is not installed; candidate parser validation was skipped."
+  fi
+  if ! mv -n -- "$tmp" "$output" || [[ -e "$tmp" ]]; then
+    rm -f "$tmp"
+    ah_err "Could not safely save the candidate file."
+    return 1
+  fi
+  ah_ok "Loopback REALITY candidate saved: $output"
+  ah_warn "This is not a migration. The active Xray config and service were not changed. Do not apply until HAProxy routing and external VLESS client compatibility are verified."
+}
