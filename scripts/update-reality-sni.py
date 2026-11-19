@@ -56,7 +56,7 @@ def update(path, hostname):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             json.dump(config, stream, indent=2)
-            stream.write("\\n")
+            stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
             os.fchmod(stream.fileno(), stat.S_IMODE(st.st_mode))
