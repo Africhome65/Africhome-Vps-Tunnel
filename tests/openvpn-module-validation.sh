@@ -29,6 +29,22 @@ ovpn_port_available tcp 1194
 ovpn_port_available udp 1194
 unset -f ss
 
+# Subnet safety must detect broad and narrow overlaps, ignore the default
+# route, and allow unrelated networks.
+ip(){
+  printf '%s\n' "default via 192.0.2.1 dev eth0" "10.0.0.0/8 dev docker0"
+}
+! ovpn_subnet_available
+ip(){
+  printf '%s\n' "default via 192.0.2.1 dev eth0" "10.8.0.7/32 dev tun-old"
+}
+! ovpn_subnet_available
+ip(){
+  printf '%s\n' "default via 192.0.2.1 dev eth0" "192.168.0.0/16 dev eth0"
+}
+ovpn_subnet_available
+unset -f ip
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 OVPN_STATE="$TMP/state"
