@@ -193,7 +193,7 @@ ovpn_configure_server(){
   local state_tmp
   state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
   umask 077
-  printf 'OVPN_REMOTE=%q\nOVPN_PORT=%q\nOVPN_PROTO=%q\n' "$remote" "$port" "$proto" > "$state_tmp"
+  printf 'OVPN_REMOTE=%s\nOVPN_PORT=%s\nOVPN_PROTO=%s\n' "$remote" "$port" "$proto" > "$state_tmp"
   chmod 0600 "$state_tmp"
   if ! mv -n -- "$state_tmp" "$OVPN_STATE" || [[ -e "$state_tmp" ]]; then
     rm -f "$state_tmp"
