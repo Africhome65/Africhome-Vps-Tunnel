@@ -84,3 +84,36 @@ The CA private key stays in the root-only Easy-RSA PKI directory. Runtime
 server certificates, keys, CRL and tls-crypt material are copied to a
 service-readable directory with restricted permissions. Exported client
 profiles are root-only and contain private keys.
+
+
+## Combined TCP 80/443 candidate configuration
+
+`scripts/render-central-haproxy.py` accepts a single JSON manifest containing
+both `tls_routes` and `http_routes`, then renders one HAProxy configuration
+with a single global/defaults section and separate port 443 TLS passthrough and
+port 80 HTTP Host/path frontends.
+
+Example:
+
+~~~json
+{
+  "tls_routes": [
+    {"name":"reality","sni":"reality.example.com","backend_host":"127.0.0.1","backend_port":1443}
+  ],
+  "http_routes": [
+    {"name":"websocket","host":"ws.example.com","path_prefix":"/tunnel","backend_host":"127.0.0.1","backend_port":10080}
+  ]
+}
+~~~
+
+Generate and inspect a candidate without applying it:
+
+~~~bash
+python3 scripts/render-central-haproxy.py routes.json
+~~~
+
+This is still a configuration generator. It does not claim that the listed
+backends exist, that a particular client protocol is compatible, or that a
+live listener can safely be migrated. Do not apply it to the live VPS until
+backend modules, port ownership, service rollback, and client interoperability
+have all been verified.
