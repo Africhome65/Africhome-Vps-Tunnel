@@ -101,6 +101,7 @@ cr_check_route_collisions(){
 cr_pick_udp_port(){
   local first="${1:-}" last="${2:-}" occupied="${3:-}" port item
   local -A used=()
+  local -a items=()
   cr_valid_port "$first" && cr_valid_port "$last" || return 2
   (( 10#$first <= 10#$last )) || return 2
   IFS=',' read -r -a items <<< "$occupied"
@@ -111,7 +112,7 @@ cr_pick_udp_port(){
   done
   for ((port=10#$first; port<=10#$last; port++)); do
     if [[ -z "${used[$port]+x}" ]]; then
-      printf '%s\\n' "$port"
+      printf '%s\n' "$port"
       return 0
     fi
   done
