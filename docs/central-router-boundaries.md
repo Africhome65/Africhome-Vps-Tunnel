@@ -33,12 +33,31 @@ Render without applying:
 python3 scripts/render-central-router.py routes.json
 ~~~
 
+## HTTP Host/path renderer for port 80
+
+A separate generator, `scripts/render-http-router.py`, creates a candidate
+HAProxy HTTP frontend for TCP port 80. It supports unique Host/path-prefix
+matchers, loopback-only HTTP backends, WebSocket-compatible HTTP proxying, and
+a 421 rejection for unmatched requests. It sorts more-specific path prefixes
+before broader routes.
+
+Example invocation:
+
+~~~bash
+python3 scripts/render-http-router.py http-routes.json
+~~~
+
+This is ordinary HTTP Host/path routing. It is not an SSH payload gateway and
+does not automatically translate arbitrary SSH payloads into HTTP proxy
+requests. Each WebSocket service still needs a compatible server-side inbound
+and client profile.
+
 ## Important limitations
 
 - It does not install HAProxy, write /etc/haproxy, bind port 443, edit firewall
   rules, reload services, or change any existing Xray listener.
 - It does not terminate TLS. It forwards the original TLS stream unchanged.
-- It does not implement HTTP Host/path routing on port 80.
+- It does not install or apply either generated frontend automatically.
 - It does not implement SSH payload/proxy gateways or OpenVPN WebSocket/TLS wrappers.
 - A route is only usable after its backend has been configured to listen on the
   specified loopback address and port and client interoperability has been tested.
