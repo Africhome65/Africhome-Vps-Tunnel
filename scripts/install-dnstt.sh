@@ -18,6 +18,10 @@ ok() { printf '[ OK ] %s\n' "$*"; }
 [[ "$(uname -s)" == "Linux" ]] || fail "Linux is required."
 [[ "$(uname -m)" == "x86_64" ]] || fail "This bootstrap currently supports x86_64/amd64 only."
 
+if [[ -L "$KEY_DIR" || ( -e "$KEY_DIR" && ! -d "$KEY_DIR" ) ]]; then
+  fail "$KEY_DIR must be a real directory, not a symlink."
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ca-certificates curl git tar
@@ -87,8 +91,11 @@ mv -f /usr/local/bin/dnstt-client.new /usr/local/bin/dnstt-client
 rm -rf "$build_tmp"
 trap - EXIT
 
-install -d -m 0700 "$KEY_DIR"
-if [[ -e "$KEY_DIR/server.key" && -e "$KEY_DIR/server.pub" ]]; then
+install -d -o root -g root -m 0700 "$KEY_DIR"
+[[ "$(stat -c '%u:%a' "$KEY_DIR")" == "0:700" ]] || fail "$KEY_DIR must be root-owned with mode 0700."
+if [[ -e "$KEY_DIR/server.key" || -L "$KEY_DIR/server.key" || -e "$KEY_DIR/server.pub" || -L "$KEY_DIR/server.pub" ]]; then
+  [[ -f "$KEY_DIR/server.key" && ! -L "$KEY_DIR/server.key" && "$(stat -c '%u:%a' "$KEY_DIR/server.key" 2>/dev/null || true)" == "0:600" ]] || fail "Existing DNSTT private key must be a root-owned regular file with mode 0600."
+  [[ -f "$KEY_DIR/server.pub" && ! -L "$KEY_DIR/server.pub" && "$(stat -c '%u:%a' "$KEY_DIR/server.pub" 2>/dev/null || true)" == "0:644" ]] || fail "Existing DNSTT public key must be a root-owned regular file with mode 0644."
   info "Existing DNSTT keypair found; preserving it."
 elif [[ ! -e "$KEY_DIR/server.key" && ! -e "$KEY_DIR/server.pub" ]]; then
   umask 077
