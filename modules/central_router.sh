@@ -14,8 +14,14 @@ cr_valid_port(){
 }
 
 cr_valid_hostname(){
-  local host="${1:-}"
-  [[ "$host" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]
+  local host="${1:-}" label
+  local -a labels=()
+  (( ${#host} <= 253 )) || return 1
+  [[ "$host" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || return 1
+  IFS='.' read -r -a labels <<< "$host"
+  for label in "${labels[@]}"; do
+    (( ${#label} <= 63 )) || return 1
+  done
 }
 
 cr_valid_backend(){
