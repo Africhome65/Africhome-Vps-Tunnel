@@ -144,3 +144,23 @@ migration plan is proven. The client must use an SSH-over-TLS wrapper compatible
 with stunnel; raw SSH clients cannot connect directly to the TLS backend.
 
 This is not an HTTP payload gateway or authenticated HTTP CONNECT proxy.
+
+
+A compatible client-side stunnel profile can expose a local SSH endpoint. For
+example, after the public SNI route is active:
+
+~~~ini
+client = yes
+foreground = yes
+[africhome-ssh-client]
+accept = 127.0.0.1:2222
+connect = ssh.example.com:443
+sni = ssh.example.com
+verifyChain = yes
+CAfile = /etc/ssl/certs/ca-certificates.crt
+checkHost = ssh.example.com
+~~~
+
+The SSH application then connects to 127.0.0.1:2222. This is an example
+configuration, not a generated mobile-client profile; verify that the target
+client supports stunnel and the selected TLS settings.
