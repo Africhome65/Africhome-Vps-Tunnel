@@ -149,7 +149,9 @@ The optional torrent filter is limited to common host INPUT/OUTPUT ports. It is 
 
 ## 4B. Unified account dashboard
 
-The account registry menu now presents a read-only cross-service dashboard for registered SSH, Xray VLESS/VMess/Trojan, and Hysteria accounts. It shows account ID, label, service, UTC expiry, registry status, and a systemd active/inactive/not-installed indicator for the corresponding host service. Expired records whose cleanup has not run are labelled accordingly. The dashboard does not show native service references, passwords, UUIDs, or client URIs. It reports registry metadata only: it does not discover unmanaged native accounts, and a systemd active state is not a network reachability test. No service or account is changed by refreshing the view.
+The account registry menu now presents a read-only cross-service dashboard for registered SSH, Xray VLESS/VMess/Trojan, and Hysteria accounts. It shows account ID, label, service, UTC expiry, registry status, and a systemd active/inactive/not-installed indicator for the corresponding host service. Expired records whose cleanup has not run are labelled accordingly. The dashboard does not show native service references, passwords, UUIDs, or client URIs. It reports registry metadata only, and a systemd active state is not a network reachability test. Both dashboard and reconciliation validate existing registry files without creating or changing them.
+
+The adjacent reconciliation action compares the registry with the Xray and Hysteria account-adapter metadata databases and interactive Linux accounts returned by NSS (`getent`). It reports local-only records, registry-only records, and unregistered interactive Linux accounts as review candidates. It intentionally does not parse the raw Xray configuration or Hysteria YAML for client credentials, and it does not classify ordinary Linux accounts as tunnel customers. Revoked/expired history is not treated as a missing active account. The report never prints credentials or connection URIs and does not mutate any source.
 
 ## 4A. Administrative activity log
 
