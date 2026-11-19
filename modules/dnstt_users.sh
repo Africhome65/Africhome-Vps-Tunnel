@@ -142,7 +142,7 @@ dt_trial_account_create() {
   dt_require_root || return 1
   command -v systemctl >/dev/null 2>&1 || { echo "systemd is required for timed trial expiry." >&2; return 1; }
 
-  local hours seconds username password expiry_at service_file timer_file
+  local hours seconds username password expiry_at service_file timer_file service_tmp timer_tmp
   echo "Trial duration:"
   echo "1) 1 hour"
   echo "2) 3 hours"
@@ -165,6 +165,14 @@ dt_trial_account_create() {
   expiry_at="$(date -d "+${hours} hours" '+%Y-%m-%d %H:%M:%S')" || return 1
   service_file="/etc/systemd/system/africhome-trial-${username}.service"
   timer_file="/etc/systemd/system/africhome-trial-${username}.timer"
+  service_tmp=""
+  timer_tmp=""
+  for path in "$service_file" "$timer_file"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || {
+      echo "Refusing to overwrite an existing trial unit path: $path" >&2
+      return 1
+    }
+  done
 
   if ! useradd --create-home --shell /bin/bash --groups "$DT_GROUP" "$username"; then
     unset password
@@ -178,7 +186,18 @@ dt_trial_account_create() {
     return 1
   fi
 
-  cat > "$service_file" <<EOF
+  service_tmp="$(mktemp /etc/systemd/system/.africhome-trial-service.XXXXXX)" || {
+    userdel --remove "$username" 2>/dev/null || true
+    unset password
+    return 1
+  }
+  timer_tmp="$(mktemp /etc/systemd/system/.africhome-trial-timer.XXXXXX)" || {
+    rm -f -- "$service_tmp"
+    userdel --remove "$username" 2>/dev/null || true
+    unset password
+    return 1
+  }
+  cat > "$service_tmp" <<EOF
 [Unit]
 Description=Expire Africhome DNSTT trial account $username
 
@@ -187,7 +206,7 @@ Type=oneshot
 ExecStart=/usr/sbin/usermod --lock --expiredate=1970-01-02 $username
 ExecStartPost=-/usr/bin/pkill -KILL -u $username
 EOF
-  cat > "$timer_file" <<EOF
+  cat > "$timer_tmp" <<EOF
 [Unit]
 Description=Timed expiry for Africhome DNSTT trial account $username
 
@@ -199,11 +218,15 @@ Unit=africhome-trial-$username.service
 [Install]
 WantedBy=timers.target
 EOF
+  chmod 0644 "$service_tmp" "$timer_tmp"
+  chown root:root "$service_tmp" "$timer_tmp"
 
-  if ! systemd-analyze verify "$service_file" "$timer_file" >/dev/null 2>&1 ||
+  if ! systemd-analyze verify "$service_tmp" "$timer_tmp" >/dev/null 2>&1 ||
+     ! mv -T -- "$service_tmp" "$service_file" ||
+     ! mv -T -- "$timer_tmp" "$timer_file" ||
      ! systemctl daemon-reload ||
      ! systemctl enable --now "africhome-trial-$username.timer"; then
-    rm -f "$service_file" "$timer_file"
+    rm -f -- "$service_tmp" "$timer_tmp" "$service_file" "$timer_file"
     systemctl daemon-reload >/dev/null 2>&1 || true
     userdel --remove "$username" 2>/dev/null || true
     unset password
