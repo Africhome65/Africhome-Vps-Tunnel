@@ -61,6 +61,38 @@ check_invalid "too many digits" hy2_valid_port_spec "123456"
 check_invalid "malformed range" hy2_valid_port_spec "1000-2000-3000"
 
 
+# Mock socket inventory so failure and exact-port behavior are deterministic.
+ah_err() { printf '[mock error] %s\\n' "$*" >&2; }
+SS_MODE="free"
+ss() {
+  case "$SS_MODE:$*" in
+    fail-udp:*lunp*) return 1 ;;
+    fail-tcp:*ltn*) return 1 ;;
+    udp-busy:*lunp*) printf '%s\\n' 'UNCONN 0 0 0.0.0.0:24000 0.0.0.0:*' ;;
+    tcp-busy:*ltn*) printf '%s\\n' 'LISTEN 0 4096 0.0.0.0:80 0.0.0.0:*' ;;
+    near-port:*lunp*) printf '%s\\n' 'UNCONN 0 0 0.0.0.0:21194 0.0.0.0:*' ;;
+    *) : ;;
+  esac
+}
+check_listener_result() {
+  local label="$1" expected="$2" actual=0
+  hy2_check_listener_conflicts 1194 1194 || actual=1
+  if [[ "$actual" == "$expected" ]]; then
+    printf 'PASS: %s\\n' "$label"
+    ((pass+=1))
+  else
+    printf 'FAIL: %s (expected refusal=%s, got=%s)\\n' "$label" "$expected" "$actual" >&2
+    ((fail+=1))
+  fi
+}
+SS_MODE="free"; check_listener_result "free requested ports accepted" 0
+SS_MODE="fail-udp"; check_listener_result "UDP inventory failure refuses setup" 1
+SS_MODE="fail-tcp"; check_listener_result "TCP inventory failure refuses setup" 1
+SS_MODE="udp-busy"; check_listener_result "UDP listener in requested range blocks setup" 1
+SS_MODE="tcp-busy"; check_listener_result "TCP port 80 listener blocks setup" 1
+SS_MODE="near-port"; check_listener_result "nearby UDP port 21194 does not collide with 1194" 0
+unset -f ss ah_err
+
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 config_file="$tmp_dir/config.yaml"
