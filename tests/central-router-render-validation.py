@@ -33,7 +33,7 @@ for expected in (
     "frontend africhome_tls_443", "bind 0.0.0.0:443",
     "req.ssl_sni -i reality.example.com",
     "server srv_xray_reality 127.0.0.1:1443 check",
-    "server srv_trojan_tls ::1:8443 check",
+    "server srv_trojan_tls [::1]:8443 check",
     "default_backend be_unmatched", "tcp-request content reject",
 ):
     assert expected in result.stdout, expected
