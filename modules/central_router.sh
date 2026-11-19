@@ -20,7 +20,8 @@ cr_valid_hostname(){
 
 cr_valid_backend(){
   local host="${1:-}" port="${2:-}"
-  [[ "$host" == 127.0.0.1 || "$host" == "::1" ]] || cr_valid_hostname "$host" || return 1
+  # Shared-router backends must never bind to a public interface.
+  [[ "$host" == 127.0.0.1 || "$host" == "::1" ]] || return 1
   cr_valid_port "$port"
 }
 
@@ -52,6 +53,10 @@ cr_validate_route(){
   [[ "$transport" == tcp || "$transport" == udp ]] || { cr_error "Transport must be tcp or udp."; return 1; }
   cr_valid_port "$public_port" || { cr_error "Invalid public port."; return 1; }
   cr_valid_backend "$backend_host" "$backend_port" || { cr_error "Invalid backend address or port."; return 1; }
+  if [[ "$transport" == udp && "$hostname" != "-" ]]; then
+    cr_error "UDP routes do not use TCP SNI/hostname matching."
+    return 1
+  fi
   if [[ "$hostname" != "-" ]]; then
     cr_valid_hostname "$hostname" || { cr_error "Invalid hostname/SNI."; return 1; }
   fi
