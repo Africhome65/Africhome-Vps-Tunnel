@@ -19,6 +19,14 @@ case "$OS_ID" in
   *) fail "Unsupported OS: $OS_ID. Use Ubuntu 22.04+ or Debian 11+." ;;
 esac
 
+# Refuse unsafe install paths before apt or any other system changes.
+if [[ -L "$INSTALL_DIR" ]]; then
+  fail "$INSTALL_DIR is a symlink. Review it manually; installer will not follow it."
+fi
+if [[ -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" ]]; then
+  fail "$INSTALL_DIR exists but is not a Git checkout. Move it aside deliberately before retrying."
+fi
+
 # Refuse to overwrite local tracked or untracked work in an existing installation.
 # The update step below uses reset --hard, so a clean worktree is mandatory.
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -38,7 +46,6 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --depth=1 origin "$INSTALL_BRANCH"
   git -C "$INSTALL_DIR" reset --hard "origin/$INSTALL_BRANCH"
 else
-  [[ ! -e "$INSTALL_DIR" ]] || fail "$INSTALL_DIR exists but is not a Git checkout. Move it aside and retry."
   git clone --depth=1 --branch "$INSTALL_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 
