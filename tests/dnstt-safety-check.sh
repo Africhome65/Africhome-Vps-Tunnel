@@ -23,6 +23,9 @@ grep -q 'systemctl daemon-reload' "$SERVICE"
 grep -q 'root-owned directory with mode 0700' "$SERVICE"
 grep -q 'private key must be a root-owned regular file with mode 0600' "$SERVICE"
 grep -q 'public key must be a root-owned regular file with mode 0644' "$SERVICE"
+grep -q 'refusing to replace an unsafe path' "$SERVICE"
+grep -q 'trap cleanup EXIT' "$SERVICE"
+grep -q 'install -o root -g root -m 0644' "$SERVICE"
 
 # Exercise the same address validators used by the service configurator.
 VALIDATORS="$(sed -n '/^valid_ipv4() {/,/^}/p; /^valid_upstream_host() {/,/^}/p' "$SERVICE")"
