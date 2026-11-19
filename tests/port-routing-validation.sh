@@ -41,14 +41,12 @@ declare -F pr_route_plan >/dev/null || {
 }
 
 # The interactive planner must not terminate the set -e menu on ordinary input/results.
-if ! pr_route_plan <<< 
-bad\\n443\\nexample.com' >/dev/null 2>&1; then
+if ! printf 'bad\n443\nexample.com\n' | pr_route_plan >/dev/null 2>&1; then
   echo "Invalid planner input incorrectly returned a fatal status." >&2
   exit 1
 fi
 pr_check_port_available(){ return 1; }
-if ! pr_route_plan <<< 
-tcp\\n443\\nexample.com' >/dev/null 2>&1; then
+if ! printf 'tcp\n443\nexample.com\n' | pr_route_plan >/dev/null 2>&1; then
   echo "Occupied port incorrectly returned a fatal menu status." >&2
   exit 1
 fi
