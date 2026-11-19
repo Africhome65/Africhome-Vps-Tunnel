@@ -131,7 +131,11 @@ writes `/etc/haproxy`, binds ports, changes firewall rules, or reloads services.
 The menu can configure a stunnel service that accepts TLS only on a loopback
 backend port and forwards decrypted traffic to the local SSH daemon on
 127.0.0.1:22. It validates the supplied SNI hostname, certificate validity,
-certificate/key match, and loopback port availability.
+certificate/key match, root-only private-key permissions, and loopback port
+availability. Regular certificate files are accepted; standard Let's Encrypt
+live symlinks are accepted only when they resolve inside
+`/etc/letsencrypt/archive`. The existing deploy hook restarts this backend
+when its matching live certificate renews.
 
 This backend does not bind public TCP 443 or change the central HAProxy
 configuration. A matching SNI route must be added to a reviewed candidate
