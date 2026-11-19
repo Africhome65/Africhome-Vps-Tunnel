@@ -260,7 +260,14 @@ backup_menu(){
         read -r -p "Backup filename inside $AH_BACKUP_ROOT: " name
         backup_stage_restore "$AH_BACKUP_ROOT/$name"; ah_pause
         ;;
-      5)\n        read -r -p "Keep newest archive count (1-100) [10]: " keep\n        keep="${keep:-10}"\n        read -r -p "Minimum archive age in days (1-3650) [90]: " days\n        days="${days:-90}"\n        backup_retention_prune "$keep" "$days"; ah_pause\n        ;;\n      0) return ;;
+      5)
+        read -r -p "Keep newest archive count (1-100) [10]: " keep
+        keep="${keep:-10}"
+        read -r -p "Minimum archive age in days (1-3650) [90]: " days
+        days="${days:-90}"
+        backup_retention_prune "$keep" "$days"; ah_pause
+        ;;
+      0) return ;;
       *) ah_warn "Invalid choice."; sleep 1 ;;
     esac
   done
