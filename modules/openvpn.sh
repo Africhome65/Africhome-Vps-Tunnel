@@ -40,6 +40,14 @@ ovpn_pki_paths_safe(){
     [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
   done
 }
+ovpn_prepare_client_dir(){
+  if [[ ! -e "$OVPN_CLIENT_DIR" && ! -L "$OVPN_CLIENT_DIR" ]]; then
+    install -d -o root -g root -m 0700 "$OVPN_CLIENT_DIR" || return 1
+  fi
+  [[ -d "$OVPN_CLIENT_DIR" && ! -L "$OVPN_CLIENT_DIR" && "$(stat -c '%u:%a' -- "$OVPN_CLIENT_DIR" 2>/dev/null)" == "0:700" ]] || {
+    ovpn_error "Client export directory must be a root-owned mode-0700 directory."; return 1;
+  }
+}
 ovpn_load_state(){
   [[ -f "$OVPN_STATE" && ! -L "$OVPN_STATE" && "$(stat -c '%u:%a' -- "$OVPN_STATE" 2>/dev/null)" == "0:600" ]] || {
     ovpn_error "OpenVPN state file is missing or has unsafe ownership/permissions."; return 1;
@@ -225,7 +233,7 @@ ovpn_add_client(){
   local name output tmp
   read -r -p "New client name (letters/numbers/_/-): " name
   ovpn_valid_name "$name" || { ovpn_error "Invalid client name."; return 1; }
-  [[ ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "Client export directory must not be a symlink."; return 1; }
+  ovpn_prepare_client_dir || return 1
   [[ ! -e "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -e "$OVPN_CLIENT_DIR/$name.ovpn" ]] || {
     ovpn_error "Client already exists."; return 1;
   }
@@ -235,7 +243,6 @@ ovpn_add_client(){
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
     ovpn_error "Client certificate/key generation incomplete."; return 1;
   }
-  install -d -m 0700 "$OVPN_CLIENT_DIR"
   output="$OVPN_CLIENT_DIR/$name.ovpn"
   tmp="$(mktemp "$OVPN_CLIENT_DIR/.$name.XXXXXX")" || return 1
   cat > "$tmp" <<EOF
