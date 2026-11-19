@@ -91,4 +91,49 @@ ovpn_fail_closed "test CRL failure"
 grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
 unset -f systemctl
 
+# PKI initialization is staged and published only after a complete CA build.
+OVPN_EASYRSA_DIR="$TMP/pki-success"
+OVPN_EASYRSA_SOURCE="$TMP/easy-rsa-source"
+mkdir -p "$OVPN_EASYRSA_SOURCE"
+printf '#!/bin/sh\\nexit 0\\n' > "$OVPN_EASYRSA_SOURCE/easyrsa"
+chmod 0700 "$OVPN_EASYRSA_SOURCE/easyrsa"
+ah_require_root(){ return 0; }
+ah_ok(){ :; }
+ah_warn(){ :; }
+ovpn_easyrsa(){
+  case "$*" in
+    "init-pki") mkdir -p "$OVPN_EASYRSA_DIR/pki/private"; return 0 ;;
+    "--batch --req-cn=Africhome-CA build-ca nopass") printf 'test-ca-key\\n' > "$OVPN_EASYRSA_DIR/pki/private/ca.key"; return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# The implementation executes Easy-RSA in the staging path; this test uses
+# real shell scripts so both success and failure exercise the atomic publish.
+cat > "$OVPN_EASYRSA_SOURCE/easyrsa" <<'MOCK'
+#!/usr/bin/env bash
+set -e
+case "$*" in
+  "init-pki") mkdir -p pki/private ;;
+  "--batch --req-cn=Africhome-CA build-ca nopass") printf 'test-ca-key\\n' > pki/private/ca.key ;;
+  "fail-build") exit 1 ;;
+esac
+MOCK
+chmod 0700 "$OVPN_EASYRSA_SOURCE/easyrsa"
+ovpn_init_pki
+[[ -s "$OVPN_EASYRSA_DIR/pki/private/ca.key" ]]
+[[ "$(stat -c '%a' "$OVPN_EASYRSA_DIR")" == 700 ]]
+! compgen -G "$TMP/.africhome-easyrsa.*" >/dev/null
+OVPN_EASYRSA_DIR="$TMP/pki-failure"
+OVPN_EASYRSA_SOURCE="$TMP/easy-rsa-failing"
+mkdir -p "$OVPN_EASYRSA_SOURCE"
+cat > "$OVPN_EASYRSA_SOURCE/easyrsa" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$*" != "--batch --req-cn=Africhome-CA build-ca nopass" ]]
+MOCK
+chmod 0700 "$OVPN_EASYRSA_SOURCE/easyrsa"
+! ovpn_init_pki
+[[ ! -e "$OVPN_EASYRSA_DIR" && ! -L "$OVPN_EASYRSA_DIR" ]]
+! compgen -G "$TMP/.africhome-easyrsa.*" >/dev/null
+unset -f ah_require_root ah_ok ah_warn ovpn_easyrsa
+
 echo "OpenVPN module validation passed."
