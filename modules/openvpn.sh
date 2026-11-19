@@ -40,6 +40,27 @@ ovpn_pki_paths_safe(){
     [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
   done
 }
+ovpn_load_state(){
+  [[ -f "$OVPN_STATE" && ! -L "$OVPN_STATE" && "$(stat -c '%u:%a' -- "$OVPN_STATE" 2>/dev/null)" == "0:600" ]] || {
+    ovpn_error "OpenVPN state file is missing or has unsafe ownership/permissions."; return 1;
+  }
+  OVPN_REMOTE=""
+  OVPN_PORT=""
+  OVPN_PROTO=""
+  local key value
+  while IFS='=' read -r key value; do
+    case "$key" in
+      OVPN_REMOTE) OVPN_REMOTE="$value" ;;
+      OVPN_PORT) OVPN_PORT="$value" ;;
+      OVPN_PROTO) OVPN_PROTO="$value" ;;
+      *) ovpn_error "Unexpected key in OpenVPN state file."; return 1 ;;
+    esac
+  done < "$OVPN_STATE"
+  ovpn_valid_remote "$OVPN_REMOTE" && ovpn_valid_port "$OVPN_PORT" &&
+    [[ "$OVPN_PROTO" == udp || "$OVPN_PROTO" == tcp ]] || {
+      ovpn_error "OpenVPN state values failed validation."; return 1;
+    }
+}
 ovpn_require_tools(){
   local missing=0 cmd
   for cmd in openvpn systemctl ss install openssl; do
@@ -204,8 +225,7 @@ ovpn_add_client(){
   [[ ! -e "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -e "$OVPN_CLIENT_DIR/$name.ovpn" ]] || {
     ovpn_error "Client already exists."; return 1;
   }
-  # shellcheck disable=SC1090
-  . "$OVPN_STATE"
+  ovpn_load_state || return 1
   ovpn_easyrsa gen-req "$name" nopass || return 1
   ovpn_easyrsa sign-req client "$name" || return 1
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
