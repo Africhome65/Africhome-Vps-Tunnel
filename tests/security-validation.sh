@@ -17,9 +17,9 @@ if security_valid_ip "999.1.1.1"; then echo "Invalid IPv4 was accepted" >&2; exi
 if security_valid_ip "not-an-ip"; then echo "Invalid address was accepted" >&2; exit 1; fi
 
 log_fixture="$(mktemp)"
-trap 'rm -f "$log_fixture" "${TMPDIR:-/tmp}/africhome-torrent-test.$.nft"' EXIT
-printf '%s\\n' 'Nov 19 00:00:00 host sshd[1234]: Failed password for invalid user test' > "$log_fixture"
-SECURITY_AUTH_LOG_CANDIDATES="$log_fixture" [[ "$(SECURITY_AUTH_LOG_CANDIDATES="$log_fixture" security_detect_ssh_log_path)" == "$log_fixture" ]]
+trap 'rm -f "$log_fixture" "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"' EXIT
+printf '%s\n' 'Nov 19 00:00:00 host sshd[1234]: Failed password for invalid user test' > "$log_fixture"
+[[ "$(SECURITY_AUTH_LOG_CANDIDATES="$log_fixture" security_detect_ssh_log_path)" == "$log_fixture" ]]
 if SECURITY_AUTH_LOG_CANDIDATES="$log_fixture.missing" security_detect_ssh_log_path; then
   echo "Missing SSH auth log was accepted" >&2
   exit 1
