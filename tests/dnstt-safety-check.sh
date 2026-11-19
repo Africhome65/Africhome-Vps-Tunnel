@@ -20,6 +20,11 @@ SERVICE="$ROOT_DIR/scripts/install-dnstt-service.sh"
 grep -q 'EnvironmentFile=/etc/africhome-dnstt/server.env' "$SERVICE"
 grep -q 'EnvironmentFile=/etc/africhome-dnstt/service.env' "$SERVICE"
 grep -q 'systemctl daemon-reload' "$SERVICE"
+grep -q 'root-owned directory with mode 0700' "$SERVICE"
+grep -q 'private key must be a root-owned regular file with mode 0600' "$SERVICE"
+grep -q 'public key must be a root-owned regular file with mode 0644' "$SERVICE"
+grep -q 'root-owned regular file with mode 0600' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
+grep -q 'must be a real directory, not a symlink' "$ROOT_DIR/scripts/install-dnstt.sh"
 
 # Preparing the unit must not stop iodine or activate DNSTT automatically.
 if grep -E -q '^[[:space:]]*systemctl[[:space:]]+(stop|disable|enable|start|restart)[[:space:]]' "$SERVICE"; then
