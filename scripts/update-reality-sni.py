@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Safely add a server name to exactly one Xray VLESS REALITY inbound."""
+import errno
 import json
 import os
 import re
@@ -24,7 +25,12 @@ def update(path, hostname):
     if not valid_hostname(hostname):
         raise ValueError("Invalid DNS hostname")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    source_fd = os.open(path, flags)
+    try:
+        source_fd = os.open(path, flags)
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            raise ValueError("Xray config must not be a symlink") from error
+        raise
     with os.fdopen(source_fd, "r", encoding="utf-8") as stream:
         st = os.fstat(stream.fileno())
         if not stat.S_ISREG(st.st_mode):
