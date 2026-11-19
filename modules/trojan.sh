@@ -48,7 +48,7 @@ trojan_add() {
   ' "$TROJAN_CONFIG" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update Xray configuration."; return 1
   fi
-  install -m 600 "$tmp" "$TROJAN_CONFIG"
+  install -m 640 -o root -g xray "$tmp" "$TROJAN_CONFIG"
   rm -f "$tmp"
   if ! xray run -test -config "$TROJAN_CONFIG"; then
     cp -a "$backup" "$TROJAN_CONFIG"
