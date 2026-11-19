@@ -289,9 +289,10 @@ ovpn_menu(){
     echo "2) Create Africhome certificate authority (one-time)"
     echo "3) Configure native OpenVPN server (UDP/TCP)"
     echo "4) Create client profile"
-    echo "5) Revoke client certificate"
-    echo "6) Service status and logs"
-    echo "7) Read-only OpenVPN deployment inventory"
+    echo "5) List client certificates"
+    echo "6) Revoke client certificate"
+    echo "7) Service status and logs"
+    echo "8) Read-only OpenVPN deployment inventory"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -299,9 +300,10 @@ ovpn_menu(){
       2) ovpn_init_pki; ah_pause ;;
       3) ovpn_configure_server; ah_pause ;;
       4) ovpn_add_client; ah_pause ;;
-      5) ovpn_revoke_client; ah_pause ;;
-      6) ovpn_status; ah_pause ;;
-      7) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
+      5) ovpn_list_clients; ah_pause ;;
+      6) ovpn_revoke_client; ah_pause ;;
+      7) ovpn_status; ah_pause ;;
+      8) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
