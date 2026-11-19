@@ -15,6 +15,16 @@ bash -c '
   dt_valid_username customer_01
   ! dt_valid_username root
   ! dt_valid_username "bad name"
+  dt_valid_host "127.0.0.1"
+  dt_valid_host "255.255.255.255"
+  dt_valid_host "localhost"
+  dt_valid_host "dns.example.net"
+  ! dt_valid_host "256.1.1.1"
+  ! dt_valid_host "999.0.0.1"
+  ! dt_valid_host "127.0.0"
+  ! dt_valid_host "bad..host"
+  ! dt_valid_host "-bad.example"
+  ! dt_valid_host "bad-.example"
 ' _ "$MODULE"
 
 grep -q 'useradd --create-home --shell /bin/bash --groups "$DT_GROUP"' "$MODULE"
