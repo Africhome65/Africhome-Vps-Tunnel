@@ -14,7 +14,7 @@ CFG
 chmod 0600 "$CANDIDATE"
 cat > "$TMP/bin/haproxy" <<'MOCK'
 #!/usr/bin/env bash
-[[ "\${MOCK_HAPROXY_FAIL:-0}" != 1 ]]
+[[ "${MOCK_HAPROXY_FAIL:-0}" != 1 ]]
 MOCK
 cat > "$TMP/bin/systemctl" <<'MOCK'
 #!/usr/bin/env bash
@@ -23,14 +23,14 @@ case "$1" in
   is-enabled) [[ -f "$MOCK_ENABLED" ]] ;;
   enable) touch "$MOCK_ENABLED" ;;
   disable) rm -f "$MOCK_ENABLED" ;;
-  start) [[ "\${MOCK_FAIL_START:-0}" != 1 ]] || exit 1; touch "$MOCK_RUNNING" ;;
+  start) [[ "${MOCK_FAIL_START:-0}" != 1 ]] || exit 1; touch "$MOCK_RUNNING" ;;
   stop) rm -f "$MOCK_RUNNING" ;;
   *) exit 2 ;;
 esac
 MOCK
 cat > "$TMP/bin/ss" <<'MOCK'
 #!/usr/bin/env bash
-if [[ -n "\${MOCK_BUSY_PORT:-}" ]]; then
+if [[ -n "${MOCK_BUSY_PORT:-}" ]]; then
   printf 'LISTEN 0 128 0.0.0.0:%s 0.0.0.0:*\n' "$MOCK_BUSY_PORT"
 fi
 if [[ -f "$MOCK_RUNNING" ]]; then
