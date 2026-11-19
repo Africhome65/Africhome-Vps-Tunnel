@@ -36,7 +36,7 @@ if grep -q 'PRIVATE-KEY-MUST-NOT-APPEAR\|password-file' "$TMP/openvpn.out"; then
   exit 1
 fi
 cat > "$TMP/xray.json" <<'JSON'
-{"inbounds":[{"tag":"safe-inbound","protocol":"vless","listen":"127.0.0.1","port":443,"streamSettings":{"network":"ws","security":"tls"},"settings":{"clients":[{"id":"UUID-MUST-NOT-APPEAR","password":"PASSWORD-MUST-NOT-APPEAR"}]},"streamSettings":{"network":"ws","security":"tls","tlsSettings":{"certificates":[{"keyFile":"/secret/private.key"}]}}}]}
+{"inbounds":[{"tag":"safe-inbound","protocol":"vless","listen":"127.0.0.1","port":443,"settings":{"clients":[{"id":"UUID-MUST-NOT-APPEAR","password":"PASSWORD-MUST-NOT-APPEAR"}]},"streamSettings":{"network":"ws","security":"tls","tlsSettings":{"certificates":[{"keyFile":"/secret/private.key"}]}}}]}
 JSON
 XRAY_CONFIG="$TMP/xray.json" bash "$ROOT/scripts/xray-inventory.sh" > "$TMP/xray.out"
 grep -q 'safe-inbound' "$TMP/xray.out"
