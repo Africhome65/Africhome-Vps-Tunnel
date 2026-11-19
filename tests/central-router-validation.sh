@@ -15,7 +15,14 @@ cr_valid_hostname example.com
 cr_valid_hostname vpn-1.example.net
 if cr_valid_hostname '-bad.example'; then exit 1; fi
 cr_valid_backend 127.0.0.1 10001
+cr_valid_backend ::1 10001
 if cr_valid_backend 127.0.0.1 70000; then exit 1; fi
+if cr_valid_backend 0.0.0.0 10001; then
+  echo "Wildcard backend bind was accepted." >&2; exit 1
+fi
+if cr_valid_backend 203.0.113.10 10001; then
+  echo "Public backend address was accepted." >&2; exit 1
+fi
 
 cr_validate_route vless-reality tcp 443 reality.example.com 127.0.0.1 1443 >/dev/null
 cr_validate_route ssh-direct-ssl tcp 443 ssh.example.com 127.0.0.1 2222 >/dev/null
@@ -26,6 +33,12 @@ if cr_validate_route vless-reality udp 443 - 127.0.0.1 1443 >/dev/null 2>&1; the
 fi
 if cr_validate_route v2ray-ws tcp 80 ws.example.com 127.0.0.1 10002 >/dev/null 2>&1; then
   echo "Invalid public port accepted." >&2; exit 1
+fi
+if cr_validate_route openvpn-direct-udp udp 1194 udp.example.com 127.0.0.1 1195 >/dev/null 2>&1; then
+  echo "UDP route incorrectly accepted an SNI hostname." >&2; exit 1
+fi
+if cr_validate_route openvpn-direct-udp udp 1194 - 203.0.113.10 1195 >/dev/null 2>&1; then
+  echo "Public backend address was accepted for UDP." >&2; exit 1
 fi
 
 cr_check_route_collisions $'tcp|443|reality.example.com|vless-reality\ntcp|443|ssh.example.com|ssh-direct-ssl'
