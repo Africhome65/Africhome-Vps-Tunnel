@@ -69,7 +69,7 @@ ovpn_port_available(){
   fi
 }
 ovpn_client_proto(){
-  case "${1:-}" in tcp) printf 'tcp-client\\n' ;; udp) printf 'udp\\n' ;; *) return 1 ;; esac
+  case "${1:-}" in tcp) printf 'tcp-client\n' ;; udp) printf 'udp\n' ;; *) return 1 ;; esac
 }
 ovpn_write_server_config(){
   local output="$1" port="$2" proto="$3" runtime_dir="${4:-/etc/openvpn/server/africhome-pki}"
