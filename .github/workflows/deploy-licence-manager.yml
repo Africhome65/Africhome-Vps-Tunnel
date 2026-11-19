@@ -1,0 +1,48 @@
+name: Deploy Africhome Licence Manager
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/feature/central-port-routing-architecture'
+    defaults:
+      run:
+        working-directory: license-manager
+    env:
+      CLOUDFLARE_ACCOUNT_ID: af6929d244fadf6e746b005f4987b750
+    steps:
+      - name: Check out selected feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/central-port-routing-architecture
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configure Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LICENSE_PRIVATE_KEY_PKCS8_B64: ${{ secrets.LICENSE_PRIVATE_KEY_PKCS8_B64 }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$LICENSE_PRIVATE_KEY_PKCS8_B64" || { echo "Missing LICENSE_PRIVATE_KEY_PKCS8_B64"; exit 1; }
+          test -n "$ADMIN_PASSWORD" || { echo "Missing ADMIN_PASSWORD"; exit 1; }
+          test -n "$SESSION_SECRET" || { echo "Missing SESSION_SECRET"; exit 1; }
+          printf '%s' "$LICENSE_PRIVATE_KEY_PKCS8_B64" | npx --yes wrangler@4 secret put LICENSE_PRIVATE_KEY_PKCS8_B64 --config wrangler.toml
+          printf '%s' "$ADMIN_PASSWORD" | npx --yes wrangler@4 secret put ADMIN_PASSWORD --config wrangler.toml
+          printf '%s' "$SESSION_SECRET" | npx --yes wrangler@4 secret put SESSION_SECRET --config wrangler.toml
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4 deploy --config wrangler.toml
