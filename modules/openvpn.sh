@@ -50,17 +50,20 @@ ovpn_load_state(){
   local key value count=0
   while IFS='=' read -r key value; do
     case "$key" in
-      OVPN_REMOTE) OVPN_REMOTE="$value" ;;
-      OVPN_PORT) OVPN_PORT="$value" ;;
-      OVPN_PROTO) OVPN_PROTO="$value" ;;
+      OVPN_REMOTE) [[ -z "$OVPN_REMOTE" ]] || return 1; OVPN_REMOTE="$value" ;;
+      OVPN_PORT) [[ -z "$OVPN_PORT" ]] || return 1; OVPN_PORT="$value" ;;
+      OVPN_PROTO) [[ -z "$OVPN_PROTO" ]] || return 1; OVPN_PROTO="$value" ;;
       *) ovpn_error "Unexpected key in OpenVPN state file."; return 1 ;;
     esac
+    ((count+=1))
   done < "$OVPN_STATE"
+  (( count == 3 )) || return 1
   ovpn_valid_remote "$OVPN_REMOTE" && ovpn_valid_port "$OVPN_PORT" &&
     [[ "$OVPN_PROTO" == udp || "$OVPN_PROTO" == tcp ]] || {
       ovpn_error "OpenVPN state values failed validation."; return 1;
     }
 }
+
 ovpn_require_tools(){
   local missing=0 cmd
   for cmd in openvpn systemctl ss install openssl; do
