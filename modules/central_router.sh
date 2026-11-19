@@ -98,7 +98,7 @@ cr_check_route_collisions(){
       fi
       seen[$key]="$host_list$hostname|"
     else
-      if [[ "$transport == tcp && -n "$hostname" ]]; then
+      if [[ "$transport" == tcp && -n "$hostname" ]]; then
         seen[$key]="|$hostname|"
       else
         seen[$key]="WILDCARD"
