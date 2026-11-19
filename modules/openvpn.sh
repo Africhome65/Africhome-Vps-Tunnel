@@ -47,7 +47,7 @@ ovpn_load_state(){
   OVPN_REMOTE=""
   OVPN_PORT=""
   OVPN_PROTO=""
-  local key value
+  local key value count=0
   while IFS='=' read -r key value; do
     case "$key" in
       OVPN_REMOTE) OVPN_REMOTE="$value" ;;
