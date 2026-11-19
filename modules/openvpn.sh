@@ -82,7 +82,7 @@ proto $server_proto
 dev tun
 topology subnet
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist /var/log/openvpn/africhome/ipp.txt
+ifconfig-pool-persist /var/log/africhome-openvpn/ipp.txt
 keepalive 10 120
 user nobody
 group nogroup
@@ -98,7 +98,7 @@ key $runtime_dir/server.key
 crl-verify $runtime_dir/crl.pem
 dh none
 ecdh-curve prime256v1
-status /var/log/openvpn/africhome/status.log
+status /var/log/africhome-openvpn/status.log
 verb 3
 EOF
   [[ "$proto" != udp ]] || printf 'explicit-exit-notify 1\n' >> "$output"
@@ -131,9 +131,9 @@ ovpn_configure_server(){
   [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
   }
-  [[ ! -L /var/log/openvpn/africhome ]] || { ovpn_error "OpenVPN log directory must not be a symlink."; return 1; }
+  [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
   install -d -m 0755 "$OVPN_CONFIG_DIR"
-  install -d -o nobody -g nogroup -m 0750 /var/log/openvpn/africhome
+  install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa gen-req server nopass || return 1
     ovpn_easyrsa sign-req server server || return 1
