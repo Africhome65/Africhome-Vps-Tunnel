@@ -66,3 +66,21 @@ and client profile.
 
 Never apply a generated configuration to a live VPS without a separate backup,
 validation, rollback, port-ownership and maintenance-window procedure.
+
+
+## Native OpenVPN management
+
+The menu includes a separate native OpenVPN management module for package
+installation, a local Easy-RSA certificate authority, UDP/TCP server setup,
+client profile generation, certificate revocation, and service status.
+
+This native module does **not** claim OpenVPN WebSocket, payload-proxy, or SNI
+support. Those require separately tested wrappers and compatible clients.
+It does not edit UFW/nftables or enable IP forwarding/NAT. Open the selected
+transport/port in the provider firewall and complete a separately reviewed
+routing/firewall setup before offering full-tunnel internet service.
+
+The CA private key stays in the root-only Easy-RSA PKI directory. Runtime
+server certificates, keys, CRL and tls-crypt material are copied to a
+service-readable directory with restricted permissions. Exported client
+profiles are root-only and contain private keys.
