@@ -2,7 +2,7 @@ name: Shell validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'repair/**']
   pull_request:
     branches: [main]
 
