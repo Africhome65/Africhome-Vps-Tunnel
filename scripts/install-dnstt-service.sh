@@ -15,7 +15,31 @@ SERVICE_CONFIG="$KEY_DIR/service.env"
 UNIT_FILE="/etc/systemd/system/africhome-dnstt.service"
 tmp=""
 unit_tmp=""
+service_config_backup=""
+unit_backup=""
+service_config_changed=0
+unit_changed=0
 cleanup() {
+  local status=$?
+  if (( status != 0 )); then
+    if (( unit_changed )); then
+      if [[ -n "$unit_backup" && -f "$unit_backup" ]]; then
+        cp -a -- "$unit_backup" "$UNIT_FILE" || true
+      else
+        rm -f -- "$UNIT_FILE" || true
+      fi
+    fi
+    if (( service_config_changed )); then
+      if [[ -n "$service_config_backup" && -f "$service_config_backup" ]]; then
+        cp -a -- "$service_config_backup" "$SERVICE_CONFIG" || true
+      else
+        rm -f -- "$SERVICE_CONFIG" || true
+      fi
+    fi
+    if (( unit_changed )); then
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+  fi
   [[ -z "$tmp" || ! -e "$tmp" ]] || rm -f -- "$tmp"
   [[ -z "$unit_tmp" || ! -e "$unit_tmp" ]] || rm -f -- "$unit_tmp"
 }
@@ -108,13 +132,9 @@ chmod 0600 "$tmp"
   printf 'DNSTT_UDP_ADDR="%s"\n' "$DNSTT_UDP_ADDR"
   printf 'DNSTT_UPSTREAM="%s"\n' "$DNSTT_UPSTREAM"
 } > "$tmp"
-if [[ -f "$SERVICE_CONFIG" ]]; then
-  cp -a "$SERVICE_CONFIG" "$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S).$$"
-fi
-mv -f "$tmp" "$SERVICE_CONFIG"
-chmod 0600 "$SERVICE_CONFIG"
 
-unit_tmp="$(mktemp)"
+# Build the complete unit beside its destination so the final rename is atomic.
+unit_tmp="$(mktemp "/etc/systemd/system/.africhome-dnstt.service.XXXXXX")"
 cat > "$unit_tmp" <<'UNIT'
 [Unit]
 Description=Africhome DNSTT DNS tunnel server
@@ -138,13 +158,25 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 UNIT
+chown root:root "$unit_tmp"
 chmod 0644 "$unit_tmp"
-if [[ -f "$UNIT_FILE" ]]; then
-  cp -a -- "$UNIT_FILE" "$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S).$$"
+
+# Preserve both previous files before changing either destination.
+if [[ -f "$SERVICE_CONFIG" ]]; then
+  service_config_backup="$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S).$$"
+  cp -a -- "$SERVICE_CONFIG" "$service_config_backup"
 fi
-install -o root -g root -m 0644 "$unit_tmp" "$UNIT_FILE"
-rm -f "$unit_tmp"
+if [[ -f "$UNIT_FILE" ]]; then
+  unit_backup="$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S).$$"
+  cp -a -- "$UNIT_FILE" "$unit_backup"
+fi
+
+mv -f -- "$tmp" "$SERVICE_CONFIG"
+tmp=""
+service_config_changed=1
+mv -f -- "$unit_tmp" "$UNIT_FILE"
 unit_tmp=""
+unit_changed=1
 systemctl daemon-reload
 
 ok "DNSTT systemd unit installed: africhome-dnstt.service"
