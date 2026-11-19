@@ -69,7 +69,7 @@ ovpn_port_available(){
   fi
 }
 ovpn_write_server_config(){
-  local output="$1" port="$2" proto="$3" runtime_dir="$4"
+  local output="$1" port="$2" proto="$3" runtime_dir="${4:-/etc/openvpn/server/africhome-pki}"
   cat > "$output" <<EOF
 port $port
 proto $proto
