@@ -36,6 +36,8 @@ jobs:
         run: bash tests/hysteria-users-validation.sh
       - name: Test central domain manager
         run: bash tests/domain-manager-validation.sh
+      - name: Test certificate deployment safety
+        run: bash tests/cert-deploy-validation.sh
       - name: Install isolated routing test dependencies
         run: |
           sudo apt-get update
