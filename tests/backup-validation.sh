@@ -9,18 +9,22 @@ export AH_RESTORE_STAGE_ROOT="$tmp/staged"
 . "$ROOT/modules/backup.sh"
 
 backup_require_root(){ return 0; }
-mkdir -p "$AH_BACKUP_ROOT" "$tmp/source/etc/xray" "$tmp/source/etc/letsencrypt/archive/example.test" "$tmp/source/etc/letsencrypt/live/example.test"
+mkdir -p "$AH_BACKUP_ROOT" "$tmp/source/etc/xray" "$tmp/source/etc/openvpn/server" "$tmp/source/etc/letsencrypt/archive/example.test" "$tmp/source/etc/letsencrypt/live/example.test"
 printf 'test-config\n' > "$tmp/source/etc/xray/config.json"
+printf 'openvpn-server-config\n' > "$tmp/source/etc/openvpn/server/africhome.conf"
+printf 'OVPN_PORT=1194\n' > "$tmp/source/etc/africhome-openvpn.env"
 printf 'test-cert\n' > "$tmp/source/etc/letsencrypt/archive/example.test/cert.pem"
 ln -s ../../archive/example.test/cert.pem "$tmp/source/etc/letsencrypt/live/example.test/cert.pem"
 good="$AH_BACKUP_ROOT/africhome-good.tar.gz"
-tar -czf "$good" -C "$tmp/source" etc/xray etc/letsencrypt
+tar -czf "$good" -C "$tmp/source" etc/xray etc/openvpn etc/africhome-openvpn.env etc/letsencrypt
 (cd "$AH_BACKUP_ROOT" && sha256sum "$(basename "$good")" > "$(basename "$good").sha256")
 backup_verify "$good"
 backup_stage_restore "$good"
 stage="$(find "$AH_RESTORE_STAGE_ROOT" -mindepth 1 -maxdepth 1 -type d -print -quit)"
 [[ -n "$stage" ]]
 [[ "$(cat "$stage/etc/xray/config.json")" == "test-config" ]]
+[[ "$(cat "$stage/etc/openvpn/server/africhome.conf")" == "openvpn-server-config" ]]
+[[ "$(cat "$stage/etc/africhome-openvpn.env")" == "OVPN_PORT=1194" ]]
 [[ "$(cat "$stage/etc/letsencrypt/live/example.test/cert.pem")" == "test-cert" ]]
 [[ -L "$stage/etc/letsencrypt/live/example.test/cert.pem" ]]
 [[ "$(stat -c '%a' "$stage/etc/xray/config.json")" == "600" ]]
