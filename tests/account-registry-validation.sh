@@ -40,7 +40,7 @@ esac
 EOF
 chmod 700 "$tmp_dir/bin/systemctl"
 PATH="$tmp_dir/bin:$PATH"
-ar_register_service "acct_expired_01" "olduser" "hysteria" "private-native-ref" 12345
+ar_register_service "acct_test_0002" "olduser" "hysteria" "private-native-ref" 12345
 dashboard="$(ar_dashboard)"
 grep -Fq "AFRICHOME ACCOUNT DASHBOARD" <<< "$dashboard"
 grep -Fq "Registered accounts: 2" <<< "$dashboard"
