@@ -178,13 +178,13 @@ ar_reconcile() {
   if [[ -r "$protocol_db" ]] && jq -e 'type == "array"' "$protocol_db" >/dev/null 2>&1; then
     while IFS=$'\t' read -r account_id service name ref; do
       [[ -n "$service" && -n "$ref" ]] || continue
-      if [[ -z "$account_id" ]] || ! jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
+      if [[ "$account_id" == "-" || "$ref" == "-" ]] || ! jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == $svc and .ref == $ref))' \
         "$AR_REGISTRY" >/dev/null 2>&1; then
         printf '%-12s %-24.24s %s\n' "XRAY/$service" "$name" "local metadata exists; registry entry missing"
         ((local_only+=1))
       fi
-    done < <(jq -r '.[] | [(.account_id // ""), .protocol, .name, .email] | @tsv' "$protocol_db")
+    done < <(jq -r '.[] | [(.account_id // "-"), .protocol, .name, (.email // "-")] | @tsv' "$protocol_db")
   else
     printf '%-12s %-24s %s\n' "XRAY" "-" "local metadata unavailable/invalid; skipped"
     ((skipped+=1))
@@ -193,13 +193,13 @@ ar_reconcile() {
   if [[ -r "$hysteria_db" ]] && jq -e 'type == "array"' "$hysteria_db" >/dev/null 2>&1; then
     while IFS=$'\t' read -r account_id name; do
       [[ -n "$name" ]] || continue
-      if [[ -z "$account_id" ]] || ! jq -e --arg id "$account_id" --arg ref "$name" \
+      if [[ "$account_id" == "-" ]] || ! jq -e --arg id "$account_id" --arg ref "$name" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == "hysteria" and .ref == $ref))' \
         "$AR_REGISTRY" >/dev/null 2>&1; then
         printf '%-12s %-24.24s %s\n' "HYSTERIA" "$name" "local metadata exists; registry entry missing"
         ((local_only+=1))
       fi
-    done < <(jq -r '.[] | [(.account_id // ""), .username] | @tsv' "$hysteria_db")
+    done < <(jq -r '.[] | [(.account_id // "-"), .username] | @tsv' "$hysteria_db")
   else
     printf '%-12s %-24s %s\n' "HYSTERIA" "-" "local metadata unavailable/invalid; skipped"
     ((skipped+=1))
