@@ -132,23 +132,11 @@ xray_add_sni() {
   [[ "$new_sni" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$new_sni" != *..* ]] || { ah_err "Enter a valid DNS hostname."; return 1; }
   # shellcheck disable=SC1090
   . "$XRAY_ENV"
-  local backup_config
+  local backup_config module_dir
+  module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
   backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
   cp -a "$XRAY_CONFIG" "$backup_config" || { ah_err "Could not back up the current Xray configuration."; return 1; }
-  if ! python3 - "$XRAY_CONFIG" "$new_sni" <<'PY'
-import json, sys
-path, name = sys.argv[1], sys.argv[2]
-with open(path, encoding="utf-8") as f:
-    config = json.load(f)
-settings = config["inbounds"][0]["streamSettings"]["realitySettings"]
-names = settings.get("serverNames", [])
-if name not in names:
-    names.append(name)
-settings["serverNames"] = names
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(config, f, indent=2)
-    f.write("\\n")
-PY
+  if ! python3 "$module_dir/scripts/update-reality-sni.py" "$XRAY_CONFIG" "$new_sni"; then
   then
     cp -a "$backup_config" "$XRAY_CONFIG"
     ah_err "Could not update the SNI list; the previous configuration was restored."
