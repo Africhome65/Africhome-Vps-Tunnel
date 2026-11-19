@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Guarded HAProxy apply transaction. Requires a free-port preflight and explicit confirmation.
 set -Eeuo pipefail
+umask 077
 CANDIDATE="${AFRICHOME_HAPROXY_CANDIDATE:-/root/africhome-haproxy-candidate.cfg}"
 CONFIG_DIR="${AFRICHOME_HAPROXY_CONFIG_DIR:-/etc/haproxy}"
 CONFIG_FILE="${AFRICHOME_HAPROXY_CONFIG_FILE:-$CONFIG_DIR/haproxy.cfg}"
@@ -53,7 +54,11 @@ install -d -o root -g root -m 0755 "$LOCK_DIR"
 safe_root_directory "$LOCK_DIR" || {
   fail "Lock directory must be root-owned, not a symlink, and not group/world-writable."; exit 1;
 }
-exec 9>"$LOCK_FILE"
+[[ ! -L "$LOCK_FILE" ]] || { fail "Lock file must not be a symlink."; exit 1; }
+if [[ -e "$LOCK_FILE" ]]; then
+  safe_root_file "$LOCK_FILE" || { fail "Existing lock file must be root-owned and not group/world-writable."; exit 1; }
+fi
+exec 9>>"$LOCK_FILE"
 flock -n 9 || { fail "Another HAProxy apply transaction is running."; exit 1; }
 if "$SYSTEMCTL_BIN" is-active --quiet haproxy 2>/dev/null; then
   fail "HAProxy is already active. Refusing to replace a live service configuration."; exit 1
