@@ -68,11 +68,16 @@ ovpn_port_available(){
     ! ss -H -ltn 2>/dev/null | awk -v p=":$port" '$0 ~ p"([[:space:]]|$)" {found=1} END{exit !found}'
   fi
 }
+ovpn_client_proto(){
+  case "${1:-}" in tcp) printf 'tcp-client\\n' ;; udp) printf 'udp\\n' ;; *) return 1 ;; esac
+}
 ovpn_write_server_config(){
   local output="$1" port="$2" proto="$3" runtime_dir="${4:-/etc/openvpn/server/africhome-pki}"
+  local server_proto="$proto"
+  [[ "$proto" != tcp ]] || server_proto="tcp-server"
   cat > "$output" <<EOF
 port $port
-proto $proto
+proto $server_proto
 dev tun
 topology subnet
 server 10.8.0.0 255.255.255.0
