@@ -185,7 +185,10 @@ ovpn_configure_server(){
     return 1
   fi
   local remote port proto tmp backup state_tmp service_was_enabled=0
-  if systemctl is-enabled --quiet "$OVPN_SERVICE" 2>/dev/null; then service_was_enabled=1; fi
+  if systemctl is-enabled --quiet "$OVPN_SERVICE" 2>/dev/null; then
+    ovpn_error "$OVPN_SERVICE is already enabled but inactive; review its existing boot configuration before setup."
+    return 1
+  fi
   read -r -p "Public VPS IP/domain for client profiles: " remote
   ovpn_valid_remote "$remote" || { ovpn_error "Invalid public hostname or IPv4 address."; return 1; }
   read -r -p "OpenVPN transport [udp/tcp] (default udp): " proto
@@ -205,10 +208,6 @@ ovpn_configure_server(){
   }
   [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
   if [[ ! -d "$OVPN_CONFIG_DIR" ]]; then install -d -m 0755 "$OVPN_CONFIG_DIR" || return 1; fi
-  if ! install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn; then
-    ovpn_error "Could not create OpenVPN log directory."
-    return 1
-  fi
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa --req-cn=server gen-req server nopass || return 1
   fi
@@ -222,6 +221,10 @@ ovpn_configure_server(){
   [[ -s "$OVPN_EASYRSA_DIR/pki/crl.pem" ]] || ovpn_easyrsa gen-crl || return 1
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
+  fi
+  if ! install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn; then
+    ovpn_error "Could not create OpenVPN log directory."
+    return 1
   fi
   if ! mkdir -m 0750 -- "$OVPN_RUNTIME_DIR"; then
     rmdir /var/log/africhome-openvpn 2>/dev/null || true
