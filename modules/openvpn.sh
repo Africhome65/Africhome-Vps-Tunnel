@@ -10,6 +10,7 @@ OVPN_CLIENT_DIR="${OVPN_CLIENT_DIR:-/root/africhome-openvpn-clients}"
 OVPN_CONFIG="${OVPN_CONFIG:-$OVPN_CONFIG_DIR/africhome.conf}"
 OVPN_STATE="${OVPN_STATE:-/etc/africhome-openvpn.env}"
 OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-$OVPN_CONFIG_DIR/africhome-pki}"
+OVPN_LOG_DIR="${OVPN_LOG_DIR:-/var/log/africhome-openvpn}"
 OVPN_SERVICE="openvpn-server@africhome"
 
 ovpn_error(){ ah_err "$*"; }
@@ -165,7 +166,7 @@ EOF
 }
 # Remove only runtime/log artifacts created by an incomplete setup attempt.
 ovpn_cleanup_unpublished_setup(){
-  local runtime="$1" log_dir="${2:-/var/log/africhome-openvpn}"
+  local runtime="$1" log_dir="${2:-$OVPN_LOG_DIR}"
   if [[ -d "$runtime" && ! -L "$runtime" ]]; then rm -rf -- "$runtime" || return 1; fi
   rmdir -- "$log_dir" 2>/dev/null || true
 }
@@ -184,7 +185,7 @@ ovpn_configure_server(){
     ovpn_error "$OVPN_SERVICE is already active; refusing to replace or restart it."
     return 1
   fi
-  local remote port proto tmp backup state_tmp service_was_enabled=0
+  local remote port proto tmp backup state_tmp service_was_enabled=0 log_dir="$OVPN_LOG_DIR"
   if systemctl is-enabled --quiet "$OVPN_SERVICE" 2>/dev/null; then
     ovpn_error "$OVPN_SERVICE is already enabled but inactive; review its existing boot configuration before setup."
     return 1
@@ -206,7 +207,7 @@ ovpn_configure_server(){
   [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" && -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
   }
-  [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
+  [[ ! -e "$log_dir" && ! -L "$log_dir" ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
   if [[ ! -d "$OVPN_CONFIG_DIR" ]]; then install -d -m 0755 "$OVPN_CONFIG_DIR" || return 1; fi
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa --req-cn=server gen-req server nopass || return 1
@@ -222,12 +223,12 @@ ovpn_configure_server(){
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
   fi
-  if ! install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn; then
+  if ! install -d -o nobody -g nogroup -m 0750 "$log_dir"; then
     ovpn_error "Could not create OpenVPN log directory."
     return 1
   fi
   if ! mkdir -m 0750 -- "$OVPN_RUNTIME_DIR"; then
-    rmdir /var/log/africhome-openvpn 2>/dev/null || true
+    rmdir "$log_dir" 2>/dev/null || true
     ovpn_error "Runtime directory appeared or could not be created; refusing to use it."
     return 1
   fi
