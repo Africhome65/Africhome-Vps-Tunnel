@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 SSH_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$SSH_USERS_BASE_DIR/lib/common.sh"
 . "$SSH_USERS_BASE_DIR/modules/account_registry.sh"
 
 ssh_users_create(){
