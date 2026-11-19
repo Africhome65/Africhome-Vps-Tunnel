@@ -33,5 +33,9 @@ fi
 
 grep -q 'modules/dnstt_users.sh' "$MENU"
 grep -q 'dnstt_users_menu' "$MENU"
+grep -q 'input hidden' "$MODULE"
+grep -q 'Confirm your password' "$MODULE"
+grep -q 'root-owned regular file with mode 0600' "$MODULE"
+grep -q 'root-owned regular file with mode 0644' "$MODULE"
 
 echo "DNSTT customer-account and resolver safety checks passed."
