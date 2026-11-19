@@ -84,8 +84,29 @@ else
 fi
 EOF
 chmod 700 "$tmp_dir/bin/getent"
+
+cat > "$tmp_dir/xray-config.json" <<'EOF'
+{
+  "inbounds": [
+    {"protocol":"vless","settings":{"clients":[
+      {"email":"vless-email-001","id":"XRAY_CONFIG_SECRET"},
+      {"email":"manual-vless-only","id":"MANUAL_XRAY_SECRET"}
+    ]}}
+  ]
+}
+EOF
+cat > "$tmp_dir/hysteria-config.yaml" <<'EOF'
+auth:
+  type: userpass
+  userpass:
+    alice: "HYSTERIA_CONFIG_SECRET"
+    orphan-hy2: "ORPHAN_HYSTERIA_SECRET"
+    manual-hy2: "MANUAL_HYSTERIA_SECRET"
+EOF
 export AR_PROTOCOL_DB="$tmp_dir/protocol-users.json"
 export AR_HYSTERIA_DB="$tmp_dir/hysteria-users.json"
+export AR_XRAY_CONFIG="$tmp_dir/xray-config.json"
+export AR_HYSTERIA_CONFIG="$tmp_dir/hysteria-config.yaml"
 export AR_TEST_PASSWD_FILE="$tmp_dir/passwd-fixture"
 cp "$AR_REGISTRY" "$tmp_dir/registry.before"
 cp "$AR_PROTOCOL_DB" "$tmp_dir/protocol.before"
@@ -95,7 +116,8 @@ grep -Fq "local metadata exists; registry entry missing" <<< "$reconciliation"
 grep -Fq "registry entry has no matching local record" <<< "$reconciliation"
 grep -Fq "interactive Linux user not registered (review candidate)" <<< "$reconciliation"
 grep -Fq "Summary: local-only=2, registry-only=1, unregistered SSH candidates=1, skipped sources=0" <<< "$reconciliation"
-if grep -Eiq 'XRAY_SECRET_SENTINEL|VMESS_SECRET_SENTINEL|HYSTERIA_SECRET_SENTINEL|OTHER_SECRET_SENTINEL|credential|password' <<< "$reconciliation"; then
+grep -Fq "Native-only=2, stale-local=1" <<< "$reconciliation"
+if grep -Eiq 'XRAY_SECRET_SENTINEL|VMESS_SECRET_SENTINEL|HYSTERIA_SECRET_SENTINEL|OTHER_SECRET_SENTINEL|XRAY_CONFIG_SECRET|MANUAL_XRAY_SECRET|HYSTERIA_CONFIG_SECRET|ORPHAN_HYSTERIA_SECRET|MANUAL_HYSTERIA_SECRET|credential|password' <<< "$reconciliation"; then
   echo "Reconciliation exposed a credential or secret-like field." >&2; exit 1
 fi
 cmp -s "$AR_REGISTRY" "$tmp_dir/registry.before"
