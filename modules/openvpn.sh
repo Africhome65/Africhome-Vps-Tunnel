@@ -19,6 +19,7 @@ ovpn_valid_name(){
 }
 ovpn_valid_remote(){
   local value="${1:-}"
+  (( ${#value} <= 253 )) || return 1
   [[ "$value" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ||
      "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
   if [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
