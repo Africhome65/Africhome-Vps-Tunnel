@@ -70,13 +70,16 @@ dt_accounts_create() {
       password="$(openssl rand -hex 16)" || return 1
       ;;
     2)
-      read -r -p "Enter your password ONCE (VISIBLE; any non-empty length; ':' is not allowed): " password
+      read -r -s -p "Enter your password (input hidden): " password
       echo
-      [[ -n "$password" && "$password" != *:* ]] || {
-        unset password
-        echo "Password must not be empty and must not contain a colon." >&2
+      read -r -s -p "Confirm your password: " password_confirm
+      echo
+      [[ -n "$password" && "$password" != *:* && "$password" == "$password_confirm" ]] || {
+        unset password password_confirm
+        echo "Passwords must match, be non-empty, and must not contain a colon." >&2
         return 1
       }
+      unset password_confirm
       ;;
     *)
       echo "Invalid password option; account was not created." >&2
@@ -109,7 +112,7 @@ dt_accounts_create() {
   if [[ "$password_mode" == 1 ]]; then
     printf 'Generated password (shown once): %s\n' "$password"
   else
-    printf 'Password (copy it now): %s\n' "$password"
+    echo "Your chosen password was set successfully and was not echoed."
   fi
   printf 'Expires: %s\n' "${expiry:-Never}"
   echo "SSH host: this VPS public IP or configured SSH hostname"
