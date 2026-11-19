@@ -36,7 +36,7 @@ ovpn_easyrsa(){
 }
 ovpn_pki_paths_safe(){
   local path
-  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_EASYRSA_DIR/pki/private/ca.key" "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_EASYRSA_DIR/pki/issued/server.crt"; do
+  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_EASYRSA_DIR/pki/reqs" "$OVPN_EASYRSA_DIR/pki/reqs/server.req" "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_EASYRSA_DIR/pki/private/ca.key" "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_EASYRSA_DIR/pki/issued/server.crt"; do
     [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
   done
 }
@@ -181,6 +181,11 @@ ovpn_configure_server(){
   install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa gen-req server nopass || return 1
+  fi
+  if [[ ! -s "$OVPN_EASYRSA_DIR/pki/issued/server.crt" ]]; then
+    [[ -s "$OVPN_EASYRSA_DIR/pki/reqs/server.req" && ! -L "$OVPN_EASYRSA_DIR/pki/reqs/server.req" ]] || {
+      ovpn_error "Server certificate request is missing or unsafe."; return 1;
+    }
     ovpn_easyrsa sign-req server server || return 1
   fi
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/server.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/server.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/server.key" && ! -L "$OVPN_EASYRSA_DIR/pki/private/server.key" ]] || { ovpn_error "Server certificate was not created."; return 1; }
@@ -242,8 +247,15 @@ ovpn_add_client(){
     ovpn_error "Client already exists."; return 1;
   }
   ovpn_load_state || return 1
-  ovpn_easyrsa gen-req "$name" nopass || return 1
-  ovpn_easyrsa sign-req client "$name" || return 1
+  if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]]; then
+    ovpn_easyrsa gen-req "$name" nopass || return 1
+  fi
+  if [[ ! -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" ]]; then
+    [[ -s "$OVPN_EASYRSA_DIR/pki/reqs/$name.req" && ! -L "$OVPN_EASYRSA_DIR/pki/reqs/$name.req" ]] || {
+      ovpn_error "Client certificate request is missing or unsafe."; return 1;
+    }
+    ovpn_easyrsa sign-req client "$name" || return 1
+  fi
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" && ! -L "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
     ovpn_error "Client certificate/key generation incomplete."; return 1;
   }
