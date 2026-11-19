@@ -64,6 +64,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck haproxy openssl iproute2 jq python3-yaml
+      - name: Test read-only central-router preflight
+        run: sudo bash tests/central-router-preflight-validation.sh
       - name: Test HAProxy ordinary TLS SNI passthrough
         run: bash tests/haproxy-sni-validation.sh
       - name: Test HAProxy central-router config renderer
