@@ -39,8 +39,8 @@ valid_fqdn "${DNS_NS_HOST:-}" || fail "DNS_NS_HOST in $DOMAIN_CONFIG is invalid.
 
 old_bind=""
 old_upstream=""
-if [[ -f "$SERVICE_CONFIG" ]]; then
-  [[ -f "$SERVICE_CONFIG" && ! -L "$SERVICE_CONFIG" && "$(stat -c '%u:%a' "$SERVICE_CONFIG")" == "0:600" ]] || fail "$SERVICE_CONFIG must be a root-owned regular file with mode 0600."
+if [[ -e "$SERVICE_CONFIG" || -L "$SERVICE_CONFIG" ]]; then
+  [[ -f "$SERVICE_CONFIG" && ! -L "$SERVICE_CONFIG" && "$(stat -c '%u:%a' "$SERVICE_CONFIG" 2>/dev/null || true)" == "0:600" ]] || fail "$SERVICE_CONFIG must be a root-owned regular file with mode 0600."
   # shellcheck disable=SC1090
   source "$SERVICE_CONFIG"
   old_bind="${DNSTT_UDP_ADDR:-}"
