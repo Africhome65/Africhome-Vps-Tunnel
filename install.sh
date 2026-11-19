@@ -23,13 +23,13 @@ esac
 if [[ -L "$INSTALL_DIR" ]]; then
   fail "$INSTALL_DIR is a symlink. Review it manually; installer will not follow it."
 fi
-if [[ -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" ]]; then
+if [[ -e "$INSTALL_DIR" && ( ! -d "$INSTALL_DIR/.git" || -L "$INSTALL_DIR/.git" ) ]]; then
   fail "$INSTALL_DIR exists but is not a Git checkout. Move it aside deliberately before retrying."
 fi
 
 # Refuse to overwrite local tracked or untracked work in an existing installation.
 # The update step below uses reset --hard, so a clean worktree is mandatory.
-if [[ -d "$INSTALL_DIR/.git" ]]; then
+if [[ -d "$INSTALL_DIR/.git" && ! -L "$INSTALL_DIR/.git" ]]; then
   if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=all)" ]]; then
     fail "$INSTALL_DIR contains local or untracked files. No update was performed. Back up and review these files, then clean or move them deliberately before retrying."
   fi
