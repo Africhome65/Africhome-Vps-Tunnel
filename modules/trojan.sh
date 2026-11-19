@@ -105,7 +105,7 @@ trojan_remove() {
   if ! jq --arg tag "$TROJAN_TAG" '.inbounds = [.inbounds[]? | select(.tag != $tag)]' "$TROJAN_CONFIG" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update Xray configuration."; return 1
   fi
-  install -m 600 "$tmp" "$TROJAN_CONFIG"
+  install -m 640 -o root -g xray "$tmp" "$TROJAN_CONFIG"
   rm -f "$tmp"
   if ! xray run -test -config "$TROJAN_CONFIG" || ! systemctl restart xray; then
     cp -a "$backup" "$TROJAN_CONFIG"
