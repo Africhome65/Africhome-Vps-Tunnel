@@ -48,7 +48,7 @@ ovpn_install_packages(){
 }
 ovpn_init_pki(){
   ah_require_root || return 1
-  [[ ! -e "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "PKI directory already exists; refusing to replace it."; return 1; }
+  [[ ! -e "$OVPN_EASYRSA_DIR" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "PKI directory already exists; refusing to replace it."; return 1; }
   [[ -x /usr/share/easy-rsa/easyrsa ]] || { ovpn_error "Install OpenVPN/Easy-RSA packages first."; return 1; }
   install -d -o root -g root -m 0700 "$OVPN_EASYRSA_DIR" || return 1
   cp -a /usr/share/easy-rsa/. "$OVPN_EASYRSA_DIR/" || return 1
@@ -147,7 +147,11 @@ ovpn_configure_server(){
   ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR"
   chmod 0640 "$tmp"
   chown root:nogroup "$tmp"
-  mv -n -- "$tmp" "$OVPN_CONFIG" || { rm -f "$tmp"; ovpn_error "Config path appeared during setup; refusing overwrite."; return 1; }
+  if ! mv -n -- "$tmp" "$OVPN_CONFIG" || [[ -e "$tmp" ]]; then
+    rm -f "$tmp"
+    ovpn_error "Config path appeared during setup; refusing overwrite."
+    return 1
+  fi
   chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"
   if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
     backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
@@ -164,7 +168,11 @@ ovpn_configure_server(){
   umask 077
   printf 'OVPN_REMOTE=%q\nOVPN_PORT=%q\nOVPN_PROTO=%q\n' "$remote" "$port" "$proto" > "$state_tmp"
   chmod 0600 "$state_tmp"
-  mv -n -- "$state_tmp" "$OVPN_STATE" || { rm -f "$state_tmp"; ovpn_error "Could not safely save OpenVPN state."; return 1; }
+  if ! mv -n -- "$state_tmp" "$OVPN_STATE" || [[ -e "$state_tmp" ]]; then
+    rm -f "$state_tmp"
+    ovpn_error "Could not safely save OpenVPN state."
+    return 1
+  fi
   ah_ok "Native OpenVPN server started on $proto/$port."
   ah_info "Open $proto/$port in the VPS provider firewall. UFW/nftables were not changed."
   ah_warn "Internet routing/NAT and IP forwarding are not enabled automatically. Configure and review them separately before advertising full-tunnel internet access."
@@ -219,7 +227,11 @@ $(cat "$OVPN_EASYRSA_DIR/pki/ta.key")
 </tls-crypt>
 EOF
   chmod 0600 "$tmp"
-  mv -n -- "$tmp" "$output" || { rm -f "$tmp"; ovpn_error "Client profile already exists; refusing overwrite."; return 1; }
+  if ! mv -n -- "$tmp" "$output" || [[ -e "$tmp" ]]; then
+    rm -f "$tmp"
+    ovpn_error "Client profile already exists; refusing overwrite."
+    return 1
+  fi
   ah_ok "Client profile created: $output"
   ah_warn "This file contains a private key. Transfer it securely and never upload it to GitHub or paste it into chat."
 }
