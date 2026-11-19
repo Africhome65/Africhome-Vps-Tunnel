@@ -40,16 +40,17 @@ esac
 EOF
 chmod 700 "$tmp_dir/bin/systemctl"
 PATH="$tmp_dir/bin:$PATH"
-ar_register_service "acct_test_0002" "olduser" "hysteria" "private-native-ref" 12345
+ar_register_service "acct_test_0001" "alice" "hysteria" "hy2-user-001" 12345
+ar_register_service "acct_test_0001" "alice" "ssh" "alice" 12345
 dashboard="$(ar_dashboard)"
 grep -Fq "AFRICHOME ACCOUNT DASHBOARD" <<< "$dashboard"
-grep -Fq "Registered accounts: 2" <<< "$dashboard"
-grep -Fq "olduser" <<< "$dashboard"
+grep -Fq "Registered accounts: 1" <<< "$dashboard"
+grep -Fq "alice" <<< "$dashboard"
 grep -Fq "expired (cleanup pending)" <<< "$dashboard"
 grep -Fq "active" <<< "$dashboard"
 grep -Fq "inactive" <<< "$dashboard"
 grep -Fq "does not discover unmanaged native accounts" <<< "$dashboard"
-if grep -Fq "private-native-ref" <<< "$dashboard" || grep -Eiq 'password|credential|private_key|client_uri' <<< "$dashboard"; then
+if grep -Fq "hy2-user-001" <<< "$dashboard" || grep -Eiq 'password|credential|private_key|client_uri' <<< "$dashboard"; then
   echo "Dashboard exposed a native reference or secret-like field." >&2; exit 1
 fi
 
