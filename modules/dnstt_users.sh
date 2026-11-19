@@ -25,7 +25,7 @@ dt_valid_host() {
   local -a octets
   [[ -n "$value" && ${#value} -le 253 ]] || return 1
   if [[ "$value" =~ ^[0-9.]+$ ]]; then
-    [[ "$value" =~ ^[0-9]{1,3}(\\.[0-9]{1,3}){3}$ ]] || return 1
+    [[ "$value" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
     IFS='.' read -r -a octets <<< "$value"
     (( ${#octets[@]} == 4 )) || return 1
     for octet in "${octets[@]}"; do
@@ -33,7 +33,7 @@ dt_valid_host() {
     done
     return 0
   fi
-  [[ "$value" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$ ]]
+  [[ "$value" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$ ]]
 }
 
 dt_read_domain() {
