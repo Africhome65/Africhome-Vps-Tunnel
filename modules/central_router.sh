@@ -29,14 +29,13 @@ cr_valid_backend(){
 # integration before it may be enabled in production.
 cr_mode_transport(){
   case "${1:-}" in
-    ssh-direct-ssl|v2ray-ssl|v2ray-ws|trojan-tls|openvpn-tls-sni) printf 'tcp/443:candidate\n' ;;
-    ssh-payload-direct|ssh-payload-proxy|v2ray-payload-proxy|v2ray-direct|trojan-direct|openvpn-ws|openvpn-payload-proxy) printf 'tcp/80:candidate\n' ;;
+    ssh-direct-ssl|ssh-payload-proxy-sni|v2ray-ssl|v2ray-ws|trojan-tls|openvpn-tls-sni) printf 'tcp/443:candidate\n' ;;
+    ssh-payload-direct|ssh-payload-proxy|ssh-payload-proxy-only|v2ray-payload-proxy|v2ray-direct|trojan-direct|trojan-tls-80|openvpn-ws|openvpn-payload-proxy) printf 'tcp/80:candidate\n' ;;
     openvpn-direct-tcp) printf 'tcp/1194:candidate\n' ;;
     openvpn-direct-80) printf 'tcp/80:candidate\n' ;;
     openvpn-direct-443) printf 'tcp/443:candidate\n' ;;
     openvpn-direct-udp) printf 'udp/1194:candidate\n' ;;
-    hysteria2) printf 'udp/custom:candidate\n' ;;
-    dnstt) printf 'udp/custom:candidate\n' ;;
+    udp-direct|hysteria2|dnstt) printf 'udp/custom:candidate\n' ;;
     vless-reality) printf 'tcp/443:preserve-first\n' ;;
     *) return 1 ;;
   esac
@@ -71,20 +70,26 @@ cr_validate_route(){
 # Input rows: transport|port|hostname|mode. A TCP port may be shared only
 # when both routes have distinct non-empty hostnames; UDP is never shared.
 cr_check_route_collisions(){
-  local input="${1:-}" line transport port hostname mode
+  local input="${1:-}" transport port hostname mode key host_list
   local -A seen=()
   while IFS='|' read -r transport port hostname mode; do
     [[ -n "$transport" && -n "$port" && -n "$mode" ]] || continue
     [[ "$transport" == tcp || "$transport" == udp ]] || { cr_error "Invalid transport in route list."; return 2; }
     cr_valid_port "$port" || { cr_error "Invalid port in route list."; return 2; }
-    local key="$transport/$port"
+    key="$transport/$port"
     if [[ -n "${seen[$key]+x}" ]]; then
-      if [[ "$transport" != tcp || -z "$hostname" || -z "${seen[$key]}" || "$hostname" == "${seen[$key]}" ]]; then
+      host_list="${seen[$key]}"
+      if [[ "$transport" != tcp || -z "$hostname" || "$hostname" == "-" || "$host_list" == *"|$hostname|"* ]]; then
         cr_error "Unresolved socket collision at $key ($mode)."
         return 1
       fi
+      seen[$key]="$host_list$hostname|"
     else
-      seen[$key]="$hostname"
+      if [[ "$transport" == tcp && -n "$hostname" && "$hostname" != "-" ]]; then
+        seen[$key]="|$hostname|"
+      else
+        seen[$key]="|"
+      fi
     fi
   done <<< "$input"
   return 0
