@@ -39,6 +39,16 @@ ip(){
   printf '%s\n' "default via 192.0.2.1 dev eth0" "10.8.0.7/32 dev tun-old"
 }
 ! ovpn_subnet_available
+# iproute2 emits host/local routes with a route-type prefix; these must
+# also be treated as overlaps with the VPN pool.
+ip(){
+  printf '%s\n' "local 10.8.0.1 dev lo table local proto kernel scope host src 10.8.0.1"
+}
+! ovpn_subnet_available
+ip(){
+  printf '%s\n' "blackhole 10.8.0.128/25"
+}
+! ovpn_subnet_available
 ip(){
   printf '%s\n' "default via 192.0.2.1 dev eth0" "192.168.0.0/16 dev eth0"
 }
