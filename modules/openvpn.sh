@@ -76,7 +76,7 @@ proto $proto
 dev tun
 topology subnet
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist /var/log/openvpn/africhome-ipp.txt
+ifconfig-pool-persist /var/log/openvpn/africhome/ipp.txt
 keepalive 10 120
 user nobody
 group nogroup
@@ -92,7 +92,7 @@ key $runtime_dir/server.key
 crl-verify $runtime_dir/crl.pem
 dh none
 ecdh-curve prime256v1
-status /var/log/openvpn/africhome-status.log
+status /var/log/openvpn/africhome/status.log
 verb 3
 EOF
   [[ "$proto" != udp ]] || printf 'explicit-exit-notify 1\n' >> "$output"
@@ -118,8 +118,9 @@ ovpn_configure_server(){
   [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
   }
+  [[ ! -L /var/log/openvpn/africhome ]] || { ovpn_error "OpenVPN log directory must not be a symlink."; return 1; }
   install -d -m 0755 "$OVPN_CONFIG_DIR"
-  install -d -o nobody -g nogroup -m 0750 /var/log/openvpn
+  install -d -o nobody -g nogroup -m 0750 /var/log/openvpn/africhome
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa gen-req server nopass || return 1
     ovpn_easyrsa sign-req server server || return 1
@@ -145,12 +146,13 @@ ovpn_configure_server(){
   if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
     backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
     mv -- "$OVPN_CONFIG" "$backup"
+    rm -f -- "$OVPN_STATE"
     systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || true
     ovpn_error "OpenVPN did not start. Failed config preserved at $backup."
     journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
-  install -d -m 0700 "$(dirname -- "$OVPN_STATE")"
+  [[ -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || { ovpn_error "OpenVPN state parent directory is missing or unsafe."; return 1; }
   local state_tmp
   state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
   umask 077
@@ -178,6 +180,7 @@ ovpn_add_client(){
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
     ovpn_error "Client certificate/key generation incomplete."; return 1;
   }
+  [[ ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "Client export directory must not be a symlink."; return 1; }
   install -d -m 0700 "$OVPN_CLIENT_DIR"
   output="$OVPN_CLIENT_DIR/$name.ovpn"
   tmp="$(mktemp "$OVPN_CLIENT_DIR/.$name.XXXXXX")" || return 1
