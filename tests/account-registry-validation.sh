@@ -102,7 +102,13 @@ export AR_TEST_PASSWD_FILE="$tmp_dir/passwd-fixture"
 cp "$AR_REGISTRY" "$tmp_dir/registry.before"
 cp "$AR_PROTOCOL_DB" "$tmp_dir/protocol.before"
 cp "$AR_HYSTERIA_DB" "$tmp_dir/hysteria.before"
+set +e
 reconciliation="$(ar_reconcile)"
+reconciliation_status=$?
+set -e
+printf '%s\n' "$reconciliation"
+echo "Reconciliation exit status: $reconciliation_status"
+(( reconciliation_status == 0 ))
 grep -Fq "local metadata exists; registry entry missing" <<< "$reconciliation"
 grep -Fq "registry entry has no matching local record" <<< "$reconciliation"
 grep -Fq "interactive Linux user not registered (review candidate)" <<< "$reconciliation"
