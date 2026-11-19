@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-. "$ROOT/lib/common.sh"
-. "$ROOT/modules/backup.sh"
-
-backup_require_root(){ return 0; }
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 export AH_BACKUP_ROOT="$tmp/backups"
 export AH_RESTORE_STAGE_ROOT="$tmp/staged"
+. "$ROOT/lib/common.sh"
+. "$ROOT/modules/backup.sh"
+
+backup_require_root(){ return 0; }
 mkdir -p "$AH_BACKUP_ROOT" "$tmp/source/etc/xray" "$tmp/source/etc/letsencrypt/archive/example.test" "$tmp/source/etc/letsencrypt/live/example.test"
 printf 'test-config\n' > "$tmp/source/etc/xray/config.json"
 printf 'test-cert\n' > "$tmp/source/etc/letsencrypt/archive/example.test/cert.pem"
