@@ -56,6 +56,7 @@ while true; do
   echo "22) Read-only central-router preflight (no changes)"
   echo "23) SSH over TLS backend (loopback only)"
   echo "24) Guarded HAProxy apply (requires TCP 80/443 to be free)"
+  echo "25) Generate VLESS REALITY loopback backend candidate (no live changes)"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
