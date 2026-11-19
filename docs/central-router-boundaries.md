@@ -143,7 +143,7 @@ manifest, then validated and activated only after the REALITY-preservation
 migration plan is proven. The client must use an SSH-over-TLS wrapper compatible
 with stunnel; raw SSH clients cannot connect directly to the TLS backend.
 
-The generated systemd unit also applies a restrictive service sandbox, including `NoNewPrivileges`, strict read-only system paths, private devices/tmp, kernel protection, restricted address families, and a restrictive umask. These are configuration-level hardening controls; validate the service on the target Ubuntu/systemd release before production use.
+The generated systemd unit also applies a restrictive service sandbox, including `NoNewPrivileges`, strict read-only system paths, private devices/tmp, kernel protection, restricted address families, and a restrictive umask. It also sets startup/shutdown timeouts, terminates the service control group together, and caps tasks and open file descriptors. These are configuration-level hardening controls; validate the service on the target Ubuntu/systemd release before production use.
 
 This is not an HTTP payload gateway or authenticated HTTP CONNECT proxy.
 
