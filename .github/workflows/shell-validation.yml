@@ -28,8 +28,10 @@ jobs:
         run: bash tests/hysteria-validation.sh
       - name: Test security module safeguards
         run: bash tests/security-validation.sh
-      - name: Test protected backups and staged restore
+      - name: Test protected backups, retention, and staged restore
         run: bash tests/backup-validation.sh
+      - name: Test privacy-safe admin audit logging
+        run: bash tests/admin-audit-validation.sh
       - name: Test read-only port routing inventory
         run: bash tests/port-routing-validation.sh
       - name: Test protocol account config permissions
