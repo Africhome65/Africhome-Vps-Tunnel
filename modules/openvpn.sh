@@ -159,12 +159,21 @@ ovpn_init_pki(){
   ah_warn "The CA private key is highly sensitive. Keep a protected off-host backup."
 }
 ovpn_port_available(){
-  local proto="$1" port="$2"
-  if [[ "$proto" == udp ]]; then
-    ! ss -H -lun 2>/dev/null | awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}'
-  else
-    ! ss -H -ltn 2>/dev/null | awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}'
+  local proto="$1" port="$2" output
+  case "$proto" in
+    udp) output="$(ss -H -lun 2>/dev/null)" ;;
+    tcp) output="$(ss -H -ltn 2>/dev/null)" ;;
+    *) ovpn_error "Unsupported OpenVPN transport for port check."; return 1 ;;
+  esac
+  # A failed socket inventory is not evidence that the port is free.
+  case "$?" in
+    0) ;;
+    *) ovpn_error "Could not inspect listening sockets; refusing to assume port $port is free."; return 1 ;;
+  esac
+  if awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}' <<< "$output"; then
+    return 1
   fi
+  return 0
 }
 ovpn_client_proto(){
   case "${1:-}" in tcp) printf 'tcp-client\n' ;; udp) printf 'udp\n' ;; *) return 1 ;; esac
