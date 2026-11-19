@@ -203,10 +203,11 @@ ovpn_configure_server(){
     ovpn_error "Could not safely save OpenVPN state."
     return 1
   fi
-  if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
+  if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE" || ! systemctl is-active --quiet "$OVPN_SERVICE"; then
     backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
     mv -- "$OVPN_CONFIG" "$backup"
     rm -f -- "$OVPN_STATE"
+    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
     systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || true
     ovpn_error "OpenVPN did not start. Failed config preserved at $backup."
     journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
