@@ -16,8 +16,18 @@ security_valid_ip "2001:db8::10"
 if security_valid_ip "999.1.1.1"; then echo "Invalid IPv4 was accepted" >&2; exit 1; fi
 if security_valid_ip "not-an-ip"; then echo "Invalid address was accepted" >&2; exit 1; fi
 
+log_fixture="$(mktemp)"
+trap 'rm -f "$log_fixture" "${TMPDIR:-/tmp}/africhome-torrent-test.$.nft"' EXIT
+printf '%s\\n' 'Nov 19 00:00:00 host sshd[1234]: Failed password for invalid user test' > "$log_fixture"
+SECURITY_AUTH_LOG_CANDIDATES="$log_fixture" [[ "$(SECURITY_AUTH_LOG_CANDIDATES="$log_fixture" security_detect_ssh_log_path)" == "$log_fixture" ]]
+if SECURITY_AUTH_LOG_CANDIDATES="$log_fixture.missing" security_detect_ssh_log_path; then
+  echo "Missing SSH auth log was accepted" >&2
+  exit 1
+fi
+grep -Fq 'backend = auto' "$ROOT/modules/security.sh"
+grep -Fq 'logpath = $ssh_log_path' "$ROOT/modules/security.sh"
+
 security_torrent_rules > "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
-trap 'rm -f "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"' EXIT
 grep -Fq 'add table inet africhome_torrent' "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
 grep -Fq 'input tcp dport { 6881-6999, 51413 } drop' "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
 grep -Fq 'output udp dport { 6881-6999, 51413 } drop' "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
