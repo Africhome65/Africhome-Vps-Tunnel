@@ -94,3 +94,27 @@ cr_check_route_collisions(){
   done <<< "$input"
   return 0
 }
+
+# Choose an available UDP port from a caller-supplied inventory.
+# Arguments: first_port last_port occupied_ports_csv. This is a planning
+# helper only; callers must refresh the live socket inventory before binding.
+cr_pick_udp_port(){
+  local first="${1:-}" last="${2:-}" occupied="${3:-}" port item
+  local -A used=()
+  cr_valid_port "$first" && cr_valid_port "$last" || return 2
+  (( 10#$first <= 10#$last )) || return 2
+  IFS=',' read -r -a items <<< "$occupied"
+  for item in "${items[@]}"; do
+    [[ -n "$item" ]] || continue
+    cr_valid_port "$item" || return 2
+    used[$((10#$item))]=1
+  done
+  for ((port=10#$first; port<=10#$last; port++)); do
+    if [[ -z "${used[$port]+x}" ]]; then
+      printf '%s\\n' "$port"
+      return 0
+    fi
+  done
+  cr_error "No free UDP port in requested range."
+  return 1
+}
