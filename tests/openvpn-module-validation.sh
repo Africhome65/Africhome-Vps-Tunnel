@@ -29,6 +29,15 @@ ovpn_load_state
 printf 'OVPN_REMOTE=vpn.example.com\nOVPN_REMOTE=other.example.com\nOVPN_PORT=1194\nOVPN_PROTO=udp\n' > "$OVPN_STATE"
 ! ovpn_load_state
 unset -f stat
+OVPN_CLIENT_DIR="$TMP/client-export"
+mkdir -m 0700 "$OVPN_CLIENT_DIR"
+stat(){ printf '0:700\\n'; }
+ovpn_prepare_client_dir
+rm -rf "$OVPN_CLIENT_DIR"
+ln -s "$TMP" "$OVPN_CLIENT_DIR"
+! ovpn_prepare_client_dir
+unset -f stat
+rm "$OVPN_CLIENT_DIR"
 OVPN_EASYRSA_DIR="$TMP/easy-rsa"
 OVPN_CONFIG_DIR="$TMP/server"
 OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
