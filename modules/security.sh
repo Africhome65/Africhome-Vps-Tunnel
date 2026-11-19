@@ -27,7 +27,7 @@ security_fail2ban_rollback_new_jail(){
 
 security_fail2ban_install(){
   ah_require_root || return 1
-  local ssh_ports jail_dir jail_file created=0
+  local ssh_ports ssh_log_path jail_dir jail_file created=0
   ssh_ports="$(security_detect_ssh_ports)" || {
     ah_err "Could not safely detect the effective SSH daemon port. No jail was written."
     return 1
@@ -58,7 +58,8 @@ security_fail2ban_install(){
 [sshd]
 enabled = true
 port = $ssh_ports
-backend = systemd
+backend = auto
+logpath = $ssh_log_path
 maxretry = 5
 findtime = 10m
 bantime = 1h
