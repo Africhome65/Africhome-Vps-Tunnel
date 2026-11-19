@@ -306,7 +306,7 @@ ovpn_revoke_client(){
   read -r -p "Client name to revoke: " name
   ovpn_valid_name "$name" && [[ "$name" != server ]] || { ovpn_error "Invalid or reserved client name."; return 1; }
   [[ ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "OpenVPN runtime/client path is a symlink."; return 1; }
-  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" ]] || { ovpn_error "Client certificate not found or unsafe."; return 1; }
+  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/private/$name.key" && ! -L "$OVPN_EASYRSA_DIR/pki/reqs/$name.req" ]] || { ovpn_error "Client certificate not found or unsafe."; return 1; }
   read -r -p "Revoke $name and disconnect future connections? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   ovpn_easyrsa revoke "$name" || return 1
