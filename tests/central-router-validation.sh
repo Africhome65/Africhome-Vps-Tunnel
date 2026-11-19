@@ -69,4 +69,15 @@ for mode in ssh-direct-ssl ssh-payload-direct ssh-payload-proxy ssh-payload-prox
   cr_mode_transport "$mode" >/dev/null || { echo "Missing mode mapping: $mode" >&2; exit 1; }
 done
 
+
+# The visible REALITY backend menu item must dispatch to its implementation.
+grep -Fq '25) cr_render_reality_backend_candidate; ah_pause ;;' "$ROOT/menu.sh" || {
+  echo "Menu option 25 is visible but not connected to the REALITY backend candidate generator." >&2
+  exit 1
+}
+if grep -Fq 'source="\\${answer:-$source}"' "$MODULE" || grep -Fq 'port="\\${port:-1443}"' "$MODULE"; then
+  echo "REALITY candidate prompt contains a literal escaped parameter expansion." >&2
+  exit 1
+fi
+
 echo "Central-router validation checks passed."
