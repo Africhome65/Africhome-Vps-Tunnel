@@ -310,13 +310,15 @@ dt_accounts_manage() {
       read -r -p "Validity from today in days (1-36500, 0 = never): " days
       [[ "$days" =~ ^[0-9]+$ ]] && (( days <= 36500 )) || { echo "Enter 0-36500 days." >&2; return 1; }
       expiry=""
+      # Cancel any old timed-trial expiry before changing the account expiry.
+      # If timer cleanup fails, leave the account's current expiry untouched.
+      dt_trial_timer_cleanup "$username" || return 1
       if (( days > 0 )); then
         expiry="$(date -d "+${days} days" +%F)" || return 1
         chage --expiredate "$expiry" "$username" || return 1
       else
         chage --expiredate -1 "$username" || return 1
       fi
-      dt_trial_timer_cleanup "$username" || return 1
       if [[ "$action" == 3 ]]; then usermod --unlock "$username" || return 1; fi
       echo "Account $username expiry updated: ${expiry:-Never}."
       ;;
