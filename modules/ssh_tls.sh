@@ -50,6 +50,17 @@ ssh_tls_port_available(){
   local port="$1"
   ! ss -H -ltn 2>/dev/null | awk -v p=":$port" '$0 ~ p"([[:space:]]|$)" {found=1} END{exit !found}'
 }
+
+# Configuration directories must be real, root-owned, and not group/world-writable.
+ssh_tls_safe_directory(){
+  local dir="${1:-}" metadata owner mode
+  [[ -n "$dir" && -d "$dir" && ! -L "$dir" ]] || return 1
+  metadata="$(stat -c '%u:%a' -- "$dir" 2>/dev/null)" || return 1
+  owner="${metadata%%:*}"
+  mode="${metadata#*:}"
+  [[ "$owner" == 0 && "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$mode & 0022) == 0 ))
+}
 ssh_tls_write_config(){
   local output="$1" port="$2" cert="$3" key="$4"
   cat > "$output" <<EOF
@@ -166,6 +177,8 @@ ssh_tls_configure(){
     ssh_tls_error "SSH is not reachable at 127.0.0.1:22. Ensure sshd listens locally before setup."; return 1;
   }
   if [[ ! -d "$SSH_TLS_CONFIG_DIR" ]]; then install -d -m 0755 "$SSH_TLS_CONFIG_DIR" || return 1; fi
+  ssh_tls_safe_directory "$SSH_TLS_CONFIG_DIR" || { ssh_tls_error "stunnel config directory must be root-owned and not group/world-writable."; return 1; }
+  ssh_tls_safe_directory /etc/systemd/system || { ssh_tls_error "systemd unit directory must be root-owned and not group/world-writable."; return 1; }
   conf_tmp="$(mktemp "$SSH_TLS_CONFIG_DIR/.africhome-ssh.XXXXXX")" || return 1
   unit_tmp="$(mktemp /etc/systemd/system/.africhome-ssh-tls.XXXXXX)" || { rm -f "$conf_tmp"; return 1; }
   ssh_tls_write_config "$conf_tmp" "$port" "$cert" "$key"
