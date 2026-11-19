@@ -95,7 +95,12 @@ touch "$OVPN_CONFIG" "$OVPN_EASYRSA_DIR/pki/issued/revoke-me.crt"
 ovpn_easyrsa(){ [[ "${1:-}" != gen-crl ]]; }
 systemctl(){ printf '%s\n' "$*" >> "$TMP/systemctl.log"; }
 ah_require_root(){ return 0; }
-! printf 'revoke-me\ny\n' | ovpn_revoke_client
+! ovpn_revoke_client <<< 
+grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
+unset -f ovpn_easyrsa systemctl ah_require_root
+
+echo "OpenVPN module validation passed."
+revoke-me\ny'
 grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
 unset -f ovpn_easyrsa systemctl ah_require_root
 
