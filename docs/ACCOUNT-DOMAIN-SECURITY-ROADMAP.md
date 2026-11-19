@@ -147,6 +147,10 @@ The optional torrent filter is limited to common host INPUT/OUTPUT ports. It is 
 - Provide a security audit command that reports findings without automatically changing settings.
 - Avoid claiming any VPS script is impossible to hack; document residual risks and keep dependencies updated.
 
+## 4B. Unified account dashboard
+
+The account registry menu now presents a read-only cross-service dashboard for registered SSH, Xray VLESS/VMess/Trojan, and Hysteria accounts. It shows account ID, label, service, UTC expiry, registry status, and a systemd active/inactive/not-installed indicator for the corresponding host service. Expired records whose cleanup has not run are labelled accordingly. The dashboard does not show native service references, passwords, UUIDs, or client URIs. It reports registry metadata only: it does not discover unmanaged native accounts, and a systemd active state is not a network reachability test. No service or account is changed by refreshing the view.
+
 ## 4A. Administrative activity log
 
 The shared `ah_audit_log` helper appends UTC timestamped event codes and outcomes to `/var/log/africhome/admin-actions.log`. The directory is root-owned mode 0700 and the log is root-owned mode 0600. Only fixed event identifiers and `success`, `failure`, or `cancelled` outcomes are accepted; raw prompts, account names, passwords, tokens, client URIs, and private-key material must not be passed to it. Event coverage includes selected Fail2ban/UFW/torrent operations, backup create/stage/retention actions, SSH account create/lock/unlock/expiry, Xray VLESS/VMess/Trojan account create/renew/revoke/expiry, and Hysteria user create/revoke/expiry. Expiry-timer enablement is also recorded for Xray and Hysteria. Event calls use fixed identifiers and outcomes only; account names, protocol credentials, Hysteria passwords, client URIs, and raw prompts are not written. This is an application-level audit trail, not tamper-proof logging; administrators with root access can alter it. Log rotation and forwarding to a protected remote collector remain future work.
