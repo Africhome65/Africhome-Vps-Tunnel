@@ -168,6 +168,10 @@ ovpn_configure_server(){
   port="${port:-1194}"
   ovpn_valid_port "$port" || { ovpn_error "Invalid port."; return 1; }
   ovpn_port_available "$proto" "$port" || { ovpn_error "$proto/$port is already in use."; return 1; }
+  if ip -4 route show exact 10.8.0.0/24 2>/dev/null | grep -q .; then
+    ovpn_error "The default OpenVPN subnet 10.8.0.0/24 already has a route. Resolve the subnet conflict before setup."
+    return 1
+  fi
 
   [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" && -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
