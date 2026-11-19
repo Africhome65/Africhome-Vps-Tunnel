@@ -14,10 +14,13 @@ DOMAIN_CONFIG="$KEY_DIR/server.env"
 SERVICE_CONFIG="$KEY_DIR/service.env"
 UNIT_FILE="/etc/systemd/system/africhome-dnstt.service"
 
+[[ -d "$KEY_DIR" && ! -L "$KEY_DIR" && "$(stat -c '%u:%a' "$KEY_DIR" 2>/dev/null || true)" == "0:700" ]] || fail "$KEY_DIR must be a root-owned directory with mode 0700."
+[[ -f "$KEY_DIR/server.key" && ! -L "$KEY_DIR/server.key" && "$(stat -c '%u:%a' "$KEY_DIR/server.key" 2>/dev/null || true)" == "0:600" ]] || fail "DNSTT private key must be a root-owned regular file with mode 0600."
+[[ -f "$KEY_DIR/server.pub" && ! -L "$KEY_DIR/server.pub" && "$(stat -c '%u:%a' "$KEY_DIR/server.pub" 2>/dev/null || true)" == "0:644" ]] || fail "DNSTT public key must be a root-owned regular file with mode 0644."
+[[ -f "$DOMAIN_CONFIG" && ! -L "$DOMAIN_CONFIG" && "$(stat -c '%u:%a' "$DOMAIN_CONFIG" 2>/dev/null || true)" == "0:600" ]] || fail "$DOMAIN_CONFIG must be a root-owned regular file with mode 0600."
+
 [[ -x "$SERVER_BIN" ]] || fail "DNSTT server is missing. Run scripts/install-dnstt.sh first."
 [[ -s "$KEY_DIR/server.key" && -s "$KEY_DIR/server.pub" ]] || fail "DNSTT keypair is missing or incomplete. Run scripts/install-dnstt.sh first."
-[[ -f "$DOMAIN_CONFIG" ]] || fail "DNSTT domain is not configured. Run scripts/configure-dnstt-domain.sh first."
-[[ "$(stat -c '%u' "$DOMAIN_CONFIG")" == "0" ]] || fail "$DOMAIN_CONFIG must be owned by root."
 
 # This file is created by configure-dnstt-domain.sh and is root-owned.
 # shellcheck disable=SC1090
@@ -37,7 +40,7 @@ valid_fqdn "${DNS_NS_HOST:-}" || fail "DNS_NS_HOST in $DOMAIN_CONFIG is invalid.
 old_bind=""
 old_upstream=""
 if [[ -f "$SERVICE_CONFIG" ]]; then
-  [[ "$(stat -c '%u' "$SERVICE_CONFIG")" == "0" ]] || fail "$SERVICE_CONFIG must be owned by root."
+  [[ -f "$SERVICE_CONFIG" && ! -L "$SERVICE_CONFIG" && "$(stat -c '%u:%a' "$SERVICE_CONFIG")" == "0:600" ]] || fail "$SERVICE_CONFIG must be a root-owned regular file with mode 0600."
   # shellcheck disable=SC1090
   source "$SERVICE_CONFIG"
   old_bind="${DNSTT_UDP_ADDR:-}"
