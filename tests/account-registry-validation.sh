@@ -26,4 +26,30 @@ fi
 if grep -Eiq 'password|private_key|client_uri|credential' "$AR_REGISTRY"; then
   echo "Registry unexpectedly contains a secret-like field." >&2; exit 1
 fi
-echo "Central account registry validation passed."
+
+# Dashboard is read-only, reports expiry and host-service state, and hides
+# native service references and credentials.
+mkdir -p "$tmp_dir/bin"
+cat > "$tmp_dir/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+case "$1:$3" in
+  is-active:xray.service|is-active:ssh.service) exit 0 ;;
+  is-enabled:hysteria-server.service) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod 700 "$tmp_dir/bin/systemctl"
+PATH="$tmp_dir/bin:$PATH"
+ar_register_service "acct_expired_01" "olduser" "hysteria" "private-native-ref" 12345
+dashboard="$(ar_dashboard)"
+grep -Fq "AFRICHOME ACCOUNT DASHBOARD" <<< "$dashboard"
+grep -Fq "Registered accounts: 2" <<< "$dashboard"
+grep -Fq "olduser" <<< "$dashboard"
+grep -Fq "expired (cleanup pending)" <<< "$dashboard"
+grep -Fq "active" <<< "$dashboard"
+grep -Fq "inactive" <<< "$dashboard"
+grep -Fq "does not discover unmanaged native accounts" <<< "$dashboard"
+if grep -Fq "private-native-ref" <<< "$dashboard" || grep -Eiq 'password|credential|private_key|client_uri' <<< "$dashboard"; then
+  echo "Dashboard exposed a native reference or secret-like field." >&2; exit 1
+fi
+\necho "Central account registry and dashboard validation passed."
