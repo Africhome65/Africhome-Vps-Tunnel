@@ -110,6 +110,13 @@ ovpn_configure_server(){
     ovpn_error "Initialize the Africhome CA first."; return 1;
   }
   [[ ! -e "$OVPN_CONFIG" ]] || { ovpn_error "OpenVPN config already exists. Refusing to overwrite it."; return 1; }
+  [[ ! -e "$OVPN_STATE" && ! -e "$OVPN_RUNTIME_DIR" ]] || {
+    ovpn_error "OpenVPN state/runtime data already exists. Review it before configuring."; return 1;
+  }
+  if systemctl is-active --quiet "$OVPN_SERVICE" 2>/dev/null; then
+    ovpn_error "$OVPN_SERVICE is already active; refusing to replace or restart it."
+    return 1
+  fi
   local remote port proto tmp backup
   read -r -p "Public VPS IP/domain for client profiles: " remote
   ovpn_valid_remote "$remote" || { ovpn_error "Invalid public hostname or IPv4 address."; return 1; }
