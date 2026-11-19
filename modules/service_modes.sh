@@ -19,10 +19,10 @@ Trojan|TLS|tcp|443|TLS passthrough with unique SNI or tested TLS termination
 Trojan|TLS|tcp|80|Only with an explicitly compatible wrapper; ordinary TLS normally uses 443
 OpenVPN|Direct TLS/SNI|tcp|443|TLS wrapper required; native OpenVPN is not assumed to be TLS/SNI
 OpenVPN|WebSocket|tcp|80|WebSocket bridge and compatible client required
-OpenVPN|Direct TCP|tcp|1194|Dedicated native OpenVPN TCP listener
-OpenVPN|Direct TCP|tcp|80|Dedicated listener or tested protocol-aware frontend
-OpenVPN|Direct TCP|tcp|443|Dedicated listener or tested TLS wrapper
-OpenVPN|Direct UDP|udp|1194|Dedicated UDP listener
+OpenVPN|Direct TCP|tcp|1194|Native OpenVPN module supports TCP; provider firewall and routing remain separate
+OpenVPN|Direct TCP|tcp|80|Possible with native module on a free port; shared-port routing is not integrated
+OpenVPN|Direct TCP|tcp|443|Possible with native module on a free port; shared-port routing is not integrated
+OpenVPN|Direct UDP|udp|1194|Native OpenVPN module supports UDP; provider firewall and routing remain separate
 OpenVPN|TLS + Payload + Proxy + SNI|tcp|443|Wrapper and client interoperability must be proven
 UDP|Direct (custom port)|udp|custom|One service per socket unless a tested multiplexer exists
 Hysteria 2|UDP|udp|custom|Preserve existing deployment and configured UDP range
@@ -34,7 +34,7 @@ af_modes_menu(){
   while true; do
     echo
     echo "===== AFRICHOME SERVICE MODE CATALOGUE ====="
-    echo "These are the requested modes; entries are not all implemented yet."
+    echo "Native OpenVPN direct mode is implemented; wrapper and shared-port modes remain pending."
     printf '%-12s | %-28s | %-8s | %-7s | %s\n' "SERVICE" "MODE" "TRANSPORT" "PORT" "REQUIREMENT"
     printf '%s\n' "---------------------------------------------------------------------------------------------------------------"
     af_mode_rows | while IFS='|' read -r service mode transport port note; do
