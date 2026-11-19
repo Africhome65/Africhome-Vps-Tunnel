@@ -54,4 +54,52 @@ if grep -Fq "hy2-user-001" <<< "$dashboard" || grep -Eiq 'password|credential|pr
   echo "Dashboard exposed a native reference or secret-like field." >&2; exit 1
 fi
 
-echo "Central account registry and dashboard validation passed."
+
+# Reconciliation compares only identifiers and labels, never credentials.
+cat > "$tmp_dir/protocol-users.json" <<'EOF'
+[
+  {"account_id":"acct_test_0001","protocol":"vless","name":"alice","email":"vless-email-001","credential":"XRAY_SECRET_SENTINEL","expires_at":0},
+  {"account_id":"acct_local_0002","protocol":"vmess","name":"orphan-vmess","email":"vmess-email-002","credential":"VMESS_SECRET_SENTINEL","expires_at":0}
+]
+EOF
+cat > "$tmp_dir/hysteria-users.json" <<'EOF'
+[
+  {"account_id":"acct_test_0001","username":"alice","password":"HYSTERIA_SECRET_SENTINEL","expires_at":12345},
+  {"account_id":"acct_local_0003","username":"orphan-hy2","password":"OTHER_SECRET_SENTINEL","expires_at":0}
+]
+EOF
+cat > "$tmp_dir/passwd-fixture" <<'EOF'
+alice:x:1001:1001::/home/alice:/bin/bash
+bob:x:1002:1002::/home/bob:/bin/bash
+svcuser:x:999:999::/nonexistent:/usr/sbin/nologin
+EOF
+cat > "$tmp_dir/bin/getent" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "passwd" && -n "${2:-}" ]]; then
+  awk -F: -v n="$2" '$1 == n {print; found=1} END {exit !found}' "$AR_TEST_PASSWD_FILE"
+elif [[ "$1" == "passwd" ]]; then
+  cat "$AR_TEST_PASSWD_FILE"
+else
+  exit 2
+fi
+EOF
+chmod 700 "$tmp_dir/bin/getent"
+export AR_PROTOCOL_DB="$tmp_dir/protocol-users.json"
+export AR_HYSTERIA_DB="$tmp_dir/hysteria-users.json"
+export AR_TEST_PASSWD_FILE="$tmp_dir/passwd-fixture"
+cp "$AR_REGISTRY" "$tmp_dir/registry.before"
+cp "$AR_PROTOCOL_DB" "$tmp_dir/protocol.before"
+cp "$AR_HYSTERIA_DB" "$tmp_dir/hysteria.before"
+reconciliation="$(ar_reconcile)"
+grep -Fq "local metadata exists; registry entry missing" <<< "$reconciliation"
+grep -Fq "registry entry has no matching local record" <<< "$reconciliation"
+grep -Fq "interactive Linux user not registered (review candidate)" <<< "$reconciliation"
+grep -Fq "Summary: local-only=2, registry-only=1, unregistered SSH candidates=1, skipped sources=0" <<< "$reconciliation"
+if grep -Eiq 'XRAY_SECRET_SENTINEL|VMESS_SECRET_SENTINEL|HYSTERIA_SECRET_SENTINEL|OTHER_SECRET_SENTINEL|credential|password' <<< "$reconciliation"; then
+  echo "Reconciliation exposed a credential or secret-like field." >&2; exit 1
+fi
+cmp -s "$AR_REGISTRY" "$tmp_dir/registry.before"
+cmp -s "$AR_PROTOCOL_DB" "$tmp_dir/protocol.before"
+cmp -s "$AR_HYSTERIA_DB" "$tmp_dir/hysteria.before"
+
+echo "Central account registry, dashboard, and reconciliation validation passed."
