@@ -134,7 +134,7 @@ ovpn_configure_server(){
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
   }
   [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
-  install -d -m 0755 "$OVPN_CONFIG_DIR"
+  if [[ ! -d "$OVPN_CONFIG_DIR" ]]; then install -d -m 0755 "$OVPN_CONFIG_DIR" || return 1; fi
   install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa gen-req server nopass || return 1
