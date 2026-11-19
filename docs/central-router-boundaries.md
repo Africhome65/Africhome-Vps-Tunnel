@@ -203,6 +203,11 @@ to `127.0.0.1:1443` by default, preserves its credentials and REALITY settings,
 and refuses a backend port already used by another inbound. The source file is
 opened read-only and symlink sources are rejected.
 
+The terminal menu also exposes this as **Generate VLESS REALITY loopback
+backend candidate (no live changes)**. It defaults to the current Xray config
+and backend port 1443, then saves a separate root-only candidate after the
+renderer and (when installed) Xray parser checks pass.
+
 Example candidate generation (review the output; redirect it to a new,
 protected file, never over the active config):
 
