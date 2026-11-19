@@ -188,6 +188,12 @@ The apply transaction does not change firewall rules, Xray, or other services.
 It is deliberately designed to refuse an already-active HAProxy service or
 any existing listener on TCP 80/443. It has not been used on the live VPS.
 
+The apply script also rejects group/world-writable configuration and lock
+directories, rejects unsafe existing configuration files and symlinked lock
+files, and creates its lock file under a restrictive umask. Regression tests
+cover these filesystem refusal paths in addition to occupied ports and
+start/rollback failures.
+
 **Important for the current VPS:** VLESS REALITY already owns TCP 443. This
 apply script must refuse to run there until a separately tested migration
 moves REALITY to a compatible loopback backend and verifies client
