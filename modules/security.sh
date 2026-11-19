@@ -205,27 +205,74 @@ security_torrent_disable(){
     ah_info "No Africhome torrent-filter table found."
   fi
 }
+security_audit_readonly(){
+  echo "=== AFRICHOME READ-ONLY SECURITY AUDIT ==="
+  echo "Timestamp (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+  echo
+  echo "-- OS --"
+  if [[ -r /etc/os-release ]]; then . /etc/os-release; printf '%s\n' "${PRETTY_NAME:-unknown}"; fi
+  printf 'Kernel: %s\n' "$(uname -r)"
+  echo
+  echo "-- SSH effective configuration --"
+  if command -v sshd >/dev/null 2>&1; then
+    sshd -T 2>/dev/null | awk '$1=="port" || $1=="permitrootlogin" || $1=="passwordauthentication" || $1=="pubkeyauthentication" {print}'
+  else
+    echo "sshd binary not found"
+  fi
+  echo
+  echo "-- Listening TCP/UDP sockets --"
+  if command -v ss >/dev/null 2>&1; then ss -H -lntup 2>/dev/null || true; else echo "ss command unavailable"; fi
+  echo
+  echo "-- Security services --"
+  local unit
+  for unit in ssh.service sshd.service fail2ban.service ufw.service nftables.service; do
+    if command -v systemctl >/dev/null 2>&1; then
+      printf '%-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
+    fi
+  done
+  echo
+  echo "-- Firewall overview (read-only) --"
+  if command -v ufw >/dev/null 2>&1; then ufw status verbose 2>&1 || true; fi
+  if command -v nft >/dev/null 2>&1; then nft list ruleset 2>/dev/null | sed -n '1,180p' || true; fi
+  echo
+  echo "-- Failed login summary --"
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl -u ssh -u sshd --since '24 hours ago' --no-pager 2>/dev/null |
+      grep -Ei 'failed password|invalid user|authentication failure' | tail -n 20 || true
+  fi
+  echo
+  echo "-- Africhome-owned torrent filter --"
+  security_torrent_status 2>&1 || true
+  echo
+  echo "Audit is informational only: no settings, services, or firewall rules were changed."
+}
 security_menu(){
   while true; do
     clear
     echo "=== SECURITY MANAGEMENT ==="
     echo "1) Install/enable Fail2ban SSH protection"
     echo "2) Fail2ban status"
-    echo "3) UFW status"
-    echo "4) Safely enable UFW"
-    echo "5) Enable basic host torrent common-port filter"
-    echo "6) Torrent filter status"
-    echo "7) Disable Africhome torrent filter"
+    echo "3) Show SSH banned IP addresses"
+    echo "4) Unban an SSH IP address"
+    echo "5) UFW status"
+    echo "6) Safely enable UFW"
+    echo "7) Enable basic host torrent common-port filter"
+    echo "8) Torrent filter status"
+    echo "9) Disable Africhome torrent filter"
+    echo "10) Read-only security audit"
     echo "0) Back"
     read -r -p "Select: " choice
     case "$choice" in
       1) security_fail2ban_install; ah_pause ;;
       2) security_fail2ban_status; ah_pause ;;
-      3) security_ufw_status; ah_pause ;;
-      4) security_ufw_enable; ah_pause ;;
-      5) security_torrent_enable; ah_pause ;;
-      6) security_torrent_status; ah_pause ;;
-      7) security_torrent_disable; ah_pause ;;
+      3) security_fail2ban_banned_ips; ah_pause ;;
+      4) security_fail2ban_unban; ah_pause ;;
+      5) security_ufw_status; ah_pause ;;
+      6) security_ufw_enable; ah_pause ;;
+      7) security_torrent_enable; ah_pause ;;
+      8) security_torrent_status; ah_pause ;;
+      9) security_torrent_disable; ah_pause ;;
+      10) security_audit_readonly; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice."; sleep 1 ;;
     esac
