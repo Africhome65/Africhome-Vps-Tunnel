@@ -115,6 +115,9 @@ ovpn_configure_server(){
   ovpn_valid_port "$port" || { ovpn_error "Invalid port."; return 1; }
   ovpn_port_available "$proto" "$port" || { ovpn_error "$proto/$port is already in use."; return 1; }
 
+  [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" ]] || {
+    ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
+  }
   install -d -m 0755 "$OVPN_CONFIG_DIR"
   install -d -o nobody -g nogroup -m 0750 /var/log/openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
@@ -127,7 +130,7 @@ ovpn_configure_server(){
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
   fi
   install -d -o root -g nogroup -m 0750 "$OVPN_RUNTIME_DIR" || return 1
-  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" 2>/dev/null || true
+  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" || return 1
   install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_RUNTIME_DIR/server.key" || return 1
   install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_RUNTIME_DIR/ca.crt" || return 1
   install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/issued/server.crt" "$OVPN_RUNTIME_DIR/server.crt" || return 1
@@ -147,9 +150,13 @@ ovpn_configure_server(){
     journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
+  install -d -m 0700 "$(dirname -- "$OVPN_STATE")"
+  local state_tmp
+  state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
   umask 077
-  printf 'OVPN_REMOTE=%q\nOVPN_PORT=%q\nOVPN_PROTO=%q\n' "$remote" "$port" "$proto" > "$OVPN_STATE"
-  chmod 0600 "$OVPN_STATE"
+  printf 'OVPN_REMOTE=%q\nOVPN_PORT=%q\nOVPN_PROTO=%q\n' "$remote" "$port" "$proto" > "$state_tmp"
+  chmod 0600 "$state_tmp"
+  mv -n -- "$state_tmp" "$OVPN_STATE" || { rm -f "$state_tmp"; ovpn_error "Could not safely save OpenVPN state."; return 1; }
   ah_ok "Native OpenVPN server started on $proto/$port."
   ah_info "Open $proto/$port in the VPS provider firewall. UFW/nftables were not changed."
   ah_warn "Internet routing/NAT and IP forwarding are not enabled automatically. Configure and review them separately before advertising full-tunnel internet access."
