@@ -35,6 +35,18 @@ for protocol in tcp udp; do
   rc=$?
   [[ "$rc" -eq 0 || "$rc" -eq 1 || "$rc" -eq 2 ]] || exit 1
 done
+# Port availability must distinguish an occupied socket from a free one.
+ss() { printf 'LISTEN 0 4096 0.0.0.0:443 0.0.0.0:*\n'; }
+if pr_check_port_available tcp 443; then
+  echo "Occupied TCP port was reported free." >&2
+  exit 1
+fi
+ss() { :; }
+pr_check_port_available tcp 443 || {
+  echo "Free TCP port was reported occupied." >&2
+  exit 1
+}
+
 declare -F pr_route_plan >/dev/null || {
   echo "Missing read-only route planner." >&2
   exit 1
