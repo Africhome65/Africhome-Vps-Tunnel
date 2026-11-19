@@ -115,8 +115,8 @@ dt_accounts_create() {
     echo "Your chosen password was set successfully and was not echoed."
   fi
   printf 'Expires: %s\n' "${expiry:-Never}"
-  echo "SSH host: this VPS public IP or configured SSH hostname"
-  echo "SSH port: 22 (unless your sshd uses another port)"
+  echo "DNSTT SSH upstream (server-side): 127.0.0.1:22 by default."
+  echo "After dnstt-client connects, the customer SSH client target is 127.0.0.1:7001."
   echo "The customer must use this SSH username/password, not the VPS root login."
   unset password
 }
@@ -202,8 +202,8 @@ EOF
   printf 'Trial duration: %s hour(s)\n' "$hours"
   printf 'Automatic expiry: %s (VPS local time)\n' "$expiry_at"
   echo "The account will be locked and its active SSH sessions terminated at expiry."
-  echo "SSH host: this VPS public IP or configured SSH hostname"
-  echo "SSH port: 22 (unless your sshd uses another port)"
+  echo "DNSTT SSH upstream (server-side): 127.0.0.1:22 by default."
+  echo "After dnstt-client connects, the customer SSH client target is 127.0.0.1:7001."
   unset password
 }
 
@@ -392,9 +392,11 @@ Username: $username
 Password: Enter the password supplied separately by the server administrator.
 Account expiry: $expiry
 
-SSH HOST: $ssh_host
-SSH PORT: $ssh_port
+DIRECT SSH FALLBACK HOST (not used by DNSTT): $ssh_host
+DIRECT SSH FALLBACK PORT (not used by DNSTT): $ssh_port
 SSH USERNAME: $username
+
+AFTER DNSTT CONNECTS, SSH CLIENT TARGET: 127.0.0.1:7001
 
 RECURSIVE DNS RESOLVER: $resolver
 DNSTT TUNNEL DOMAIN: $DT_DOMAIN
@@ -405,7 +407,7 @@ $(cat "$DT_PUBLIC_KEY")
 DNSTT CLIENT COMMAND (run on a compatible device with dnstt-client installed):
 dnstt-client $option "$resolver" -pubkey-file server.pub "$DT_DOMAIN" 127.0.0.1:7001
 
-After the DNSTT client reports that its local listener is ready, configure your SSH client to connect to 127.0.0.1 port 7001 using the SSH host account details above.
+After the DNSTT client reports that its local listener is ready, configure your SSH client to connect to 127.0.0.1 port 7001 using the customer username and password. The direct SSH fallback host/port above are not the DNSTT connection target.
 The recursive resolver is not the authoritative nameserver. DNS delegation is configured separately on the domain.
 
 IMPORTANT:
