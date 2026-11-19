@@ -12,6 +12,10 @@ OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-$OVPN_CONFIG_DIR/africhome-pki}"
 OVPN_SERVICE="openvpn-server@africhome"
 
 ovpn_error(){ ah_err "$*"; }
+ovpn_fail_closed(){
+  systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
+  ovpn_error "$1"
+}
 ovpn_valid_port(){
   [[ "${1:-}" =~ ^[0-9]{1,5}$ ]] && (( 10#${1} >= 1 && 10#${1} <= 65535 ))
 }
@@ -311,18 +315,15 @@ ovpn_revoke_client(){
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   ovpn_easyrsa revoke "$name" || return 1
   if ! ovpn_easyrsa gen-crl; then
-    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    ovpn_error "CRL generation failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
+    ovpn_fail_closed "CRL generation failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
     return 1
   fi
   if ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem"; then
-    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    ovpn_error "CRL deployment failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
+    ovpn_fail_closed "CRL deployment failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
     return 1
   fi
   if ! systemctl restart "$OVPN_SERVICE" || ! systemctl is-active --quiet "$OVPN_SERVICE"; then
-    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    ovpn_error "CRL installed but OpenVPN failed to restart; service was stopped. Check status before reconnecting clients."
+    ovpn_fail_closed "CRL installed but OpenVPN failed to restart; service was stopped. Check status before reconnecting clients."
     return 1
   fi
   rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn" "$OVPN_EASYRSA_DIR/pki/private/$name.key" "$OVPN_EASYRSA_DIR/pki/reqs/$name.req"
