@@ -310,9 +310,21 @@ ovpn_revoke_client(){
   read -r -p "Revoke $name and disconnect future connections? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   ovpn_easyrsa revoke "$name" || return 1
-  ovpn_easyrsa gen-crl || return 1
-  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem" || return 1
-  systemctl restart "$OVPN_SERVICE" || { ovpn_error "CRL generated but OpenVPN restart failed; check service status."; return 1; }
+  if ! ovpn_easyrsa gen-crl; then
+    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
+    ovpn_error "CRL generation failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
+    return 1
+  fi
+  if ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem"; then
+    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
+    ovpn_error "CRL deployment failed after revocation. OpenVPN was stopped to prevent accepting the revoked certificate."
+    return 1
+  fi
+  if ! systemctl restart "$OVPN_SERVICE" || ! systemctl is-active --quiet "$OVPN_SERVICE"; then
+    systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
+    ovpn_error "CRL installed but OpenVPN failed to restart; service was stopped. Check status before reconnecting clients."
+    return 1
+  fi
   rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn" "$OVPN_EASYRSA_DIR/pki/private/$name.key" "$OVPN_EASYRSA_DIR/pki/reqs/$name.req"
   ah_ok "Client $name revoked; CRL installed and service restarted."
 }
