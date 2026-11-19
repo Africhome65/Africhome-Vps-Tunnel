@@ -3,6 +3,7 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=../modules/openvpn.sh
 source "$ROOT/modules/openvpn.sh"
+ah_err(){ :; }
 
 ovpn_valid_port 1194
 ! ovpn_valid_port 0
@@ -23,6 +24,16 @@ OVPN_EASYRSA_DIR="$TMP/easy-rsa"
 OVPN_CONFIG_DIR="$TMP/server"
 OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
 mkdir -p "$OVPN_CONFIG_DIR" "$TMP/easy-rsa/pki"
+mkdir -p "$TMP/easy-rsa/pki/private" "$TMP/easy-rsa/pki/issued"
+touch "$TMP/easy-rsa/easyrsa"
+chmod 0700 "$TMP/easy-rsa"
+ovpn_pki_paths_safe
+mv "$TMP/easy-rsa/pki/private" "$TMP/private-real"
+ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
+! ovpn_pki_paths_safe
+rm "$TMP/easy-rsa/pki/private"
+mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
+ovpn_pki_paths_safe
 
 ovpn_write_server_config "$TMP/server.conf" 1194 udp "$TMP/runtime"
 grep -q '^proto udp$' "$TMP/server.conf"
