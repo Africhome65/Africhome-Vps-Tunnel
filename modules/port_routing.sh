@@ -72,18 +72,19 @@ pr_route_plan(){
   printf 'No proxy, firewall, service, or configuration changes will be made.\\n'
   read -r -p "Transport (tcp/udp): " protocol
   protocol="${protocol,,}"
-  [[ "$protocol" == tcp || "$protocol" == udp ]] || { pr_warn "Choose tcp or udp."; return 1; }
+  [[ "$protocol" == tcp || "$protocol" == udp ]] || { pr_warn "Choose tcp or udp."; return 0; }
   read -r -p "Proposed public port (1-65535): " port
-  pr_valid_port "$port" || { pr_warn "Invalid port."; return 1; }
+  pr_valid_port "$port" || { pr_warn "Invalid port."; return 0; }
   read -r -p "Hostname/SNI (optional): " hostname
   if [[ -n "$hostname" && ! "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
-    pr_warn "Hostname format is invalid."; return 1
+    pr_warn "Hostname format is invalid."; return 0
   fi
   if pr_check_port_available "$protocol" "$port"; then rc=0; else rc=$?; fi
   case "$rc" in 0) status="CURRENTLY FREE" ;; 1) status="ALREADY IN USE" ;; *) status="UNKNOWN (inspection unavailable)" ;; esac
   printf '\\nProposed route: %s/%s\\nHostname/SNI: %s\\nSocket status: %s\\n' "$protocol" "$port" "${hostname:-not specified}" "$status"
   printf 'Planning only: no port has been reserved and no configuration has been written.\\n'
-  [[ "$rc" -eq 0 ]]
+  # A busy or unknown port is a reported planning result, not a fatal menu error.
+  return 0
 }
 pr_service_inventory(){
   pr_section "RELEVANT SERVICE STATES"
