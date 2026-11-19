@@ -79,7 +79,7 @@ pr_route_plan(){
   if [[ -n "$hostname" && ! "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
     pr_warn "Hostname format is invalid."; return 1
   fi
-  pr_check_port_available "$protocol" "$port"; rc=$?
+  if pr_check_port_available "$protocol" "$port"; then rc=0; else rc=$?; fi
   case "$rc" in 0) status="CURRENTLY FREE" ;; 1) status="ALREADY IN USE" ;; *) status="UNKNOWN (inspection unavailable)" ;; esac
   printf '\\nProposed route: %s/%s\\nHostname/SNI: %s\\nSocket status: %s\\n' "$protocol" "$port" "${hostname:-not specified}" "$status"
   printf 'Planning only: no port has been reserved and no configuration has been written.\\n'
