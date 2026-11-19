@@ -39,6 +39,8 @@ for expected in (
     "path_beg -i /tunnel",
     "server srv_reality 127.0.0.1:1443 check",
     "server srv_ws 127.0.0.1:10080 check",
+    "default_backend be_http_unmatched",
+    "backend be_http_unmatched",
 ):
     assert expected in result.stdout, expected
 assert result.stdout.splitlines().count("global") == 1
