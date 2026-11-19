@@ -8,6 +8,7 @@ OVPN_EASYRSA_DIR="${OVPN_EASYRSA_DIR:-/etc/openvpn/easy-rsa}"
 OVPN_CLIENT_DIR="${OVPN_CLIENT_DIR:-/root/africhome-openvpn-clients}"
 OVPN_CONFIG="${OVPN_CONFIG:-$OVPN_CONFIG_DIR/africhome.conf}"
 OVPN_STATE="${OVPN_STATE:-/etc/africhome-openvpn.env}"
+OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-$OVPN_CONFIG_DIR/africhome-pki}"
 OVPN_SERVICE="openvpn-server@africhome"
 
 ovpn_error(){ ah_err "$*"; }
@@ -110,7 +111,7 @@ ovpn_configure_server(){
     ovpn_error "Initialize the Africhome CA first."; return 1;
   }
   [[ ! -e "$OVPN_CONFIG" ]] || { ovpn_error "OpenVPN config already exists. Refusing to overwrite it."; return 1; }
-  [[ ! -e "$OVPN_STATE" && ! -e "$OVPN_RUNTIME_DIR" ]] || {
+  [[ ! -e "$OVPN_STATE" && ! -L "$OVPN_STATE" && ! -e "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_RUNTIME_DIR" ]] || {
     ovpn_error "OpenVPN state/runtime data already exists. Review it before configuring."; return 1;
   }
   if systemctl is-active --quiet "$OVPN_SERVICE" 2>/dev/null; then
@@ -128,7 +129,7 @@ ovpn_configure_server(){
   ovpn_valid_port "$port" || { ovpn_error "Invalid port."; return 1; }
   ovpn_port_available "$proto" "$port" || { ovpn_error "$proto/$port is already in use."; return 1; }
 
-  [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" ]] || {
+  [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" && -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
   }
   [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
@@ -169,7 +170,6 @@ ovpn_configure_server(){
     journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
-  [[ -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || { ovpn_error "OpenVPN state parent directory is missing or unsafe."; return 1; }
   local state_tmp
   state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
   umask 077
