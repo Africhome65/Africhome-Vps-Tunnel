@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/scripts/update-reality-sni.py" && -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" && -f "$BASE_DIR/modules/openvpn.sh" && -f "$BASE_DIR/modules/central_router.sh" ]] || {
+[[ -f "$BASE_DIR/scripts/update-reality-sni.py" && -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" && -f "$BASE_DIR/modules/openvpn.sh" && -f "$BASE_DIR/modules/ssh_tls.sh" && -f "$BASE_DIR/modules/central_router.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -23,6 +23,7 @@ BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 . "$BASE_DIR/modules/backup.sh"
 . "$BASE_DIR/modules/service_modes.sh"
 . "$BASE_DIR/modules/openvpn.sh"
+. "$BASE_DIR/modules/ssh_tls.sh"
 . "$BASE_DIR/modules/central_router.sh"
 
 while true; do
@@ -52,6 +53,7 @@ while true; do
   echo "19) Read-only OpenVPN deployment inventory"
   echo "20) OpenVPN server and certificate management"
   echo "21) Generate central HAProxy candidate (no live changes)"
+  echo "22) SSH over TLS backend (loopback only)"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -83,6 +85,7 @@ while true; do
     19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
     20) ovpn_menu ;;
     21) cr_render_candidate; ah_pause ;;
+    22) ssh_tls_menu ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
