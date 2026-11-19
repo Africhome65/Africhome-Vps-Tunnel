@@ -33,6 +33,10 @@ fi
 
 grep -q 'modules/dnstt_users.sh' "$MENU"
 grep -q 'dnstt_users_menu' "$MENU"
+if grep -Eiq 'wireguard|iodine|slowdns|zivpn' "$MENU"; then
+  echo "Excluded protocol reference found in the terminal menu." >&2
+  exit 1
+fi
 grep -q 'input hidden' "$MODULE"
 grep -q 'Confirm your password' "$MODULE"
 grep -q 'root-owned regular file with mode 0600' "$MODULE"
