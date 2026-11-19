@@ -13,7 +13,20 @@ ssh_tls_valid_hostname vpn.xn--p1ai
 ! ssh_tls_valid_hostname bad-.example
 ! ssh_tls_valid_hostname https://ssh.example.com
 
+# Directory safety checks use mocked ownership metadata so CI need not run as root.
 TMP="$(mktemp -d)"
+MOCK_DIR_METADATA="0:755"
+stat(){ printf '%s\\n' "$MOCK_DIR_METADATA"; }
+ssh_tls_safe_directory "$TMP"
+MOCK_DIR_METADATA="0:775"
+! ssh_tls_safe_directory "$TMP"
+MOCK_DIR_METADATA="1000:755"
+! ssh_tls_safe_directory "$TMP"
+MOCK_DIR_METADATA="0:755"
+ln -s "$TMP" "$TMP-link"
+! ssh_tls_safe_directory "$TMP-link"
+unset -f stat
+
 trap 'rm -rf "$TMP"' EXIT
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$TMP/key.pem" -out "$TMP/cert.pem" -days 1 -subj "/CN=ssh.example.com" -addext "subjectAltName=DNS:ssh.example.com" >/dev/null 2>&1
 stat(){ printf '0:600\n'; }
