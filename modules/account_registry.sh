@@ -109,13 +109,19 @@ ar_set_service_status() {
   mv -f "$tmp" "$AR_REGISTRY"
 }
 
+
 ar_host_service_state() {
   local service="${1:-}" unit=""
   case "$service" in
-    ssh) unit="ssh.service"; systemctl is-active --quiet "$unit" 2>/dev/null || {
-      unit="sshd.service"
-      systemctl is-active --quiet "$unit" 2>/dev/null || { echo "inactive"; return 0; }
-    } ;;
+    ssh)
+      for unit in ssh.service sshd.service; do
+        if systemctl is-active --quiet "$unit" 2>/dev/null; then echo "active"; return 0; fi
+      done
+      if systemctl is-enabled --quiet ssh.service 2>/dev/null || systemctl is-enabled --quiet sshd.service 2>/dev/null; then
+        echo "inactive"
+      else
+        echo "not-installed"
+      fi ;;
     vless|vmess|trojan) unit="xray.service" ;;
     hysteria) unit="hysteria-server.service" ;;
     *) echo "not-mapped"; return 0 ;;
@@ -131,12 +137,11 @@ ar_dashboard() {
   local account_count service_count expired_count id label service expiry status host_state expiry_display
   account_count="$(jq '.accounts | length' "$AR_REGISTRY")" || return 1
   service_count="$(jq '[.accounts[].services[]] | length' "$AR_REGISTRY")" || return 1
-  # Expiry is shared at account level, so count each expired account once.
   expired_count="$(jq '[.accounts[] | select(.expires_at != 0 and .expires_at <= now)] | length' "$AR_REGISTRY")" || return 1
   printf '\n=== AFRICHOME ACCOUNT DASHBOARD ===\n'
   printf 'Registered accounts: %s | Service entries: %s | Expired accounts: %s\n' "$account_count" "$service_count" "$expired_count"
   printf '%-20s %-16s %-10s %-20s %-20s %s\n' "ACCOUNT ID" "LABEL" "SERVICE" "EXPIRES (UTC)" "ACCOUNT STATUS" "HOST SERVICE"
-  while read -r id label service expiry status; do
+  while IFS=$'\t' read -r id label service expiry status; do
     if [[ "$expiry" == "0" ]]; then expiry_display="Never"
     elif [[ "$expiry" =~ ^[0-9]+$ ]]; then
       expiry_display="$(date -u -d "@$expiry" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "Unknown")"
@@ -148,37 +153,20 @@ ar_dashboard() {
   printf '\nNote: this view shows accounts registered in Africhome metadata only. It does not discover unmanaged native accounts. Host service state is a current systemd check, not a connectivity test.\n'
 }
 
-
 # Compare registry metadata with local account metadata. This function is
 # strictly read-only and deliberately never reads credential fields.
 ar_reconcile() {
   ar_init || return 1
   local protocol_db="${AR_PROTOCOL_DB:-/etc/africhome-protocol-users.json}"
   local hysteria_db="${AR_HYSTERIA_DB:-/etc/africhome-hysteria-users.json}"
-  local account_id service name ref status display_name local_only=0 registry_only=0 ssh_candidates=0 skipped=0
+  local account_id service name ref status display_name
+  local local_only=0 registry_only=0 ssh_candidates=0 skipped=0
 
   printf '\n=== READ-ONLY ACCOUNT RECONCILIATION ===\n'
   printf '%-12s %-24s %s\n' "SOURCE" "ACCOUNT" "FINDING"
 
   if [[ -r "$protocol_db" ]] && jq -e 'type == "array"' "$protocol_db" >/dev/null 2>&1; then
-    while IFS=
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r account_id service name ref; do
+    while IFS=$'\t' read -r account_id service name ref; do
       [[ -n "$service" && -n "$ref" ]] || continue
       if [[ -z "$account_id" ]] || ! jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == $svc and .ref == $ref))' \
@@ -193,22 +181,7 @@ ar_menu() {
   fi
 
   if [[ -r "$hysteria_db" ]] && jq -e 'type == "array"' "$hysteria_db" >/dev/null 2>&1; then
-    while IFS=
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r account_id name; do
+    while IFS=$'\t' read -r account_id name; do
       [[ -n "$name" ]] || continue
       if [[ -z "$account_id" ]] || ! jq -e --arg id "$account_id" --arg ref "$name" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == "hysteria" and .ref == $ref))' \
@@ -222,22 +195,7 @@ ar_menu() {
     ((skipped+=1))
   fi
 
-  while IFS=
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r account_id service ref status; do
+  while IFS=$'\t' read -r account_id service ref status; do
     [[ -n "$ref" ]] || continue
     case "$service" in
       vless|vmess|trojan)
@@ -290,10 +248,12 @@ ar_menu() {
     echo
     echo "----- Unified Account Registry -----"
     echo "1) Refresh unified account dashboard (read-only)"
+    echo "2) Reconcile native accounts against registry (read-only)"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
       1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
+      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
       0) return ;;
       *) echo "[WARN] Invalid choice." ;;
     esac
