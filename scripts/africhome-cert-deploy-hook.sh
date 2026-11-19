@@ -10,4 +10,16 @@ status=0
 for domain in $RENEWED_DOMAINS; do
   cd_deploy_lineage "$RENEWED_LINEAGE" "$domain" || status=1
 done
+ssh_tls_config=/etc/stunnel/africhome-ssh.conf
+if [[ -f "$ssh_tls_config" && ! -L "$ssh_tls_config" ]]; then
+  for domain in $RENEWED_DOMAINS; do
+    dm_valid_domain "$domain" || continue
+    if grep -Fqx "cert = /etc/letsencrypt/live/$domain/fullchain.pem" "$ssh_tls_config" &&
+       grep -Fqx "key = /etc/letsencrypt/live/$domain/privkey.pem" "$ssh_tls_config"; then
+      if systemctl is-active --quiet africhome-ssh-tls.service; then
+        systemctl restart africhome-ssh-tls.service || status=1
+      fi
+    fi
+  done
+fi
 exit "$status"
