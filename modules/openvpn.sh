@@ -36,7 +36,7 @@ ovpn_easyrsa(){
 }
 ovpn_pki_paths_safe(){
   local path
-  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued"; do
+  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_EASYRSA_DIR/pki/private/ca.key" "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_EASYRSA_DIR/pki/issued/server.crt"; do
     [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
   done
 }
@@ -179,7 +179,7 @@ ovpn_configure_server(){
     ovpn_easyrsa gen-req server nopass || return 1
     ovpn_easyrsa sign-req server server || return 1
   fi
-  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/server.crt" ]] || { ovpn_error "Server certificate was not created."; return 1; }
+  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/server.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/server.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/server.key" && ! -L "$OVPN_EASYRSA_DIR/pki/private/server.key" ]] || { ovpn_error "Server certificate was not created."; return 1; }
   [[ -s "$OVPN_EASYRSA_DIR/pki/crl.pem" ]] || ovpn_easyrsa gen-crl || return 1
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
@@ -240,7 +240,7 @@ ovpn_add_client(){
   ovpn_load_state || return 1
   ovpn_easyrsa gen-req "$name" nopass || return 1
   ovpn_easyrsa sign-req client "$name" || return 1
-  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
+  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" && ! -L "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
     ovpn_error "Client certificate/key generation incomplete."; return 1;
   }
   output="$OVPN_CLIENT_DIR/$name.ovpn"
@@ -290,7 +290,7 @@ ovpn_revoke_client(){
   read -r -p "Client name to revoke: " name
   ovpn_valid_name "$name" && [[ "$name" != server ]] || { ovpn_error "Invalid or reserved client name."; return 1; }
   [[ ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "OpenVPN runtime/client path is a symlink."; return 1; }
-  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" ]] || { ovpn_error "Client certificate not found."; return 1; }
+  [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" ]] || { ovpn_error "Client certificate not found or unsafe."; return 1; }
   read -r -p "Revoke $name and disconnect future connections? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   ovpn_easyrsa revoke "$name" || return 1
