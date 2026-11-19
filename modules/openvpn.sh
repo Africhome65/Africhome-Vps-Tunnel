@@ -54,7 +54,7 @@ ovpn_init_pki(){
   cp -a /usr/share/easy-rsa/. "$OVPN_EASYRSA_DIR/" || return 1
   chmod 0700 "$OVPN_EASYRSA_DIR"
   if ! ovpn_easyrsa init-pki ||
-     ! ovpn_easyrsa --batch --req-cn africhome-ca build-ca nopass; then
+     ! ovpn_easyrsa --batch --req-cn=Africhome-CA build-ca nopass; then
     ovpn_error "CA initialization failed. PKI directory retained for inspection: $OVPN_EASYRSA_DIR"
     return 1
   fi
