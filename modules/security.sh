@@ -98,6 +98,38 @@ security_fail2ban_status(){
     ah_warn "Fail2ban is not installed."
   fi
 }
+security_fail2ban_banned_ips(){
+  if ! command -v fail2ban-client >/dev/null 2>&1; then
+    ah_warn "Fail2ban is not installed."
+    return 1
+  fi
+  fail2ban-client get sshd banip
+}
+security_valid_ip(){
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 -c 'import ipaddress,sys; ipaddress.ip_address(sys.argv[1])' "$1" >/dev/null 2>&1
+}
+security_fail2ban_unban(){
+  ah_require_root || return 1
+  command -v fail2ban-client >/dev/null 2>&1 || {
+    ah_warn "Fail2ban is not installed."
+    return 1
+  }
+  fail2ban-client status sshd >/dev/null 2>&1 || {
+    ah_err "The SSH jail is not active."
+    return 1
+  }
+  local ip
+  read -r -p "IP address to unban from the sshd jail: " ip
+  if ! security_valid_ip "$ip"; then
+    ah_err "Enter a valid IPv4 or IPv6 address."
+    return 1
+  fi
+  echo "Selected address: $ip"
+  read -r -p "Type UNBAN to release this address: " answer
+  [[ "$answer" == "UNBAN" ]] || { ah_info "Cancelled."; return; }
+  fail2ban-client set sshd unbanip "$ip"
+}
 security_ufw_status(){
   if command -v ufw >/dev/null 2>&1; then ufw status verbose; else ah_warn "UFW is not installed."; fi
 }
