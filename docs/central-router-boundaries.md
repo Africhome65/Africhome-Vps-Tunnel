@@ -192,3 +192,28 @@ moves REALITY to a compatible loopback backend and verifies client
 interoperability. The generic TLS SNI passthrough renderer does not by itself
 prove REALITY compatibility. The apply script's tests use mocked services;
 they are not a production migration or end-to-end protocol test.
+
+
+## VLESS REALITY loopback-backend candidate (not a migration)
+
+`scripts/render-reality-backend.py` reads an existing Xray JSON configuration
+and emits a separate candidate configuration to standard output. It requires
+exactly one VLESS inbound using REALITY, changes only that inbound's listener
+to `127.0.0.1:1443` by default, preserves its credentials and REALITY settings,
+and refuses a backend port already used by another inbound. The source file is
+opened read-only and symlink sources are rejected.
+
+Example candidate generation (review the output; redirect it to a new,
+protected file, never over the active config):
+
+~~~bash
+python3 scripts/render-reality-backend.py /usr/local/etc/xray/config.json > /root/xray-reality-backend-candidate.json
+chmod 0600 /root/xray-reality-backend-candidate.json
+xray run -test -config /root/xray-reality-backend-candidate.json
+~~~
+
+This is only a configuration transformation and parser check. It does not
+change the active Xray config, restart Xray, configure HAProxy, or prove that
+VLESS REALITY clients work through HAProxy. Keep the current public listener
+untouched until a separate maintenance plan, rollback test, and external
+client interoperability test are complete.
