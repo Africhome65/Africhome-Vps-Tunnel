@@ -23,10 +23,12 @@ def update(path, hostname):
     hostname = hostname.lower()
     if not valid_hostname(hostname):
         raise ValueError("Invalid DNS hostname")
-    st = os.stat(path, follow_symlinks=False)
-    if not stat.S_ISREG(st.st_mode):
-        raise ValueError("Xray config must be a regular file")
-    with open(path, "r", encoding="utf-8") as stream:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    source_fd = os.open(path, flags)
+    with os.fdopen(source_fd, "r", encoding="utf-8") as stream:
+        st = os.fstat(stream.fileno())
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError("Xray config must be a regular file")
         config = json.load(stream)
     if not isinstance(config, dict) or not isinstance(config.get("inbounds"), list):
         raise ValueError("Xray config has no valid inbounds array")
