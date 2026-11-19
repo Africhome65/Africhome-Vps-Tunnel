@@ -86,7 +86,7 @@ grep -q 'REVOKED.*client-two' "$TMP/clients.txt"
 
 # Revocation failure handling must stop the service.
 OVPN_SERVICE="openvpn-server@africhome"
-systemctl(){ touch "$TMP/systemctl.log"; printf '%s\\n' "$*" >> "$TMP/systemctl.log"; }
+systemctl(){ touch "$TMP/systemctl.log"; printf '%s\n' "$*" >> "$TMP/systemctl.log"; }
 ovpn_fail_closed "test CRL failure"
 grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
 unset -f systemctl
