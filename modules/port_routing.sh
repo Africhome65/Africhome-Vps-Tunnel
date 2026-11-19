@@ -48,6 +48,43 @@ pr_firewall_inventory(){
   fi
 }
 
+# Read-only helpers for validating proposed public ports.
+pr_valid_port(){
+  local port="${1:-}"
+  [[ "$port" =~ ^[0-9]{1,5}$ ]] || return 1
+  (( 10#$port >= 1 && 10#$port <= 65535 ))
+}
+
+# Return 0 when the selected transport/port is free, 1 when occupied, 2 if unknown.
+pr_check_port_available(){
+  local protocol="${1:-}" port="${2:-}" output
+  [[ "$protocol" == tcp || "$protocol" == udp ]] || return 2
+  pr_valid_port "$port" || return 2
+  command -v ss >/dev/null 2>&1 || return 2
+  if [[ "$protocol" == tcp ]]; then output="$(ss -H -lnt 2>/dev/null)" || return 2
+  else output="$(ss -H -lun 2>/dev/null)" || return 2; fi
+  awk -v p="$port" '{ endpoint=$4; sub(/^.*:/,"",endpoint); if(endpoint==p) found=1 } END{exit !found}' <<< "$output"
+}
+
+pr_route_plan(){
+  local protocol port hostname status rc
+  pr_section "READ-ONLY ROUTE PLANNER"
+  printf 'No proxy, firewall, service, or configuration changes will be made.\\n'
+  read -r -p "Transport (tcp/udp): " protocol
+  protocol="${protocol,,}"
+  [[ "$protocol" == tcp || "$protocol" == udp ]] || { pr_warn "Choose tcp or udp."; return 1; }
+  read -r -p "Proposed public port (1-65535): " port
+  pr_valid_port "$port" || { pr_warn "Invalid port."; return 1; }
+  read -r -p "Hostname/SNI (optional): " hostname
+  if [[ -n "$hostname" && ! "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+    pr_warn "Hostname format is invalid."; return 1
+  fi
+  pr_check_port_available "$protocol" "$port"; rc=$?
+  case "$rc" in 0) status="CURRENTLY FREE" ;; 1) status="ALREADY IN USE" ;; *) status="UNKNOWN (inspection unavailable)" ;; esac
+  printf '\\nProposed route: %s/%s\\nHostname/SNI: %s\\nSocket status: %s\\n' "$protocol" "$port" "${hostname:-not specified}" "$status"
+  printf 'Planning only: no port has been reserved and no configuration has been written.\\n'
+  [[ "$rc" -eq 0 ]]
+}
 pr_service_inventory(){
   pr_section "RELEVANT SERVICE STATES"
   local unit
@@ -81,10 +118,12 @@ pr_port_routing_menu(){
     printf ' AFRICHOME PORT & ROUTING MANAGER\n'
     printf '======================================\n'
     printf '1) Read-only port and firewall inventory\n'
+    printf '2) Plan a proposed TCP/UDP route (read-only)\n'
     printf '0) Return to main menu\n'
     read -r -p "Select an option: " pr_choice
     case "$pr_choice" in
       1) pr_port_routing_inventory; read -r -p "Press Enter to continue..." _ ;;
+      2) pr_route_plan; read -r -p "Press Enter to continue..." _ ;;
       0) return 0 ;;
       *) pr_warn "Invalid choice." ;;
     esac
