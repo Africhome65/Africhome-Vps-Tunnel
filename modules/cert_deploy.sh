@@ -20,6 +20,7 @@ cd_target_add() {
     hysteria) cert=/etc/hysteria/certs/fullchain.pem; key=/etc/hysteria/certs/privkey.pem; owner=hysteria; group=hysteria; unit=hysteria-server.service ;;
     *) ah_err "Unsupported service."; return 1 ;;
   esac
+  if [[ -e "$CD_LEGACY_HOOK" ]]; then ah_warn "The existing Africhome deploy hook already updates Xray and Hysteria certificates; refusing duplicate target."; return 1; fi
   cd_init || return 1
   jq -e --arg d "$domain" --arg s "$service" 'any(.[]; .domain==$d and .service==$s)' "$CD_CONFIG" >/dev/null && { ah_warn "Target exists."; return 1; }
   tmp="$(mktemp "$(dirname "$CD_CONFIG")/.cert-deploy.XXXXXX")" || return 1
