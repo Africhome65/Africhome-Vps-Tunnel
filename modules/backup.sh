@@ -174,6 +174,70 @@ PY
   ah_ok "Restore staged for inspection: $stage"
   ah_warn "Nothing was copied into live system paths. Review files and plan service-specific restoration separately."
 }
+# Retention is manual and opt-in. Only old, regular Africhome archives and
+# their matching regular checksum sidecars inside the fixed backup root qualify.
+backup_retention_preview() {
+  local keep="${1:-10}" days="${2:-90}" root archive index=0 mtime cutoff
+  [[ "$keep" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ ]] || return 1
+  (( keep >= 1 && keep <= 100 && days >= 1 && days <= 3650 )) || return 1
+  [[ -d "$AH_BACKUP_ROOT" && ! -L "$AH_BACKUP_ROOT" ]] || {
+    ah_warn "Backup directory is missing or is a symlink; nothing will be pruned."
+    return 1
+  }
+  root="$(realpath -e -- "$AH_BACKUP_ROOT")" || return 1
+  [[ "$root" == "$AH_BACKUP_ROOT" ]] || { ah_err "Backup root must be a canonical, non-symlink path."; return 1; }
+  cutoff=$(( $(date +%s) - days * 86400 ))
+  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\\n' | sort -rn)
+  printf 'Retention preview: keep newest %s archives; prune only archives at least %s days old.\\n' "$keep" "$days"
+  for row in "${_backup_retention_rows[@]}"; do
+    mtime="${row%% *}"
+    archive="${row#* }"
+    ((index+=1))
+    [[ -f "$archive" && ! -L "$archive" ]] || continue
+    if (( index > keep )) && [[ "$mtime" =~ ^[0-9]+(\\.[0-9]+)?$ ]] && (( ${mtime%%.*} <= cutoff )); then
+      if [[ -f "$archive.sha256" && ! -L "$archive.sha256" ]]; then
+        printf 'WOULD PRUNE: %s\\n' "$(basename -- "$archive")"
+      else
+        printf 'SKIP (missing/unsafe checksum): %s\\n' "$(basename -- "$archive")"
+      fi
+    else
+      printf 'KEEP: %s\\n' "$(basename -- "$archive")"
+    fi
+  done
+}
+backup_retention_prune() {
+  backup_require_root || return 1
+  local keep="${1:-10}" days="${2:-90}" root row mtime archive index=0 removed=0
+  [[ "$keep" =~ ^[0-9]+$ && "$days" =~ ^[0-9]+$ ]] || return 1
+  (( keep >= 1 && keep <= 100 && days >= 1 && days <= 3650 )) || {
+    ah_err "Retention must keep 1-100 archives and use an age of 1-3650 days."
+    return 1
+  }
+  backup_retention_preview "$keep" "$days" || return 1
+  read -r -p "Type PRUNE to permanently delete only the listed old backups: " answer
+  if [[ "$answer" != PRUNE ]]; then
+    ah_info "Retention pruning cancelled."
+    ah_audit_log backup.retention cancelled 2>/dev/null || true
+    return 0
+  fi
+  root="$(realpath -e -- "$AH_BACKUP_ROOT")" || return 1
+  [[ "$root" == "$AH_BACKUP_ROOT" && -d "$root" && ! -L "$AH_BACKUP_ROOT" ]] || return 1
+  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\\n' | sort -rn)
+  for row in "${_backup_retention_rows[@]}"; do
+    mtime="${row%% *}"
+    archive="${row#* }"
+    ((index+=1))
+    [[ "$archive" == "$root"/africhome-*.tar.gz && -f "$archive" && ! -L "$archive" ]] || continue
+    [[ "$mtime" =~ ^[0-9]+(\\.[0-9]+)?$ ]] || continue
+    if (( index > keep && ${mtime%%.*} <= $(date +%s) - days * 86400 )) &&
+       [[ -f "$archive.sha256" && ! -L "$archive.sha256" ]]; then
+      rm -f -- "$archive.sha256" "$archive" || return 1
+      ((removed+=1))
+    fi
+  done
+  ah_ok "Removed $removed old backup archive(s); newest $keep were retained."
+  ah_audit_log backup.retention success 2>/dev/null || true
+}
 backup_menu(){
   while true; do
     clear
@@ -182,6 +246,7 @@ backup_menu(){
     echo "2) List backups"
     echo "3) Verify a backup"
     echo "4) Stage restore for inspection (no live overwrite)"
+    echo "5) Preview and apply manual backup retention"
     echo "0) Back"
     read -r -p "Select: " choice
     case "$choice" in
@@ -195,7 +260,7 @@ backup_menu(){
         read -r -p "Backup filename inside $AH_BACKUP_ROOT: " name
         backup_stage_restore "$AH_BACKUP_ROOT/$name"; ah_pause
         ;;
-      0) return ;;
+      5)\n        read -r -p "Keep newest archive count (1-100) [10]: " keep\n        keep="${keep:-10}"\n        read -r -p "Minimum archive age in days (1-3650) [90]: " days\n        days="${days:-90}"\n        backup_retention_prune "$keep" "$days"; ah_pause\n        ;;\n      0) return ;;
       *) ah_warn "Invalid choice."; sleep 1 ;;
     esac
   done
