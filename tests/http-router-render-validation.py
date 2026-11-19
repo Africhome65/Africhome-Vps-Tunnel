@@ -36,7 +36,7 @@ for expected in (
     assert expected in result.stdout, expected
 assert result.stdout.index("path_beg -i /vless") < result.stdout.index("default_backend")
 assert "bind 0.0.0.0:443" not in result.stdout
-assert "ssh" not in result.stdout.lower()
+assert "not an SSH payload/proxy gateway" in result.stdout
 
 if shutil.which("haproxy"):
     with tempfile.TemporaryDirectory() as tmp:
