@@ -26,6 +26,8 @@ jobs:
           done < <(find . -type f -name '*.sh' -print0)
       - name: Test Hysteria input validation
         run: bash tests/hysteria-validation.sh
+      - name: Test security module safeguards
+        run: bash tests/security-validation.sh
       - name: Test read-only port routing inventory
         run: bash tests/port-routing-validation.sh
       - name: Test protocol account config permissions
