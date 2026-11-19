@@ -84,4 +84,19 @@ grep -q 'VALID.*client-one' "$TMP/clients.txt"
 grep -q 'REVOKED.*client-two' "$TMP/clients.txt"
 ! grep -q 'server' "$TMP/clients.txt"
 
+# Revocation must stop OpenVPN if a fresh CRL cannot be generated.
+OVPN_CONFIG="$TMP/server/africhome.conf"
+OVPN_STATE="$TMP/state"
+OVPN_RUNTIME_DIR="$TMP/runtime"
+OVPN_CLIENT_DIR="$TMP/client-export"
+OVPN_EASYRSA_DIR="$TMP/easy-rsa"
+mkdir -p "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/reqs" "$OVPN_RUNTIME_DIR" "$OVPN_CLIENT_DIR"
+touch "$OVPN_CONFIG" "$OVPN_EASYRSA_DIR/pki/issued/revoke-me.crt"
+ovpn_easyrsa(){ [[ "${1:-}" != gen-crl ]]; }
+systemctl(){ printf '%s\\n' "$*" >> "$TMP/systemctl.log"; }
+ah_require_root(){ return 0; }
+! printf 'revoke-me\\ny\\n' | ovpn_revoke_client
+grep -q '^stop openvpn-server@africhome "$TMP/systemctl.log"
+unset -f ovpn_easyrsa systemctl ah_require_root
+
 echo "OpenVPN module validation passed."
