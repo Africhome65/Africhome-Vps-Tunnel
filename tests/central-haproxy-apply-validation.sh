@@ -57,6 +57,28 @@ export AFRICHOME_HAPROXY_BIN="$TMP/bin/haproxy"
 export AFRICHOME_SYSTEMCTL_BIN="$TMP/bin/systemctl"
 export AFRICHOME_SS_BIN="$TMP/bin/ss"
 
+# Refuse unsafe configuration-directory permissions before touching the config.
+chmod 0777 "$AFRICHOME_HAPROXY_CONFIG_DIR"
+if printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
+  echo "Expected writable config-directory refusal." >&2; exit 1
+fi
+chmod 0755 "$AFRICHOME_HAPROXY_CONFIG_DIR"
+
+# Refuse an unsafe existing config file.
+printf 'original config\n' > "$AFRICHOME_HAPROXY_CONFIG_FILE"
+chmod 0666 "$AFRICHOME_HAPROXY_CONFIG_FILE"
+if printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
+  echo "Expected writable config-file refusal." >&2; exit 1
+fi
+chmod 0644 "$AFRICHOME_HAPROXY_CONFIG_FILE"
+
+# Refuse a symlinked lock file rather than following it.
+ln -s "$TMP/lock-target" "$AFRICHOME_HAPROXY_LOCK_FILE"
+if printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
+  echo "Expected symlinked lock-file refusal." >&2; exit 1
+fi
+rm -f "$AFRICHOME_HAPROXY_LOCK_FILE"
+
 # Occupied port: refuse before touching the existing configuration.
 printf 'original config\n' > "$AFRICHOME_HAPROXY_CONFIG_FILE"
 if printf 'APPLY\n' | MOCK_BUSY_PORT=443 bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
