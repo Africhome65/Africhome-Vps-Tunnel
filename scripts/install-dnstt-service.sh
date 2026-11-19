@@ -13,6 +13,13 @@ KEY_DIR="/etc/africhome-dnstt"
 DOMAIN_CONFIG="$KEY_DIR/server.env"
 SERVICE_CONFIG="$KEY_DIR/service.env"
 UNIT_FILE="/etc/systemd/system/africhome-dnstt.service"
+tmp=""
+unit_tmp=""
+cleanup() {
+  [[ -z "$tmp" || ! -e "$tmp" ]] || rm -f -- "$tmp"
+  [[ -z "$unit_tmp" || ! -e "$unit_tmp" ]] || rm -f -- "$unit_tmp"
+}
+trap cleanup EXIT
 
 [[ -d "$KEY_DIR" && ! -L "$KEY_DIR" && "$(stat -c '%u:%a' "$KEY_DIR" 2>/dev/null || true)" == "0:700" ]] || fail "$KEY_DIR must be a root-owned directory with mode 0700."
 [[ -f "$KEY_DIR/server.key" && ! -L "$KEY_DIR/server.key" && "$(stat -c '%u:%a' "$KEY_DIR/server.key" 2>/dev/null || true)" == "0:600" ]] || fail "DNSTT private key must be a root-owned regular file with mode 0600."
@@ -103,6 +110,9 @@ fi
 mv -f "$tmp" "$SERVICE_CONFIG"
 chmod 0600 "$SERVICE_CONFIG"
 
+if [[ -e "$UNIT_FILE" || -L "$UNIT_FILE" ]]; then
+  [[ -f "$UNIT_FILE" && ! -L "$UNIT_FILE" && "$(stat -c '%u' "$UNIT_FILE" 2>/dev/null || true)" == "0" ]] || fail "$UNIT_FILE must be a root-owned regular file; refusing to replace an unsafe path."
+fi
 unit_tmp="$(mktemp)"
 cat > "$unit_tmp" <<'UNIT'
 [Unit]
@@ -129,10 +139,11 @@ WantedBy=multi-user.target
 UNIT
 chmod 0644 "$unit_tmp"
 if [[ -f "$UNIT_FILE" ]]; then
-  cp -a "$UNIT_FILE" "$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S)"
+  cp -a -- "$UNIT_FILE" "$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S).$"
 fi
-install -m 0644 "$unit_tmp" "$UNIT_FILE"
+install -o root -g root -m 0644 "$unit_tmp" "$UNIT_FILE"
 rm -f "$unit_tmp"
+unit_tmp=""
 systemctl daemon-reload
 
 ok "DNSTT systemd unit installed: africhome-dnstt.service"
