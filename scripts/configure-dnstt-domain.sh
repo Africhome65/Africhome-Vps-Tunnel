@@ -5,7 +5,15 @@ set -Eeuo pipefail
 
 CONFIG_DIR="/etc/africhome-dnstt"
 CONFIG_FILE="$CONFIG_DIR/server.env"
-install -d -m 0700 "$CONFIG_DIR"
+if [[ -L "$CONFIG_DIR" || ( -e "$CONFIG_DIR" && ! -d "$CONFIG_DIR" ) ]]; then
+  echo "DNSTT config directory must be a real directory, not a symlink." >&2
+  exit 1
+fi
+install -d -o root -g root -m 0700 "$CONFIG_DIR"
+[[ "$(stat -c '%u:%a' "$CONFIG_DIR")" == "0:700" ]] || {
+  echo "DNSTT config directory must be root-owned with mode 0700." >&2
+  exit 1
+}
 
 valid_fqdn() {
   local value="$1"
@@ -17,7 +25,11 @@ valid_fqdn() {
 
 current_domain=""
 current_ns=""
-if [[ -f "$CONFIG_FILE" ]]; then
+if [[ -e "$CONFIG_FILE" || -L "$CONFIG_FILE" ]]; then
+  [[ -f "$CONFIG_FILE" && ! -L "$CONFIG_FILE" && "$(stat -c '%u:%a' "$CONFIG_FILE")" == "0:600" ]] || {
+    echo "Existing DNSTT domain config must be a root-owned regular file with mode 0600." >&2
+    exit 1
+  }
   # shellcheck disable=SC1090
   source "$CONFIG_FILE"
   current_domain="${DNS_DOMAIN:-}"
