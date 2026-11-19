@@ -53,7 +53,8 @@ while true; do
   echo "19) Read-only OpenVPN deployment inventory"
   echo "20) OpenVPN server and certificate management"
   echo "21) Generate central HAProxy candidate (no live changes)"
-  echo "22) SSH over TLS backend (loopback only)"
+  echo "22) Read-only central-router preflight (no changes)"
+  echo "23) SSH over TLS backend (loopback only)"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -85,7 +86,8 @@ while true; do
     19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
     20) ovpn_menu ;;
     21) cr_render_candidate; ah_pause ;;
-    22) ssh_tls_menu ;;
+    22) bash "$BASE_DIR/scripts/central-router-preflight.sh"; ah_pause ;;
+    23) ssh_tls_menu ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
