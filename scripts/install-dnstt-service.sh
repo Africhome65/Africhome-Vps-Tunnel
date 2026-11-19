@@ -109,7 +109,7 @@ chmod 0600 "$tmp"
   printf 'DNSTT_UPSTREAM="%s"\n' "$DNSTT_UPSTREAM"
 } > "$tmp"
 if [[ -f "$SERVICE_CONFIG" ]]; then
-  cp -a "$SERVICE_CONFIG" "$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S)"
+  cp -a "$SERVICE_CONFIG" "$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S).$"
 fi
 mv -f "$tmp" "$SERVICE_CONFIG"
 chmod 0600 "$SERVICE_CONFIG"
