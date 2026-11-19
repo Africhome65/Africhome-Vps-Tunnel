@@ -109,7 +109,7 @@ chmod 0600 "$tmp"
   printf 'DNSTT_UPSTREAM="%s"\n' "$DNSTT_UPSTREAM"
 } > "$tmp"
 if [[ -f "$SERVICE_CONFIG" ]]; then
-  cp -a "$SERVICE_CONFIG" "$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S).$"
+  cp -a "$SERVICE_CONFIG" "$SERVICE_CONFIG.bak.$(date +%Y%m%d%H%M%S).$$"
 fi
 mv -f "$tmp" "$SERVICE_CONFIG"
 chmod 0600 "$SERVICE_CONFIG"
@@ -140,7 +140,7 @@ WantedBy=multi-user.target
 UNIT
 chmod 0644 "$unit_tmp"
 if [[ -f "$UNIT_FILE" ]]; then
-  cp -a -- "$UNIT_FILE" "$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S).$"
+  cp -a -- "$UNIT_FILE" "$UNIT_FILE.bak.$(date +%Y%m%d%H%M%S).$$"
 fi
 install -o root -g root -m 0644 "$unit_tmp" "$UNIT_FILE"
 rm -f "$unit_tmp"
