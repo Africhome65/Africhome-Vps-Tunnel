@@ -40,4 +40,21 @@ if backup_stage_restore "$bad"; then
   exit 1
 fi
 [[ ! -e "$tmp/escape" ]]
-echo "Backup and staged-restore validation passed."
+
+# Retention is explicit, age-gated, and restricted to paired Africhome archives.
+old="$AH_BACKUP_ROOT/africhome-old.tar.gz"
+recent="$AH_BACKUP_ROOT/africhome-recent.tar.gz"
+printf old > "$old"
+printf recent > "$recent"
+printf 'checksum  old\\n' > "$old.sha256"
+printf 'checksum  recent\\n' > "$recent.sha256"
+touch -d '120 days ago' "$old" "$old.sha256"
+touch "$recent" "$recent.sha256"
+printf 'unrelated\\n' > "$AH_BACKUP_ROOT/keep-me.txt"
+preview="$(backup_retention_preview 1 90)"
+grep -Fq 'WOULD PRUNE: africhome-old.tar.gz' <<< "$preview"
+grep -Fq 'KEEP: africhome-recent.tar.gz' <<< "$preview"
+printf 'PRUNE\\n' | backup_retention_prune 1 90
+[[ ! -e "$old" && ! -e "$old.sha256" ]]
+[[ -f "$recent" && -f "$recent.sha256" && -f "$AH_BACKUP_ROOT/keep-me.txt" ]]
+\necho "Backup, retention, and staged-restore validation passed."
