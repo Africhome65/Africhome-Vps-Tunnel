@@ -122,6 +122,7 @@ chmod 0700 "$OVPN_EASYRSA_SOURCE/easyrsa"
 ovpn_init_pki
 [[ -s "$OVPN_EASYRSA_DIR/pki/private/ca.key" ]]
 [[ "$(stat -c '%a' "$OVPN_EASYRSA_DIR")" == 700 ]]
+[[ "$(stat -c '%a' "$OVPN_EASYRSA_DIR/pki/private/ca.key")" == 600 ]]
 ! compgen -G "$TMP/.africhome-easyrsa.*" >/dev/null
 OVPN_EASYRSA_DIR="$TMP/pki-failure"
 OVPN_EASYRSA_SOURCE="$TMP/easy-rsa-failing"
