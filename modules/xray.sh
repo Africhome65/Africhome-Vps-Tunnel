@@ -134,8 +134,8 @@ xray_add_sni() {
   . "$XRAY_ENV"
   local backup_config backup_env env_tmp module_dir
   module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-  backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
-  backup_env="${XRAY_ENV}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
+  backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)-$"
+  backup_env="${XRAY_ENV}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)-$"
   env_tmp="$(mktemp "${XRAY_ENV}.tmp.XXXXXX")" || { ah_err "Could not prepare a temporary client environment file."; return 1; }
   if ! cp -a "$XRAY_CONFIG" "$backup_config" || ! cp -a "$XRAY_ENV" "$backup_env" || ! cp -a "$XRAY_ENV" "$env_tmp"; then
     rm -f "$env_tmp"
