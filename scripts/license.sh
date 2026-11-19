@@ -16,7 +16,7 @@ machine_fingerprint() {
 
 verify_token() {
   local token="$1" payload_b64 signature_b64 extra tmp payload
-  [[ -r "$PUBLIC_KEY" ]] || fail "The Africhome licence public key is missing."
+  [[ -f "$PUBLIC_KEY" && ! -L "$PUBLIC_KEY" && -r "$PUBLIC_KEY" ]] || fail "The Africhome licence public key must be a readable regular file, not a symlink."
   command -v openssl >/dev/null 2>&1 || fail "OpenSSL is required to verify the licence."
   command -v base64 >/dev/null 2>&1 || fail "The base64 utility is required."
   command -v sha256sum >/dev/null 2>&1 || fail "The sha256sum utility is required."
@@ -59,6 +59,15 @@ case "${1:-verify}" in
   fingerprint) machine_fingerprint ;;
   verify)
     [[ "$EUID" -eq 0 ]] || fail "Run the installer as root."
+    if [[ -L "$LICENSE_DIR" || ( -e "$LICENSE_DIR" && ! -d "$LICENSE_DIR" ) ]]; then
+      fail "$LICENSE_DIR must be a real directory, not a symlink."
+    fi
+    install -d -o root -g root -m 0700 "$LICENSE_DIR"
+    chown root:root "$LICENSE_DIR"
+    chmod 0700 "$LICENSE_DIR"
+    if [[ -e "$LICENSE_FILE" || -L "$LICENSE_FILE" ]]; then
+      [[ -f "$LICENSE_FILE" && ! -L "$LICENSE_FILE" && "$(stat -c '%u:%a' "$LICENSE_FILE" 2>/dev/null || true)" == "0:600" ]] || fail "Saved licence must be a root-owned regular file with mode 0600."
+    fi
     if [[ -s "$LICENSE_FILE" ]]; then
       token="$(cat "$LICENSE_FILE")"
       licence_id="$(verify_token "$token")"
@@ -69,7 +78,6 @@ case "${1:-verify}" in
       IFS= read -r -s token </dev/tty || fail "Could not read licence key."
       printf '\n' >/dev/tty
       licence_id="$(verify_token "$token")"
-      install -d -o root -g root -m 0700 "$LICENSE_DIR"
       umask 077
       printf '%s\n' "$token" >"$LICENSE_FILE"
       unset token
