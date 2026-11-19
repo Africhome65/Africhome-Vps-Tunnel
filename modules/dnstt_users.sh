@@ -21,9 +21,12 @@ dt_valid_username() {
 }
 
 dt_read_domain() {
-  [[ -r "$DT_DOMAIN_CONFIG" ]] || { echo "DNSTT domain is not configured. Configure it first." >&2; return 1; }
+  [[ -f "$DT_DOMAIN_CONFIG" && ! -L "$DT_DOMAIN_CONFIG" && "$(stat -c '%u:%a' "$DT_DOMAIN_CONFIG" 2>/dev/null || true)" == "0:600" ]] || {
+    echo "DNSTT domain config must be a root-owned regular file with mode 0600." >&2
+    return 1
+  }
   DT_DOMAIN="$(sed -n 's/^DNS_DOMAIN=//p' "$DT_DOMAIN_CONFIG" | head -n1)"
-  [[ "$DT_DOMAIN" =~ ^[a-z0-9.-]+$ && "$DT_DOMAIN" == *.* ]] || {
+  [[ "$DT_DOMAIN" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ && ${#DT_DOMAIN} -le 253 ]] || {
     echo "Saved DNSTT domain is invalid; refusing to generate client settings." >&2
     return 1
   }
@@ -259,7 +262,7 @@ dt_accounts_manage() {
 
 dt_client_help() {
   dt_read_domain || return 1
-  [[ -s "$DT_PUBLIC_KEY" ]] || { echo "DNSTT public key is missing; install DNSTT first." >&2; return 1; }
+  [[ -f "$DT_PUBLIC_KEY" && ! -L "$DT_PUBLIC_KEY" && -s "$DT_PUBLIC_KEY" && "$(stat -c '%u:%a' "$DT_PUBLIC_KEY" 2>/dev/null || true)" == "0:644" ]] || { echo "DNSTT public key must be a root-owned regular file with mode 0644; install DNSTT first." >&2; return 1; }
   local mode resolver option
   echo "Choose the recursive DNS resolver used by dnstt-client:"
   echo "1) UDP resolver (default: 8.8.8.8:53)"
