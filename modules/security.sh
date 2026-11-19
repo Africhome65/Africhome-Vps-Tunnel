@@ -105,6 +105,7 @@ EOF
   fi
 
   ah_ok "Fail2ban is active; SSH jail protects TCP port(s): $ssh_ports."
+  type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.fail2ban.enable success || true
   fail2ban-client status sshd
 }
 
@@ -149,7 +150,12 @@ security_fail2ban_unban(){
   echo "Selected address: $ip"
   read -r -p "Type UNBAN to release this address: " answer
   [[ "$answer" == "UNBAN" ]] || { ah_info "Cancelled."; return; }
-  fail2ban-client set sshd unbanip "$ip"
+  if fail2ban-client set sshd unbanip "$ip"; then
+    type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.fail2ban.unban success || true
+  else
+    type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.fail2ban.unban failure || true
+    return 1
+  fi
 }
 security_ufw_status(){
   if command -v ufw >/dev/null 2>&1; then ufw status verbose; else ah_warn "UFW is not installed."; fi
@@ -170,8 +176,13 @@ security_ufw_enable(){
   for port in "${_ssh_port_list[@]}"; do ufw allow "$port/tcp" || return; done
   ufw allow 80/tcp || true
   ufw allow 443/tcp || true
-  ufw --force enable
-  ah_ok "UFW enabled. Check that all required service ports are allowed."
+  if ufw --force enable; then
+    ah_ok "UFW enabled. Check that all required service ports are allowed."
+    type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.ufw.enable success || true
+  else
+    type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.ufw.enable failure || true
+    return 1
+  fi
 }
 security_torrent_status(){
   if command -v nft >/dev/null 2>&1 && nft list table inet africhome_torrent >/dev/null 2>&1; then
@@ -214,14 +225,20 @@ security_torrent_enable(){
     return 1
   fi
   ah_ok "Basic host common-port torrent filtering applied."
+  type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.torrent.enable success || true
 }
 security_torrent_disable(){
   ah_require_root || return
   if command -v nft >/dev/null 2>&1 && nft list table inet africhome_torrent >/dev/null 2>&1; then
     read -r -p "Type REMOVE to delete only the Africhome torrent table: " answer
     [[ "$answer" == "REMOVE" ]] || { ah_info "Cancelled."; return; }
-    nft delete table inet africhome_torrent
-    ah_ok "Africhome torrent-filter table removed."
+    if nft delete table inet africhome_torrent; then
+      ah_ok "Africhome torrent-filter table removed."
+      type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.torrent.disable success || true
+    else
+      type ah_audit_log >/dev/null 2>&1 && ah_audit_log security.torrent.disable failure || true
+      return 1
+    fi
   else
     ah_info "No Africhome torrent-filter table found."
   fi
@@ -246,7 +263,7 @@ security_audit_readonly(){
   echo
   echo "-- Security services --"
   local unit
-  for unit in ssh.service sshd.service fail2ban.service ufw.service nftables.service; do
+  for unit in ssh.service sshd.service fail2ban.service ufw.service nftables.service xray.service hysteria-server.service dnstt.service openvpn-server@server.service nginx.service haproxy.service; do
     if command -v systemctl >/dev/null 2>&1; then
       printf '%-22s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
     fi
@@ -255,6 +272,25 @@ security_audit_readonly(){
   echo "-- Firewall overview (read-only) --"
   if command -v ufw >/dev/null 2>&1; then ufw status verbose 2>&1 || true; fi
   if command -v nft >/dev/null 2>&1; then nft list ruleset 2>/dev/null | sed -n '1,180p' || true; fi
+  echo
+  echo "-- Certificate expiry (read-only) --"
+  local cert
+  for cert in /etc/xray/certs/fullchain.pem /etc/hysteria/certs/fullchain.pem; do
+    if [[ -r "$cert" ]] && command -v openssl >/dev/null 2>&1; then
+      printf '%s: ' "$cert"
+      if openssl x509 -in "$cert" -noout -enddate 2>/dev/null; then
+        if openssl x509 -in "$cert" -noout -checkend 2592000 >/dev/null 2>&1; then
+          echo "at least 30 days remaining"
+        else
+          echo "WARNING: expires within 30 days or is already expired"
+        fi
+      else
+        echo "unreadable or invalid certificate"
+      fi
+    else
+      printf '%s: not present/readable\\n' "$cert"
+    fi
+  done
   echo
   echo "-- Failed login summary --"
   if command -v journalctl >/dev/null 2>&1; then
