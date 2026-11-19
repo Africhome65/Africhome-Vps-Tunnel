@@ -64,6 +64,19 @@ rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
 
+# Incomplete server setup cleanup removes only the newly-created runtime
+# directory and an empty log directory; it never follows/removes a symlink.
+ROLLBACK_RUNTIME="$TMP/rollback-runtime"
+ROLLBACK_LOG="$TMP/rollback-log"
+mkdir -m 0750 "$ROLLBACK_RUNTIME" "$ROLLBACK_LOG"
+printf 'partial\n' > "$ROLLBACK_RUNTIME/partial"
+ovpn_cleanup_unpublished_setup "$ROLLBACK_RUNTIME" "$ROLLBACK_LOG"
+[[ ! -e "$ROLLBACK_RUNTIME" && ! -e "$ROLLBACK_LOG" ]]
+mkdir -p "$TMP/runtime-target"
+ln -s "$TMP/runtime-target" "$TMP/runtime-link"
+ovpn_cleanup_unpublished_setup "$TMP/runtime-link" "$TMP/nonexistent-log"
+[[ -L "$TMP/runtime-link" && -d "$TMP/runtime-target" ]]
+
 ovpn_write_server_config "$TMP/server.conf" 1194 udp "$TMP/runtime"
 grep -q '^proto udp$' "$TMP/server.conf"
 grep -q "^tls-crypt $TMP/runtime/ta.key$" "$TMP/server.conf"
