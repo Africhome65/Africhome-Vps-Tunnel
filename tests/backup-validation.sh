@@ -26,7 +26,14 @@ stage="$(find "$AH_RESTORE_STAGE_ROOT" -mindepth 1 -maxdepth 1 -type d -print -q
 [[ "$(stat -c '%a' "$stage/etc/xray/config.json")" == "600" ]]
 
 bad="$AH_BACKUP_ROOT/africhome-bad.tar.gz"
-tar -czf "$bad" -C "$tmp" --transform='s|escape|../escape|' source/etc/xray/config.json
+python3 - "$bad" <<'PY'
+import io, sys, tarfile
+with tarfile.open(sys.argv[1], "w:gz") as tf:
+    data = b"not allowed"
+    info = tarfile.TarInfo("../escape")
+    info.size = len(data)
+    tf.addfile(info, io.BytesIO(data))
+PY
 (cd "$AH_BACKUP_ROOT" && sha256sum "$(basename "$bad")" > "$(basename "$bad").sha256")
 if backup_stage_restore "$bad"; then
   echo "Path traversal archive was accepted" >&2
