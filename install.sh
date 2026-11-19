@@ -19,6 +19,14 @@ case "$OS_ID" in
   *) fail "Unsupported OS: $OS_ID. Use Ubuntu 22.04+ or Debian 11+." ;;
 esac
 
+# Refuse to overwrite local tracked or untracked work in an existing installation.
+# The update step below uses reset --hard, so a clean worktree is mandatory.
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  if [[ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=all)" ]]; then
+    fail "$INSTALL_DIR contains local or untracked files. No update was performed. Back up and review these files, then clean or move them deliberately before retrying."
+  fi
+fi
+
 # Verify the locally signed lifetime licence before package installation or system changes.
 [[ -r "$SCRIPT_DIR/scripts/license.sh" ]] || fail "Licence verifier is missing from this checkout."
 bash "$SCRIPT_DIR/scripts/license.sh" verify
