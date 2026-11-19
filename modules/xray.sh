@@ -137,7 +137,6 @@ xray_add_sni() {
   backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
   cp -a "$XRAY_CONFIG" "$backup_config" || { ah_err "Could not back up the current Xray configuration."; return 1; }
   if ! python3 "$module_dir/scripts/update-reality-sni.py" "$XRAY_CONFIG" "$new_sni"; then
-  then
     cp -a "$backup_config" "$XRAY_CONFIG"
     ah_err "Could not update the SNI list; the previous configuration was restored."
     return 1
