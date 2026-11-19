@@ -161,15 +161,6 @@ ovpn_configure_server(){
     return 1
   fi
   chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"
-  if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
-    backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
-    mv -- "$OVPN_CONFIG" "$backup"
-    rm -f -- "$OVPN_STATE"
-    systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    ovpn_error "OpenVPN did not start. Failed config preserved at $backup."
-    journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
-    return 1
-  fi
   local state_tmp
   state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
   umask 077
@@ -178,6 +169,15 @@ ovpn_configure_server(){
   if ! mv -n -- "$state_tmp" "$OVPN_STATE" || [[ -e "$state_tmp" ]]; then
     rm -f "$state_tmp"
     ovpn_error "Could not safely save OpenVPN state."
+    return 1
+  fi
+  if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
+    backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
+    mv -- "$OVPN_CONFIG" "$backup"
+    rm -f -- "$OVPN_STATE"
+    systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || true
+    ovpn_error "OpenVPN did not start. Failed config preserved at $backup."
+    journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
   ah_ok "Native OpenVPN server started on $proto/$port."
