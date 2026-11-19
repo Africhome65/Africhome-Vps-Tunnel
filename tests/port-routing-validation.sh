@@ -20,4 +20,24 @@ if grep -Eiq 'apt-get[[:space:]]+(install|remove)|systemctl[[:space:]]+(restart|
   exit 1
 fi
 
+# Validate route-planner input checks without touching host networking.
+for port in 1 80 443 1194 65535; do
+  pr_valid_port "$port" || { echo "Valid port rejected: $port" >&2; exit 1; }
+done
+for port in 0 65536 abc 12x ""; do
+  if pr_valid_port "$port"; then
+    echo "Invalid port accepted: $port" >&2
+    exit 1
+  fi
+done
+for protocol in tcp udp; do
+  pr_check_port_available "$protocol" 443 >/dev/null 2>&1 && :
+  rc=$?
+  [[ "$rc" -eq 0 || "$rc" -eq 1 || "$rc" -eq 2 ]] || exit 1
+done
+declare -F pr_route_plan >/dev/null || {
+  echo "Missing read-only route planner." >&2
+  exit 1
+}
+
 echo "Port-routing read-only validation passed."
