@@ -10,7 +10,7 @@ ovpn_inventory() {
   if [[ -n "${OPENVPN_INVENTORY_DIRS:-}" ]]; then
     IFS=':' read -r -a scan_dirs <<< "$OPENVPN_INVENTORY_DIRS"
   else
-    scan_dirs=(/etc/openvpn /etc/openvpn/server)
+    scan_dirs=(/etc/openvpn)
   fi
 
   printf 'OpenVPN configuration inventory (read-only)\n'
