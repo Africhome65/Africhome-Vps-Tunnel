@@ -31,7 +31,7 @@ grep -Fq '|| -L "$INSTALL_DIR/.git"' "$FILE"
 grep -Fq 'git -C "$INSTALL_DIR" status --porcelain --untracked-files=all' "$FILE"
 grep -Fq 'INSTALL_BRANCH="feature/central-dnstt-integration"' "$FILE"
 for dnstt_script in install-dnstt.sh configure-dnstt-domain.sh install-dnstt-service.sh; do
-  expected=""\$INSTALL_DIR/scripts/$dnstt_script""
+  expected='"$INSTALL_DIR/scripts/'"$dnstt_script"'"'
   grep -Fq "$expected" "$FILE"
 done
 LICENSE="$ROOT/scripts/license.sh"
