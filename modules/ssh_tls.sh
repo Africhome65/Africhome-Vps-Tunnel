@@ -47,8 +47,22 @@ ssh_tls_check_certificate(){
   [[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || { ssh_tls_error "Certificate and private key do not match."; return 1; }
 }
 ssh_tls_port_available(){
-  local port="$1"
-  ! ss -H -ltn 2>/dev/null | awk -v p=":$port" '$0 ~ p"([[:space:]]|$)" {found=1} END{exit !found}'
+  local port="$1" output
+  if ! output="$(ss -H -ltn 2>/dev/null)"; then
+    ssh_tls_error "Could not inspect TCP listeners; refusing to assume port $port is free."
+    return 1
+  fi
+  if awk -v p="$port" '
+    {
+      endpoint=$4
+      sub(/^.*:/, "", endpoint)
+      if (endpoint == p) found=1
+    }
+    END {exit !found}
+  ' <<< "$output"; then
+    return 1
+  fi
+  return 0
 }
 
 # Configuration directories must be real, root-owned, and not group/world-writable.
