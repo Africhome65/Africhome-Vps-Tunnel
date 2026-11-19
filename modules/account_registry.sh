@@ -164,31 +164,3 @@ ar_menu() {
     esac
   done
 }
-\t' read -r id label service expiry status; do
-    if [[ "$expiry" == "0" ]]; then expiry_display="Never"
-    elif [[ "$expiry" =~ ^[0-9]+$ ]]; then
-      expiry_display="$(date -u -d "@$expiry" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "Unknown")"
-      if (( expiry <= $(date +%s) )) && [[ "$status" == "active" ]]; then status="expired (cleanup pending)"; fi
-    else expiry_display="Unknown"; fi
-    host_state="$(ar_host_service_state "$service")"
-    printf '%-20.20s %-16.16s %-10.10s %-20.20s %-20.20s %s\n' "$id" "$label" "$service" "$expiry_display" "$status" "$host_state"
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,$a.label,.service,($a.expires_at|tostring),.status] | @tsv' "$AR_REGISTRY")
-  printf '\nNote: this view shows accounts registered in Africhome metadata only. It does not discover unmanaged native accounts. Host service state is a current systemd check, not a connectivity test.\n'
-}
-
-ar_list() { ar_dashboard; }
-
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
