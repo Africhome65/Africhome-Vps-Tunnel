@@ -20,6 +20,14 @@ ovpn_valid_remote vpn.xn--p1ai
 ovpn_valid_remote 192.0.2.10
 ! ovpn_valid_remote 999.1.1.1
 ! ovpn_valid_remote https://vpn.example.com
+ss(){ printf 'LISTEN 0 128 0.0.0.0:1194 0.0.0.0:*\\n'; }
+! ovpn_port_available tcp 1194
+ss(){ printf 'UNCONN 0 0 [::]:1194 [::]:*\\n'; }
+! ovpn_port_available udp 1194
+ss(){ :; }
+ovpn_port_available tcp 1194
+ovpn_port_available udp 1194
+unset -f ss
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
