@@ -136,7 +136,7 @@ ar_dashboard() {
   printf '\n=== AFRICHOME ACCOUNT DASHBOARD ===\n'
   printf 'Registered accounts: %s | Service entries: %s | Expired accounts: %s\n' "$account_count" "$service_count" "$expired_count"
   printf '%-20s %-16s %-10s %-20s %-20s %s\n' "ACCOUNT ID" "LABEL" "SERVICE" "EXPIRES (UTC)" "ACCOUNT STATUS" "HOST SERVICE"
-  while IFS=
+  while read -r id label service expiry status; do
     if [[ "$expiry" == "0" ]]; then expiry_display="Never"
     elif [[ "$expiry" =~ ^[0-9]+$ ]]; then
       expiry_display="$(date -u -d "@$expiry" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "Unknown")"
