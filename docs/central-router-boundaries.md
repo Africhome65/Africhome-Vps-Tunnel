@@ -176,8 +176,11 @@ prompt. It validates the candidate with the HAProxy binary, backs up an
 existing root-owned config, installs the new config by same-directory atomic
 rename, starts HAProxy, verifies the service and both listeners, and enables
 startup only after those checks pass. If startup or verification fails, it
-stops the service and restores the prior config (or removes the new config if
-none existed).
+attempts to stop HAProxy and restores the prior config (or removes the new
+config if none existed). If the stop command fails and HAProxy is still active,
+it deliberately does not replace the configuration underneath the running
+process; it leaves the original backup in place and reports a critical manual
+recovery condition. This failure path is covered by a mocked regression test.
 
 The apply transaction does not change firewall rules, Xray, or other services.
 It is deliberately designed to refuse an already-active HAProxy service or
