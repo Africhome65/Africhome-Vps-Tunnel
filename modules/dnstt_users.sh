@@ -223,6 +223,37 @@ EOF
   unset password
 }
 
+dt_trial_timer_cleanup() {
+  local username="$1"
+  local service_file="/etc/systemd/system/africhome-trial-${username}.service"
+  local timer_file="/etc/systemd/system/africhome-trial-${username}.timer"
+  local unit_name="africhome-trial-${username}.timer"
+  local service_name="africhome-trial-${username}.service"
+
+  # These paths are derived only from a validated Linux username. Never
+  # follow or remove a symlink if an administrator has replaced a unit.
+  for path in "$service_file" "$timer_file"; do
+    [[ ! -L "$path" && ( ! -e "$path" || -f "$path" ) ]] || {
+      echo "Refusing to remove an unsafe trial unit path: $path" >&2
+      return 1
+    }
+  done
+  if [[ -e "$service_file" || -e "$timer_file" ]]; then
+    command -v systemctl >/dev/null 2>&1 || {
+      echo "systemctl is required to safely cancel this trial timer." >&2
+      return 1
+    }
+    systemctl disable --now "$unit_name" >/dev/null 2>&1 || {
+      echo "Could not disable the trial timer $unit_name." >&2
+      return 1
+    }
+    systemctl stop "$service_name" >/dev/null 2>&1 || true
+    rm -f -- "$service_file" "$timer_file"
+    systemctl daemon-reload || return 1
+  fi
+}
+
+
 dt_accounts_list() {
   dt_require_root || return 1
   local members username status
@@ -262,11 +293,14 @@ dt_accounts_manage() {
       else
         chage --expiredate -1 "$username" || return 1
       fi
+      dt_trial_timer_cleanup "$username" || return 1
       if [[ "$action" == 3 ]]; then usermod --unlock "$username" || return 1; fi
       echo "Account $username expiry updated: ${expiry:-Never}."
       ;;
     2)
-      usermod --lock --expiredate 1970-01-02 "$username" && echo "Account $username disabled."
+      usermod --lock --expiredate 1970-01-02 "$username" || return 1
+      dt_trial_timer_cleanup "$username" || return 1
+      echo "Account $username disabled."
       ;;
     4)
       password="$(openssl rand -hex 16)" || return 1
@@ -277,6 +311,7 @@ dt_accounts_manage() {
     5)
       read -r -p "Permanently delete $username and its home directory? [y/N]: " confirm
       [[ "$confirm" =~ ^[Yy]$ ]] || return 0
+      dt_trial_timer_cleanup "$username" || return 1
       userdel --remove "$username" && echo "Account $username deleted."
       ;;
     *) echo "Invalid choice." >&2; return 1 ;;
