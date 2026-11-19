@@ -55,6 +55,7 @@ while true; do
   echo "21) Generate central HAProxy candidate (no live changes)"
   echo "22) Read-only central-router preflight (no changes)"
   echo "23) SSH over TLS backend (loopback only)"
+  echo "24) Guarded HAProxy apply (requires TCP 80/443 to be free)"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -88,6 +89,12 @@ while true; do
     21) cr_render_candidate; ah_pause ;;
     22) bash "$BASE_DIR/scripts/central-router-preflight.sh"; ah_pause ;;
     23) ssh_tls_menu ;;
+    24)
+      ah_warn "This starts HAProxy on public TCP 80 and 443. Existing listeners will cause a safe refusal."
+      read -r -p "Proceed to guarded activation checks? [y/N]: " apply_confirm
+      if [[ "$apply_confirm" =~ ^[Yy]$ ]]; then bash "$BASE_DIR/scripts/apply-central-haproxy.sh" --apply; fi
+      ah_pause
+      ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
