@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ROOT="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=../modules/openvpn.sh
 source "$ROOT/modules/openvpn.sh"
 ovpn_valid_port 1194
