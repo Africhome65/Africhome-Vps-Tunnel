@@ -150,7 +150,7 @@ ar_dashboard() {
   expired_count="$(jq '[.accounts[] | select(.expires_at != 0 and .expires_at <= now)] | length' "$AR_REGISTRY")" || return 1
   printf '\n=== AFRICHOME ACCOUNT DASHBOARD ===\n'
   printf 'Registered accounts: %s | Service entries: %s | Expired accounts: %s\n' "$account_count" "$service_count" "$expired_count"
-  printf '%-20s %-16s %-10s %-20s %-20s %s\n' "ACCOUNT ID" "LABEL" "SERVICE" "EXPIRES (UTC)" "ACCOUNT STATUS" "HOST SERVICE"
+  printf '%-20s %-16s %-10s %-20s %-30s %s\n' "ACCOUNT ID" "LABEL" "SERVICE" "EXPIRES (UTC)" "ACCOUNT STATUS" "HOST SERVICE"
   while IFS=$'\t' read -r id label service expiry status; do
     if [[ "$expiry" == "0" ]]; then expiry_display="Never"
     elif [[ "$expiry" =~ ^[0-9]+$ ]]; then
@@ -158,7 +158,7 @@ ar_dashboard() {
       if (( expiry <= $(date +%s) )) && [[ "$status" == "active" ]]; then status="expired (cleanup pending)"; fi
     else expiry_display="Unknown"; fi
     host_state="$(ar_host_service_state "$service")"
-    printf '%-20.20s %-16.16s %-10.10s %-20.20s %-20.20s %s\n' "$id" "$label" "$service" "$expiry_display" "$status" "$host_state"
+    printf '%-20.20s %-16.16s %-10.10s %-20.20s %-30.30s %s\n' "$id" "$label" "$service" "$expiry_display" "$status" "$host_state"
   done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,$a.label,.service,($a.expires_at|tostring),.status] | @tsv' "$AR_REGISTRY")
   printf '\nNote: this view shows accounts registered in Africhome metadata only. It does not discover unmanaged native accounts. Host service state is a current systemd check, not a connectivity test.\n'
 }
