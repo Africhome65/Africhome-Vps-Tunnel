@@ -40,6 +40,8 @@ jobs:
         run: bash tests/service-inventory-validation.sh
       - name: Test protocol account config permissions
         run: bash tests/protocol-users-validation.sh
+      - name: Test Xray config ownership and service readability
+        run: bash tests/xray-config-permissions-validation.sh
       - name: Test central account registry
         run: bash tests/account-registry-validation.sh
       - name: Test Hysteria userpass account adapter
