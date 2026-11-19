@@ -147,6 +147,7 @@ pu_add() {
     ah_err "Central registry update failed; account creation was rolled back."
     return 1
   fi
+  ah_audit_log protocol.account.create success 2>/dev/null || true
   ah_ok "Account created and registered."
   echo "Account ID: $account_id"
   echo "Protocol: $protocol"
@@ -206,6 +207,7 @@ pu_renew() {
     cp -a "$db_backup" "$PU_DB"
     ah_err "Registry renewal failed; local expiry was restored."; return 1
   fi
+  ah_audit_log protocol.account.renew success 2>/dev/null || true
   ah_ok "Account $name renewed by $days day(s)."
 }
 
@@ -250,6 +252,7 @@ pu_remove() {
   if [[ -n "$account_id" ]] && ! ar_set_service_status "$account_id" "$protocol" "$email" "revoked"; then
     ah_warn "Service account was removed, but registry status could not be updated."
   fi
+  ah_audit_log protocol.account.revoke success 2>/dev/null || true
   ah_ok "Account $name removed."
 }
 
@@ -290,6 +293,7 @@ pu_expire() {
         ah_warn "An expired Xray account was removed, but its registry status could not be updated."
       fi
     done <<< "$expired"
+    ah_audit_log protocol.account.expire success 2>/dev/null || true
     ah_ok "Expired protocol accounts have been removed."
   fi
 }
@@ -321,6 +325,7 @@ WantedBy=timers.target
 EOF
   systemctl daemon-reload
   systemctl enable --now africhome-expire.timer
+  ah_audit_log protocol.expiry_timer.enable success 2>/dev/null || true
   ah_ok "Daily protocol account expiry timer enabled."
 }
 
