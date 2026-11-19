@@ -23,6 +23,10 @@ valid_fqdn() {
   (( ${#value} <= 253 ))
 }
 
+tmp=""
+cleanup() { [[ -z "$tmp" || ! -e "$tmp" ]] || rm -f -- "$tmp"; }
+trap cleanup EXIT
+
 current_domain=""
 current_ns=""
 if [[ -e "$CONFIG_FILE" || -L "$CONFIG_FILE" ]]; then
@@ -72,9 +76,10 @@ chmod 0600 "$tmp"
   printf 'DNS_NS_HOST=%q\n' "$DNS_NS_HOST"
 } > "$tmp"
 if [[ -f "$CONFIG_FILE" ]]; then
-  cp -a "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S)"
+  cp -a -- "$CONFIG_FILE" "$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S).$"
 fi
-mv -f "$tmp" "$CONFIG_FILE"
+mv -f -- "$tmp" "$CONFIG_FILE"
+tmp=""
 chmod 0600 "$CONFIG_FILE"
 
 echo
