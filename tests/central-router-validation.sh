@@ -15,6 +15,11 @@ done
 cr_valid_hostname example.com
 cr_valid_hostname vpn-1.example.net
 if cr_valid_hostname '-bad.example'; then echo "Invalid hostname accepted." >&2; exit 1; fi
+label64="$(printf '%064d' 0 | tr '0' 'a')"
+label63="$(printf '%063d' 0 | tr '0' 'a')"
+long_hostname="${label63}.${label63}.${label63}.${label63}"
+if cr_valid_hostname "${label64}.example.com"; then echo "Overlong DNS label accepted." >&2; exit 1; fi
+if cr_valid_hostname "$long_hostname"; then echo "Overlong DNS hostname accepted." >&2; exit 1; fi
 
 cr_valid_backend 127.0.0.1 10001
 cr_valid_backend ::1 10001
