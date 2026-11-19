@@ -26,5 +26,5 @@ fetch_reset="$(line_of 'git -C "$INSTALL_DIR" reset --hard')"
 (( license_check < fetch_reset && apt_update < fetch_reset ))
 
 grep -Fq '[[ -r "$SCRIPT_DIR/scripts/license.sh" ]]' "$FILE"
-grep -Fq 'git status --porcelain --untracked-files=all' "$FILE"
+grep -Fq 'git -C "$INSTALL_DIR" status --porcelain --untracked-files=all' "$FILE"
 echo "Installer ordering and overwrite safeguards validation passed."
