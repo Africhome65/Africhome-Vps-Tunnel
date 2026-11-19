@@ -10,7 +10,7 @@ sshd(){
 }
 ports="$(security_detect_ssh_ports)"
 [[ "$ports" == "2222,443" ]] || { echo "Unexpected SSH port detection: $ports" >&2; exit 1; }
-
+security_valid_ip "192.0.2.10"\nsecurity_valid_ip "2001:db8::10"\nif security_valid_ip "999.1.1.1"; then echo "Invalid IPv4 was accepted" >&2; exit 1; fi\nif security_valid_ip "not-an-ip"; then echo "Invalid address was accepted" >&2; exit 1; fi\n
 security_torrent_rules > "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
 trap 'rm -f "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"' EXIT
 grep -Fq 'add table inet africhome_torrent' "${TMPDIR:-/tmp}/africhome-torrent-test.$$.nft"
