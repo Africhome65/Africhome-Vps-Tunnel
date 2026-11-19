@@ -82,18 +82,26 @@ cr_check_route_collisions(){
     [[ "$transport" == tcp || "$transport" == udp ]] || { cr_error "Invalid transport in route list."; return 2; }
     cr_valid_port "$port" || { cr_error "Invalid port in route list."; return 2; }
     key="$transport/$port"
+    if [[ "$hostname" == "-" ]]; then hostname=""; fi
+    if [[ -n "$hostname" ]]; then
+      cr_valid_hostname "$hostname" || { cr_error "Invalid hostname in route list."; return 2; }
+      hostname="${hostname,,}"
+    fi
     if [[ -n "${seen[$key]+x}" ]]; then
       host_list="${seen[$key]}"
-      if [[ "$transport" != tcp || -z "$hostname" || "$hostname" == "-" || "$host_list" == *"|$hostname|"* ]]; then
+      # Sharing a TCP socket is permitted only when every route has a
+      # distinct, valid SNI hostname. A hostname-less route is a wildcard
+      # claimant and therefore blocks all additional routes on that socket.
+      if [[ "$transport" != tcp || -z "$hostname" || "$host_list" == "WILDCARD" || "$host_list" == *"|$hostname|"* ]]; then
         cr_error "Unresolved socket collision at $key ($mode)."
         return 1
       fi
       seen[$key]="$host_list$hostname|"
     else
-      if [[ "$transport" == tcp && -n "$hostname" && "$hostname" != "-" ]]; then
+      if [[ "$transport == tcp && -n "$hostname" ]]; then
         seen[$key]="|$hostname|"
       else
-        seen[$key]="|"
+        seen[$key]="WILDCARD"
       fi
     fi
   done <<< "$input"
