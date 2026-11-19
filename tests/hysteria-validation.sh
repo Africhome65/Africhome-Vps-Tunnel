@@ -75,8 +75,8 @@ ss() {
   esac
 }
 check_listener_result() {
-  local label="$1" expected="$2" actual=0
-  hy2_check_listener_conflicts 1194 1194 || actual=1
+  local label="$1" expected="$2" first="${3:-1194}" last="${4:-${3:-1194}}" actual=0
+  hy2_check_listener_conflicts "$first" "$last" || actual=1
   if [[ "$actual" == "$expected" ]]; then
     printf 'PASS: %s\\n' "$label"
     ((pass+=1))
