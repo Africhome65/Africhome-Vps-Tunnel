@@ -165,204 +165,82 @@ ar_dashboard() {
 
 # Compare registry metadata with local account metadata. This function is
 # strictly read-only and deliberately never reads credential fields.
+
+# Read-only reconciliation across Africhome metadata, native configs, and NSS.
+# Only account labels/tags/usernames are emitted; credentials are never printed.
 ar_reconcile() {
   ar_validate_readonly || return 1
   local protocol_db="${AR_PROTOCOL_DB:-/etc/africhome-protocol-users.json}"
   local hysteria_db="${AR_HYSTERIA_DB:-/etc/africhome-hysteria-users.json}"
   local xray_config="${AR_XRAY_CONFIG:-/usr/local/etc/xray/config.json}"
   local hysteria_config="${AR_HYSTERIA_CONFIG:-/etc/hysteria/config.yaml}"
-  local account_id service name ref status display_name native_users="" native_status=error
+  local account_id service name ref status display_name native_users=""
   local local_only=0 registry_only=0 native_only=0 stale_local=0 ssh_candidates=0 skipped=0
+  local xray_ok=0 hysteria_ok=0 db_match native_match
 
   printf '\n=== READ-ONLY ACCOUNT RECONCILIATION ===\n'
   printf '%-12s %-24s %s\n' "SOURCE" "ACCOUNT" "FINDING"
 
   if [[ -r "$protocol_db" ]] && jq -e 'type == "array"' "$protocol_db" >/dev/null 2>&1; then
-    while IFS=$'\t' read -r account_id service name ref; do
-      [[ -n "$service" && -n "$ref" ]] || continue
-      if [[ "$account_id" == "-" || "$ref" == "-" ]] || ! jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
+    while IFS='|' read -r account_id service name ref; do
+      [[ -n "$service" && "$ref" != "-" ]] || continue
+      if [[ "$account_id" == "-" ]] || ! jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == $svc and .ref == $ref))' \
         "$AR_REGISTRY" >/dev/null 2>&1; then
         printf '%-12s %-24.24s %s\n' "XRAY/$service" "$name" "local metadata exists; registry entry missing"
         ((local_only+=1))
       fi
-    done < <(jq -r '.[] | [(.account_id // "-"), .protocol, .name, (.email // "-")] | @tsv' "$protocol_db")
+    done < <(jq -r '.[] | [(.account_id // "-"), .protocol, .name, (.email // "-")] | join("|")' "$protocol_db")
   else
-    printf '%-12s %-24s %s\n' "XRAY" "-" "local metadata unavailable/invalid; skipped"
+    printf '%-12s %-24s %s\n' "XRAY DB" "-" "local metadata unavailable/invalid; skipped"
     ((skipped+=1))
   fi
 
   if [[ -r "$hysteria_db" ]] && jq -e 'type == "array"' "$hysteria_db" >/dev/null 2>&1; then
-    while IFS=$'\t' read -r account_id name; do
+    while IFS='|' read -r account_id name; do
       [[ -n "$name" ]] || continue
       if [[ "$account_id" == "-" ]] || ! jq -e --arg id "$account_id" --arg ref "$name" \
         'any(.accounts[]; .id == $id and any(.services[]; .service == "hysteria" and .ref == $ref))' \
         "$AR_REGISTRY" >/dev/null 2>&1; then
-        printf '%-12s %-24.24s %s\n' "HYSTERIA" "$name" "local metadata exists; registry entry missing"
+        printf '%-12s %-24.24s %s\n' "HYSTERIA DB" "$name" "local metadata exists; registry entry missing"
         ((local_only+=1))
       fi
-    done < <(jq -r '.[] | [(.account_id // "-"), .username] | @tsv' "$hysteria_db")
+    done < <(jq -r '.[] | [(.account_id // "-"), .username] | join("|")' "$hysteria_db")
   else
-    printf '%-12s %-24s %s\n' "HYSTERIA" "-" "local metadata unavailable/invalid; skipped"
+    printf '%-12s %-24s %s\n' "HYSTERIA DB" "-" "local metadata unavailable/invalid; skipped"
     ((skipped+=1))
   fi
 
-
-  # Native Xray comparison selects only client email tags, never credentials.
   if [[ -r "$xray_config" ]] && jq -e 'type == "object" and (.inbounds | type == "array")' "$xray_config" >/dev/null 2>&1; then
-    while IFS=
-    [[ -n "$ref" ]] || continue
-    case "$service" in
-      vless|vmess|trojan)
-        if [[ -r "$protocol_db" ]] && jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      hysteria)
-        if [[ -r "$hysteria_db" ]] && jq -e --arg id "$account_id" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      ssh)
-        if getent passwd "$ref" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "SSH" "$ref" "registry entry has no matching Linux user"
-          ((registry_only+=1))
-        fi ;;
-    esac
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | @tsv' "$AR_REGISTRY")
-
-  while IFS=: read -r name _ uid _ _ _ shell; do
-    [[ "$uid" =~ ^[0-9]+$ ]] && (( uid >= 1000 )) || continue
-    [[ "$shell" != */nologin && "$shell" != */false ]] || continue
-    if ! jq -e --arg ref "$name" \
-      'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' \
-      "$AR_REGISTRY" >/dev/null 2>&1; then
-      printf '%-12s %-24.24s %s\n' "SSH" "$name" "interactive Linux user not registered (review candidate)"
-      ((ssh_candidates+=1))
-    fi
-  done < <(getent passwd 2>/dev/null || true)
-
-  printf "Native-only=%s, stale-local=%s\\n" "$native_only" "$stale_local"
-  printf '\nSummary: local-only=%s, registry-only=%s, unregistered SSH candidates=%s, skipped sources=%s\n' \
-    "$local_only" "$registry_only" "$ssh_candidates" "$skipped"
-  printf 'Read-only report: no accounts, registry records, or service configurations were changed. SSH candidates may be ordinary Linux users.\n'
-}
-
-ar_list() { ar_dashboard; }
-
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r service ref; do
+    xray_ok=1
+    while IFS='|' read -r service ref; do
       [[ -n "$ref" ]] || continue
-      if { [[ ! -r "$protocol_db" ]] || ! jq -e --arg svc "$service" --arg ref "$ref" 'any(.[]; .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; } &&
-         ! jq -e --arg svc "$service" --arg ref "$ref" 'any(.accounts[]; any(.services[]; .service == $svc and .ref == $ref))' "$AR_REGISTRY" >/dev/null 2>&1; then
+      db_match=0
+      [[ ! -r "$protocol_db" ]] || jq -e --arg svc "$service" --arg ref "$ref" \
+        'any(.[]; .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1 && db_match=1
+      if (( db_match == 0 )) && ! jq -e --arg svc "$service" --arg ref "$ref" \
+        'any(.accounts[]; any(.services[]; .service == $svc and .ref == $ref))' "$AR_REGISTRY" >/dev/null 2>&1; then
         printf '%-12s %-24.24s %s\n' "XRAY/$service" "$ref" "native client is not registered or in local metadata"
         ((native_only+=1))
       fi
-    done < <(jq -r '.inbounds[] | select(.protocol == "vless" or .protocol == "vmess" or .protocol == "trojan") | .protocol as $p | .settings.clients[]? | select((.email // "") != "") | [$p,.email] | @tsv' "$xray_config")
+    done < <(jq -r '.inbounds[] | select(.protocol == "vless" or .protocol == "vmess" or .protocol == "trojan") | .protocol as $p | .settings.clients[]? | select((.email // "") != "") | [$p,.email] | join("|")' "$xray_config")
 
     if [[ -r "$protocol_db" ]]; then
-      while IFS=
-    [[ -n "$ref" ]] || continue
-    case "$service" in
-      vless|vmess|trojan)
-        if [[ -r "$protocol_db" ]] && jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      hysteria)
-        if [[ -r "$hysteria_db" ]] && jq -e --arg id "$account_id" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      ssh)
-        if getent passwd "$ref" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "SSH" "$ref" "registry entry has no matching Linux user"
-          ((registry_only+=1))
-        fi ;;
-    esac
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | @tsv' "$AR_REGISTRY")
-
-  while IFS=: read -r name _ uid _ _ _ shell; do
-    [[ "$uid" =~ ^[0-9]+$ ]] && (( uid >= 1000 )) || continue
-    [[ "$shell" != */nologin && "$shell" != */false ]] || continue
-    if ! jq -e --arg ref "$name" \
-      'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' \
-      "$AR_REGISTRY" >/dev/null 2>&1; then
-      printf '%-12s %-24.24s %s\n' "SSH" "$name" "interactive Linux user not registered (review candidate)"
-      ((ssh_candidates+=1))
-    fi
-  done < <(getent passwd 2>/dev/null || true)
-
-  printf '\nSummary: local-only=%s, registry-only=%s, unregistered SSH candidates=%s, skipped sources=%s\n' \
-    "$local_only" "$registry_only" "$ssh_candidates" "$skipped"
-  printf 'Read-only report: no accounts, registry records, or service configurations were changed. SSH candidates may be ordinary Linux users.\n'
-}
-
-ar_list() { ar_dashboard; }
-
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r service name ref; do
-        [[ -n "$service" && -n "$ref" ]] || continue
-        if ! jq -e --arg svc "$service" --arg ref "$ref" 'any(.inbounds[]; .protocol == $svc and any(.settings.clients[]?; .email == $ref))' "$xray_config" >/dev/null 2>&1; then
+      while IFS='|' read -r service name ref; do
+        [[ -n "$service" && "$ref" != "-" ]] || continue
+        if ! jq -e --arg svc "$service" --arg ref "$ref" \
+          'any(.inbounds[]; .protocol == $svc and any(.settings.clients[]?; .email == $ref))' \
+          "$xray_config" >/dev/null 2>&1; then
           printf '%-12s %-24.24s %s\n' "XRAY/$service" "$name" "local metadata record is absent from native config"
           ((stale_local+=1))
         fi
-      done < <(jq -r '.[] | [.protocol,.name,.email] | @tsv' "$protocol_db")
+      done < <(jq -r '.[] | [.protocol,.name,(.email // "-")] | join("|")' "$protocol_db")
     fi
   else
     printf '%-12s %-24s %s\n' "XRAY CONFIG" "-" "native config unavailable/invalid; skipped"
     ((skipped+=1))
   fi
 
-  # Parse Hysteria userpass YAML and emit usernames only.
   if [[ -r "$hysteria_config" ]] && command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' >/dev/null 2>&1; then
     native_users="$(python3 - "$hysteria_config" <<'PY'
 import sys, yaml
@@ -380,90 +258,28 @@ try:
 except Exception:
     raise SystemExit(5)
 PY
-)" && native_status=ok || native_status=error
+)" && hysteria_ok=1 || hysteria_ok=0
 
-    if [[ "$native_status" == "ok" ]]; then
+    if (( hysteria_ok == 1 )); then
       while IFS= read -r name; do
         [[ -n "$name" ]] || continue
-        if { [[ ! -r "$hysteria_db" ]] || ! jq -e --arg ref "$name" 'any(.[]; .username == $ref)' "$hysteria_db" >/dev/null 2>&1; } &&
-           ! jq -e --arg ref "$name" 'any(.accounts[]; any(.services[]; .service == "hysteria" and .ref == $ref))' "$AR_REGISTRY" >/dev/null 2>&1; then
+        db_match=0
+        [[ ! -r "$hysteria_db" ]] || jq -e --arg ref "$name" 'any(.[]; .username == $ref)' "$hysteria_db" >/dev/null 2>&1 && db_match=1
+        if (( db_match == 0 )) && ! jq -e --arg ref "$name" \
+          'any(.accounts[]; any(.services[]; .service == "hysteria" and .ref == $ref))' "$AR_REGISTRY" >/dev/null 2>&1; then
           printf '%-12s %-24.24s %s\n' "HYSTERIA" "$name" "native user is not registered or in local metadata"
           ((native_only+=1))
         fi
       done <<< "$native_users"
 
       if [[ -r "$hysteria_db" ]]; then
-        while IFS=
-    [[ -n "$ref" ]] || continue
-    case "$service" in
-      vless|vmess|trojan)
-        if [[ -r "$protocol_db" ]] && jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      hysteria)
-        if [[ -r "$hysteria_db" ]] && jq -e --arg id "$account_id" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      ssh)
-        if getent passwd "$ref" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "SSH" "$ref" "registry entry has no matching Linux user"
-          ((registry_only+=1))
-        fi ;;
-    esac
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | @tsv' "$AR_REGISTRY")
-
-  while IFS=: read -r name _ uid _ _ _ shell; do
-    [[ "$uid" =~ ^[0-9]+$ ]] && (( uid >= 1000 )) || continue
-    [[ "$shell" != */nologin && "$shell" != */false ]] || continue
-    if ! jq -e --arg ref "$name" \
-      'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' \
-      "$AR_REGISTRY" >/dev/null 2>&1; then
-      printf '%-12s %-24.24s %s\n' "SSH" "$name" "interactive Linux user not registered (review candidate)"
-      ((ssh_candidates+=1))
-    fi
-  done < <(getent passwd 2>/dev/null || true)
-
-  printf '\nSummary: local-only=%s, registry-only=%s, unregistered SSH candidates=%s, skipped sources=%s\n' \
-    "$local_only" "$registry_only" "$ssh_candidates" "$skipped"
-  printf 'Read-only report: no accounts, registry records, or service configurations were changed. SSH candidates may be ordinary Linux users.\n'
-}
-
-ar_list() { ar_dashboard; }
-
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r account_id name; do
+        while IFS='|' read -r account_id name; do
           [[ -n "$name" ]] || continue
           if ! grep -Fxq -- "$name" <<< "$native_users"; then
-            printf '%-12s %-24.24s %s\n' "HYSTERIA" "$name" "local metadata record is absent from native config"
+            printf '%-12s %-24.24s %s\n' "HYSTERIA DB" "$name" "local metadata record is absent from native config"
             ((stale_local+=1))
           fi
-        done < <(jq -r '.[] | [(.account_id // "-"), .username] | @tsv' "$hysteria_db")
+        done < <(jq -r '.[] | [(.account_id // "-"), .username] | join("|")' "$hysteria_db")
       fi
     else
       printf '%-12s %-24s %s\n' "HYSTERIA CONFIG" "-" "unsupported auth type or invalid YAML; skipped"
@@ -474,47 +290,61 @@ ar_menu() {
     ((skipped+=1))
   fi
 
-  while IFS=
+  while IFS='|' read -r account_id service ref status; do
     [[ -n "$ref" ]] || continue
     case "$service" in
       vless|vmess|trojan)
-        if [[ -r "$protocol_db" ]] && jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
+        db_match=1
+        if [[ -r "$protocol_db" ]]; then
+          db_match=0
+          jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
+            'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1 && db_match=1
+        fi
+        native_match=1
+        if (( xray_ok == 1 )); then
+          native_match=0
+          jq -e --arg svc "$service" --arg ref "$ref" \
+            'any(.inbounds[]; .protocol == $svc and any(.settings.clients[]?; .email == $ref))' "$xray_config" >/dev/null 2>&1 && native_match=1
+        fi
+        if [[ "$status" != "revoked" && "$status" != "expired" ]] && { (( db_match == 0 )) || (( native_match == 0 )); }; then
           display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
+          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry record missing from local metadata and/or native config"
           ((registry_only+=1))
         fi ;;
       hysteria)
-        if [[ -r "$hysteria_db" ]] && jq -e --arg id "$account_id" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry entry has no matching local record"
+        db_match=1
+        if [[ -r "$hysteria_db" ]]; then
+          db_match=0
+          jq -e --arg id "$account_id" --arg ref "$ref" \
+            'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1 && db_match=1
+        fi
+        native_match=1
+        if (( hysteria_ok == 1 )); then
+          native_match=0
+          grep -Fxq -- "$ref" <<< "$native_users" && native_match=1
+        fi
+        if [[ "$status" != "revoked" && "$status" != "expired" ]] && { (( db_match == 0 )) || (( native_match == 0 )); }; then
+          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry record missing from local metadata and/or native config"
           ((registry_only+=1))
         fi ;;
       ssh)
-        if getent passwd "$ref" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
+        if ! getent passwd "$ref" >/dev/null 2>&1 && [[ "$status" != "revoked" && "$status" != "expired" ]]; then
           printf '%-12s %-24.24s %s\n' "SSH" "$ref" "registry entry has no matching Linux user"
           ((registry_only+=1))
         fi ;;
     esac
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | @tsv' "$AR_REGISTRY")
+  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | join("|")' "$AR_REGISTRY")
 
   while IFS=: read -r name _ uid _ _ _ shell; do
     [[ "$uid" =~ ^[0-9]+$ ]] && (( uid >= 1000 )) || continue
     [[ "$shell" != */nologin && "$shell" != */false ]] || continue
-    if ! jq -e --arg ref "$name" \
-      'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' \
-      "$AR_REGISTRY" >/dev/null 2>&1; then
+    if ! jq -e --arg ref "$name" 'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' "$AR_REGISTRY" >/dev/null 2>&1; then
       printf '%-12s %-24.24s %s\n' "SSH" "$name" "interactive Linux user not registered (review candidate)"
       ((ssh_candidates+=1))
     fi
   done < <(getent passwd 2>/dev/null || true)
 
+  printf 'Native-only=%s, stale-local=%s\n' "$native_only" "$stale_local"
   printf '\nSummary: local-only=%s, registry-only=%s, unregistered SSH candidates=%s, skipped sources=%s\n' \
     "$local_only" "$registry_only" "$ssh_candidates" "$skipped"
   printf 'Read-only report: no accounts, registry records, or service configurations were changed. SSH candidates may be ordinary Linux users.\n'
@@ -527,71 +357,7 @@ ar_menu() {
     echo
     echo "----- Unified Account Registry -----"
     echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
-    echo "0) Back"
-    read -r -p "Select an option: " choice
-    case "$choice" in
-      1) ar_dashboard; read -r -p "Press Enter to continue..." _ ;;
-      2) ar_reconcile; read -r -p "Press Enter to continue..." _ ;;
-      0) return ;;
-      *) echo "[WARN] Invalid choice." ;;
-    esac
-  done
-}
-\t' read -r account_id service ref status; do
-    [[ -n "$ref" ]] || continue
-    case "$service" in
-      vless|vmess|trojan)
-        if [[ -r "$protocol_db" ]] && jq -e --arg id "$account_id" --arg svc "$service" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      hysteria)
-        if [[ -r "$hysteria_db" ]] && jq -e --arg id "$account_id" --arg ref "$ref" \
-          'any(.[]; .account_id == $id and .username == $ref)' "$hysteria_db" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "HYSTERIA" "$ref" "registry entry has no matching local record"
-          ((registry_only+=1))
-        fi ;;
-      ssh)
-        if getent passwd "$ref" >/dev/null 2>&1; then :
-        elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
-        else
-          printf '%-12s %-24.24s %s\n' "SSH" "$ref" "registry entry has no matching Linux user"
-          ((registry_only+=1))
-        fi ;;
-    esac
-  done < <(jq -r '.accounts[] as $a | $a.services[] | [$a.id,.service,.ref,.status] | @tsv' "$AR_REGISTRY")
-
-  while IFS=: read -r name _ uid _ _ _ shell; do
-    [[ "$uid" =~ ^[0-9]+$ ]] && (( uid >= 1000 )) || continue
-    [[ "$shell" != */nologin && "$shell" != */false ]] || continue
-    if ! jq -e --arg ref "$name" \
-      'any(.accounts[]; any(.services[]; .service == "ssh" and .ref == $ref))' \
-      "$AR_REGISTRY" >/dev/null 2>&1; then
-      printf '%-12s %-24.24s %s\n' "SSH" "$name" "interactive Linux user not registered (review candidate)"
-      ((ssh_candidates+=1))
-    fi
-  done < <(getent passwd 2>/dev/null || true)
-
-  printf '\nSummary: local-only=%s, registry-only=%s, unregistered SSH candidates=%s, skipped sources=%s\n' \
-    "$local_only" "$registry_only" "$ssh_candidates" "$skipped"
-  printf 'Read-only report: no accounts, registry records, or service configurations were changed. SSH candidates may be ordinary Linux users.\n'
-}
-
-ar_list() { ar_dashboard; }
-
-ar_menu() {
-  while true; do
-    echo
-    echo "----- Unified Account Registry -----"
-    echo "1) Refresh unified account dashboard (read-only)"
-    echo "2) Reconcile native accounts against registry (read-only)"
+    echo "2) Reconcile accounts with native configs (read-only)"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
