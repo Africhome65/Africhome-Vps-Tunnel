@@ -19,6 +19,6 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 printf 'AFRICHOME-LICENSE-V1\nid=%s\nexpires=%s\nfingerprint=%s\n' "$licence_id" "$expiry" "$fingerprint" >"$tmp/payload"
 openssl pkeyutl -sign -inkey "$private_key" -rawin -in "$tmp/payload" -out "$tmp/signature"
-payload_b64="$(base64 -w0 "$tmp/payload")"
-signature_b64="$(base64 -w0 "$tmp/signature")"
+payload_b64="$(base64 <"$tmp/payload" | tr -d '\r\n')"
+signature_b64="$(base64 <"$tmp/signature" | tr -d '\r\n')"
 printf '%s.%s\n' "$payload_b64" "$signature_b64"
