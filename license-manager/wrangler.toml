@@ -10,5 +10,5 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "africhome-licences"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "b1a1418e-d55e-4ca6-84d1-52c735cab37e"
 migrations_dir = "migrations"
