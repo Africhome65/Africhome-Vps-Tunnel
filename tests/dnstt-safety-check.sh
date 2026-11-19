@@ -48,6 +48,10 @@ fi
 "
 grep -q 'root-owned regular file with mode 0600' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
 grep -q 'must be a real directory, not a symlink' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -q 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh"
+license_line="$(grep -n 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
+apt_line="$(grep -n '^apt-get update' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
+[[ -n "$license_line" && -n "$apt_line" && "$license_line" -lt "$apt_line" ]] || { echo "DNSTT installer must verify licence before apt changes." >&2; exit 1; }
 
 # Preparing the unit must not stop iodine or activate DNSTT automatically.
 if grep -E -q '^[[:space:]]*systemctl[[:space:]]+(stop|disable|enable|start|restart)[[:space:]]' "$SERVICE"; then
