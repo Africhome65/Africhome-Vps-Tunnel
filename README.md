@@ -64,9 +64,16 @@ Review scripts before running them. Keep VPS console access available when chang
 
 The planned unified account manager, centralized domain/certificate manager, Fail2ban hardening, and optional BitTorrent firewall policy are specified in [the account/domain/security roadmap](docs/ACCOUNT-DOMAIN-SECURITY-ROADMAP.md). This is a staged implementation plan, not a claim that every listed feature is already available. In particular, torrent port filtering is not comprehensive torrent detection, and each protocol must pass its own account lifecycle tests before it is advertised as supported.
 
-## License
+## Licence system
 
-License to be determined.
+- Installation requires a valid, digitally signed Africhome licence key before package installation or persistent system changes.
+- Each licence is bound to one VPS using the SHA-256 hash of `/etc/machine-id` and includes a UTC expiry date.
+- Get the target VPS fingerprint by cloning the repository and running `sudo bash scripts/license.sh fingerprint`. Send that fingerprint to the Africhome licence administrator.
+- The administrator issues the key offline with `bash admin/issue-license.sh /secure/path/private.pem LICENCE_ID YYYY-MM-DD VPS_FINGERPRINT`. The generated one-line key is then supplied to the installer.
+- The installer stores the accepted signed token at `/etc/africhome/license.token` with root-only access (directory mode 0700; file mode 0600).
+- The Ed25519 private signing key is never included in this repository or installed on customer VPSs. Keep the administrator private key offline and backed up securely.
+- VPS binding is a practical clone deterrent, not hardware-backed anti-tamper protection. A root administrator can alter local identifiers or patch local scripts.
+- The installer needs OpenSSL already present to verify the key. It deliberately does not install dependencies before licence verification.
 
 ## Trojan TLS notes
 
