@@ -18,13 +18,27 @@ ssh_tls_valid_hostname(){
   (( ${#value} <= 253 )) || return 1
   [[ "$value" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]]
 }
+ssh_tls_resolve_material(){
+  local path="${1:-}" resolved
+  [[ "$path" =~ ^/[A-Za-z0-9._/-]+$ ]] || return 1
+  if [[ -L "$path" ]]; then
+    [[ "$path" == /etc/letsencrypt/live/* ]] || return 1
+    resolved="$(readlink -f -- "$path")" || return 1
+    [[ "$resolved" == /etc/letsencrypt/archive/* && -f "$resolved" && ! -L "$resolved" ]] || return 1
+  else
+    [[ -f "$path" && ! -L "$path" ]] || return 1
+    resolved="$path"
+  fi
+  printf '%s' "$resolved"
+}
 ssh_tls_check_certificate(){
-  local host="$1" cert="$2" key="$3" cert_pub key_pub
+  local host="$1" cert="$2" key="$3" cert_real key_real cert_pub key_pub
   [[ "$cert" =~ ^/[A-Za-z0-9._/-]+$ ]] || { ssh_tls_error "Certificate path contains unsupported characters."; return 1; }
   [[ "$key" =~ ^/[A-Za-z0-9._/-]+$ ]] || { ssh_tls_error "Private-key path contains unsupported characters."; return 1; }
-  [[ -f "$cert" && ! -L "$cert" && -r "$cert" ]] || { ssh_tls_error "Certificate must be a readable regular file, not a symlink."; return 1; }
-  [[ -f "$key" && ! -L "$key" && -r "$key" ]] || { ssh_tls_error "Private key must be a readable regular file, not a symlink."; return 1; }
-  [[ "$(stat -c '%u:%a' -- "$key" 2>/dev/null)" == "0:600" ]] || { ssh_tls_error "Private key must be root-owned with mode 0600."; return 1; }
+  cert_real="$(ssh_tls_resolve_material "$cert")" || { ssh_tls_error "Certificate must be a regular file or a valid Let's Encrypt live symlink."; return 1; }
+  key_real="$(ssh_tls_resolve_material "$key")" || { ssh_tls_error "Private key must be a regular file or a valid Let's Encrypt live symlink."; return 1; }
+  [[ -r "$cert_real" && -r "$key_real" ]] || { ssh_tls_error "Certificate and key must be readable by root."; return 1; }
+  [[ "$(stat -c '%u:%a' -- "$key_real" 2>/dev/null)" == "0:600" ]] || { ssh_tls_error "Private key must be root-owned with mode 0600."; return 1; }
   openssl x509 -in "$cert" -noout -checkhost "$host" >/dev/null 2>&1 || { ssh_tls_error "Certificate does not cover SNI hostname $host."; return 1; }
   openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1 || { ssh_tls_error "Certificate is expired or invalid."; return 1; }
   openssl pkey -in "$key" -passin pass: -noout >/dev/null 2>&1 || { ssh_tls_error "Private key must be an unencrypted PEM key readable by root."; return 1; }
