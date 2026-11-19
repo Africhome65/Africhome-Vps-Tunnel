@@ -15,6 +15,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Hysteria 2 server management with a user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
+- Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
 
 ## Central routing status
 
