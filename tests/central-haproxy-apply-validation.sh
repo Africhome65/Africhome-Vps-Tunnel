@@ -23,8 +23,12 @@ case "$1" in
   is-enabled) [[ -f "$MOCK_ENABLED" ]] ;;
   enable) touch "$MOCK_ENABLED" ;;
   disable) rm -f "$MOCK_ENABLED" ;;
-  start) [[ "${MOCK_FAIL_START:-0}" != 1 ]] || exit 1; touch "$MOCK_RUNNING" ;;
-  stop) rm -f "$MOCK_RUNNING" ;;
+  start)
+    touch "$MOCK_RUNNING"
+    [[ "${MOCK_FAIL_START:-0}" != 1 ]] || exit 1
+    ;;
+
+  stop) [[ "${MOCK_FAIL_STOP:-0}" != 1 ]] || exit 1; rm -f "$MOCK_RUNNING" ;;
   *) exit 2 ;;
 esac
 MOCK
@@ -61,8 +65,54 @@ grep -q '^original config$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
 if printf 'APPLY\n' | MOCK_FAIL_START=1 bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
   echo "Expected failed-start rollback." >&2; exit 1
 fi
-grep -q '^original config$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+grep -q '^original config
+
+rm -f "$AFRICHOME_HAPROXY_CONFIG_FILE"
+printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply
+grep -q '^    bind 0.0.0.0:80$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+grep -q '^    bind 0.0.0.0:443$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+[[ -f "$MOCK_RUNNING" ]]
+[[ -f "$MOCK_ENABLED" ]]
+[[ "$(stat -c '%a' "$AFRICHOME_HAPROXY_CONFIG_FILE")" == 640 ]]
+compgen -G "$TMP/backups/transaction.*" >/dev/null
+
+echo "Central HAProxy apply transaction validation passed."
+ "$AFRICHOME_HAPROXY_CONFIG_FILE"
 [[ ! -e "$MOCK_RUNNING" ]]
+
+# If stop fails and the service remains active, do not overwrite its live config.
+if printf 'APPLY\n' | MOCK_FAIL_START=1 MOCK_FAIL_STOP=1 bash "$ROOT/scripts/apply-central-haproxy.sh" --apply; then
+  echo "Expected critical stop-failure report." >&2; exit 1
+fi
+grep -q '^    bind 0.0.0.0:80
+
+rm -f "$AFRICHOME_HAPROXY_CONFIG_FILE"
+printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply
+grep -q '^    bind 0.0.0.0:80$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+grep -q '^    bind 0.0.0.0:443$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+[[ -f "$MOCK_RUNNING" ]]
+[[ -f "$MOCK_ENABLED" ]]
+[[ "$(stat -c '%a' "$AFRICHOME_HAPROXY_CONFIG_FILE")" == 640 ]]
+compgen -G "$TMP/backups/transaction.*" >/dev/null
+
+echo "Central HAProxy apply transaction validation passed."
+ "$AFRICHOME_HAPROXY_CONFIG_FILE"
+[[ -f "$MOCK_RUNNING" ]]
+find "$TMP/backups" -name haproxy.cfg -type f -exec grep -q '^original config
+
+rm -f "$AFRICHOME_HAPROXY_CONFIG_FILE"
+printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply
+grep -q '^    bind 0.0.0.0:80$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+grep -q '^    bind 0.0.0.0:443$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
+[[ -f "$MOCK_RUNNING" ]]
+[[ -f "$MOCK_ENABLED" ]]
+[[ "$(stat -c '%a' "$AFRICHOME_HAPROXY_CONFIG_FILE")" == 640 ]]
+compgen -G "$TMP/backups/transaction.*" >/dev/null
+
+echo "Central HAProxy apply transaction validation passed."
+ {} \;
+rm -f "$MOCK_RUNNING"
+printf 'original config\n' > "$AFRICHOME_HAPROXY_CONFIG_FILE"
 
 rm -f "$AFRICHOME_HAPROXY_CONFIG_FILE"
 printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply
