@@ -97,6 +97,10 @@ valid_upstream_host "$upstream_host" || fail "SSH upstream host must be a valid 
 upstream_port="${DNSTT_UPSTREAM##*:}"
 (( 10#$upstream_port >= 1 && 10#$upstream_port <= 65535 )) || fail "SSH upstream port must be between 1 and 65535."
 
+if [[ -e "$UNIT_FILE" || -L "$UNIT_FILE" ]]; then
+  [[ -f "$UNIT_FILE" && ! -L "$UNIT_FILE" && "$(stat -c '%u' "$UNIT_FILE" 2>/dev/null || true)" == "0" ]] || fail "$UNIT_FILE must be a root-owned regular file; refusing to replace an unsafe path."
+fi
+
 install -d -m 0700 "$KEY_DIR"
 tmp="$(mktemp "$KEY_DIR/service.env.XXXXXX")"
 chmod 0600 "$tmp"
@@ -110,9 +114,6 @@ fi
 mv -f "$tmp" "$SERVICE_CONFIG"
 chmod 0600 "$SERVICE_CONFIG"
 
-if [[ -e "$UNIT_FILE" || -L "$UNIT_FILE" ]]; then
-  [[ -f "$UNIT_FILE" && ! -L "$UNIT_FILE" && "$(stat -c '%u' "$UNIT_FILE" 2>/dev/null || true)" == "0" ]] || fail "$UNIT_FILE must be a root-owned regular file; refusing to replace an unsafe path."
-fi
 unit_tmp="$(mktemp)"
 cat > "$unit_tmp" <<'UNIT'
 [Unit]
