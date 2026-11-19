@@ -9,7 +9,7 @@
 - Read-only listener/service inventory.
 - Central TCP 443 SNI, TCP 80 HTTP Host/path, and combined HAProxy configuration renderers. These generate and validate candidates only.
 - Native OpenVPN UDP/TCP setup, Easy-RSA CA, server/client certificate lifecycle, client profiles, revocation, service status, and read-only inventory.
-- Protected backup collection and staged restore now include `/etc/openvpn` and the OpenVPN state file.
+- Protected backup collection and staged restore now include `/etc/openvpn`, `/etc/stunnel`, the OpenVPN state file, and Africhome systemd units.
 
 ## Still required before production
 
