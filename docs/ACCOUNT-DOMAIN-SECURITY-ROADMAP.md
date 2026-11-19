@@ -1,6 +1,6 @@
 # Account, Domain, and Security Management Roadmap
 
-Status: implementation specification; not yet implemented as a unified feature set.
+Status: partially implemented on the development branch; this remains an implementation roadmap, not a claim that every listed control is complete.
 
 ## Current implementation status (development branch)
 
