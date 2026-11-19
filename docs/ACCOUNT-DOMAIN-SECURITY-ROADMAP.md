@@ -119,7 +119,7 @@ Add optional connection/rate limits for supported services, with safe defaults a
 
 The security menu now includes a read-only audit covering effective SSH settings, listening sockets, security service states, firewall summaries, recent SSH authentication failures, and the Africhome torrent filter. It does not alter system configuration.
 
-Fail2ban integration detects effective SSH ports, preserves an existing Africhome jail drop-in, validates configuration before restart, checks service/jail health, and exposes status, banned IP listing, and confirmed IP unban. The SSH jail uses the systemd journal backend with conservative thresholds. This still needs a live-host check that SSH authentication events are available in the journal before it is enabled.
+Fail2ban integration detects effective SSH ports, preserves an existing Africhome jail drop-in, validates configuration before restart, checks service/jail health, and exposes status, banned IP listing, and confirmed IP unban. The SSH jail now requires a readable auth log containing actual sshd records, then uses Fail2ban's auto backend with that detected log path and conservative thresholds. If neither supported auth log contains SSH records, the module refuses to create or enable the jail.
 
 The optional torrent filter is limited to common host INPUT/OUTPUT ports. It is runtime-only, does not cover forwarded tunnel traffic, and cannot reliably identify all BitTorrent use.
 
