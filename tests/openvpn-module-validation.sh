@@ -11,6 +11,7 @@ ovpn_valid_name client_01
 ! ovpn_valid_name ../escape
 ! ovpn_valid_name "client name"
 ovpn_valid_remote vpn.example.com
+! ovpn_valid_remote "$(printf 'a%.0s' {1..250}).com"
 ovpn_valid_remote 192.0.2.10
 ! ovpn_valid_remote 999.1.1.1
 ! ovpn_valid_remote https://vpn.example.com
