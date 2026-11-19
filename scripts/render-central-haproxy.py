@@ -50,7 +50,8 @@ def render(tls_routes, http_routes) -> str:
         http_start = http_config.index("frontend africhome_http_80")
     except ValueError as exc:
         raise ConfigError("HTTP renderer did not produce its expected frontend") from exc
-    return tls_config + "\n\n" + "\n".join(http_config[http_start:]) + "\n"
+    http_fragment = "\n".join(http_config[http_start:]).replace("be_unmatched", "be_http_unmatched")
+    return tls_config + "\n\n" + http_fragment + "\n"
 
 
 def main(argv: list[str]) -> int:
