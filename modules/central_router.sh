@@ -85,6 +85,7 @@ cr_check_route_collisions(){
     key="$transport/$port"
     if [[ "$hostname" == "-" ]]; then hostname=""; fi
     if [[ -n "$hostname" ]]; then
+      [[ "$transport" == tcp ]] || { cr_error "UDP routes cannot use hostname/SNI matching."; return 2; }
       cr_valid_hostname "$hostname" || { cr_error "Invalid hostname in route list."; return 2; }
       hostname="${hostname,,}"
     fi
