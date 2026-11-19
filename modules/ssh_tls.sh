@@ -20,6 +20,8 @@ ssh_tls_valid_hostname(){
 }
 ssh_tls_check_certificate(){
   local host="$1" cert="$2" key="$3" cert_pub key_pub
+  [[ "$cert" =~ ^/[A-Za-z0-9._/-]+$ ]] || { ssh_tls_error "Certificate path contains unsupported characters."; return 1; }
+  [[ "$key" =~ ^/[A-Za-z0-9._/-]+$ ]] || { ssh_tls_error "Private-key path contains unsupported characters."; return 1; }
   [[ -f "$cert" && ! -L "$cert" && -r "$cert" ]] || { ssh_tls_error "Certificate must be a readable regular file, not a symlink."; return 1; }
   [[ -f "$key" && ! -L "$key" && -r "$key" ]] || { ssh_tls_error "Private key must be a readable regular file, not a symlink."; return 1; }
   openssl x509 -in "$cert" -noout -checkhost "$host" >/dev/null 2>&1 || { ssh_tls_error "Certificate does not cover SNI hostname $host."; return 1; }
@@ -113,11 +115,6 @@ ssh_tls_configure(){
   chmod 0600 "$conf_tmp"
   chown root:root "$conf_tmp" "$unit_tmp"
   chmod 0644 "$unit_tmp"
-  stunnel4 -test -f "$conf_tmp" >/dev/null 2>&1 || {
-    rm -f "$conf_tmp" "$unit_tmp"
-    ssh_tls_error "stunnel rejected the candidate configuration; no service was changed."
-    return 1
-  }
   if ! mv -n -- "$conf_tmp" "$SSH_TLS_CONFIG" || [[ -e "$conf_tmp" ]]; then
     rm -f "$conf_tmp" "$unit_tmp"
     ssh_tls_error "Could not safely install stunnel config."; return 1
