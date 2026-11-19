@@ -69,7 +69,7 @@ ovpn_port_available(){
   fi
 }
 ovpn_write_server_config(){
-  local output="$1" port="$2" proto="$3"
+  local output="$1" port="$2" proto="$3" runtime_dir="$4"
   cat > "$output" <<EOF
 port $port
 proto $proto
@@ -85,11 +85,11 @@ persist-tun
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
 auth SHA256
 tls-version-min 1.2
-tls-crypt $OVPN_EASYRSA_DIR/pki/ta.key
-ca $OVPN_EASYRSA_DIR/pki/ca.crt
-cert $OVPN_EASYRSA_DIR/pki/issued/server.crt
-key $OVPN_EASYRSA_DIR/pki/private/server.key
-crl-verify $OVPN_EASYRSA_DIR/pki/crl.pem
+tls-crypt $runtime_dir/ta.key
+ca $runtime_dir/ca.crt
+cert $runtime_dir/server.crt
+key $runtime_dir/server.key
+crl-verify $runtime_dir/crl.pem
 dh none
 ecdh-curve prime256v1
 status /var/log/openvpn/africhome-status.log
@@ -115,7 +115,8 @@ ovpn_configure_server(){
   ovpn_valid_port "$port" || { ovpn_error "Invalid port."; return 1; }
   ovpn_port_available "$proto" "$port" || { ovpn_error "$proto/$port is already in use."; return 1; }
 
-  install -d -m 0755 "$OVPN_CONFIG_DIR" /var/log/openvpn
+  install -d -m 0755 "$OVPN_CONFIG_DIR"
+  install -d -o nobody -g nogroup -m 0750 /var/log/openvpn
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa gen-req server nopass || return 1
     ovpn_easyrsa sign-req server server || return 1
@@ -125,17 +126,19 @@ ovpn_configure_server(){
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
   fi
+  install -d -o root -g nogroup -m 0750 "$OVPN_RUNTIME_DIR" || return 1
+  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" 2>/dev/null || true
+  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_RUNTIME_DIR/server.key" || return 1
+  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_RUNTIME_DIR/ca.crt" || return 1
+  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/issued/server.crt" "$OVPN_RUNTIME_DIR/server.crt" || return 1
+  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem" || return 1
   tmp="$(mktemp "$OVPN_CONFIG_DIR/.africhome.XXXXXX")" || return 1
   backup=""
-  ovpn_write_server_config "$tmp" "$port" "$proto"
+  ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR"
   chmod 0640 "$tmp"
   chown root:nogroup "$tmp"
   mv -n -- "$tmp" "$OVPN_CONFIG" || { rm -f "$tmp"; ovpn_error "Config path appeared during setup; refusing overwrite."; return 1; }
-  chmod 0640 "$OVPN_EASYRSA_DIR/pki/ta.key"
-  chown root:nogroup "$OVPN_EASYRSA_DIR/pki/ta.key"
-  chmod 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key"
-  chown root:nogroup "$OVPN_EASYRSA_DIR/pki/private/server.key"
-  chmod 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_EASYRSA_DIR/pki/issued/server.crt" "$OVPN_EASYRSA_DIR/pki/crl.pem"
+  chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"
   if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE"; then
     backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
     mv -- "$OVPN_CONFIG" "$backup"
@@ -215,7 +218,7 @@ ovpn_revoke_client(){
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   ovpn_easyrsa revoke "$name" || return 1
   ovpn_easyrsa gen-crl || return 1
-  chmod 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem"
+  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem" || return 1
   systemctl restart "$OVPN_SERVICE" || { ovpn_error "CRL generated but OpenVPN restart failed; check service status."; return 1; }
   rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn"
   ah_ok "Client $name revoked; CRL installed and service restarted."
