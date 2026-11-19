@@ -198,13 +198,13 @@ cr_render_reality_backend_candidate(){
     return 1
   }
   read -r -p "Source Xray config [$source]: " answer
-  source="\${answer:-$source}"
+  source="${answer:-$source}"
   [[ -f "$source" && ! -L "$source" ]] || {
     ah_err "Source must be an existing regular file, not a symlink."
     return 1
   }
   read -r -p "Loopback backend port [1443]: " port
-  port="\${port:-1443}"
+  port="${port:-1443}"
   [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1024 && 10#$port <= 65535 )) || {
     ah_err "Backend port must be between 1024 and 65535."
     return 1
