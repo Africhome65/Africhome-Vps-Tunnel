@@ -16,7 +16,7 @@ ssh_tls_valid_hostname vpn.xn--p1ai
 # Directory safety checks use mocked ownership metadata so CI need not run as root.
 TMP="$(mktemp -d)"
 MOCK_DIR_METADATA="0:755"
-stat(){ printf '%s\\n' "$MOCK_DIR_METADATA"; }
+stat(){ printf '%s\n' "$MOCK_DIR_METADATA"; }
 ssh_tls_safe_directory "$TMP"
 MOCK_DIR_METADATA="0:775"
 ! ssh_tls_safe_directory "$TMP"
