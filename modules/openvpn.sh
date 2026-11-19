@@ -107,8 +107,8 @@ ovpn_init_pki(){
   fi
   # Build the CA in a private staging directory. Publish the complete PKI
   # atomically only after both initialization and CA creation succeed.
-  if ! (cd "$tmpdir" && EASYRSA_BATCH=1 ./easyrsa init-pki) ||
-     ! (cd "$tmpdir" && EASYRSA_BATCH=1 ./easyrsa --batch --req-cn=Africhome-CA build-ca nopass); then
+  if ! (cd "$tmpdir" && umask 077 && EASYRSA_BATCH=1 ./easyrsa init-pki) ||
+     ! (cd "$tmpdir" && umask 077 && EASYRSA_BATCH=1 ./easyrsa --batch --req-cn=Africhome-CA build-ca nopass); then
     rm -rf -- "$tmpdir"
     ovpn_error "CA initialization failed. No partial PKI directory was published."
     return 1
