@@ -14,17 +14,19 @@ line_of(){
 root_check="$(line_of '[[ "$EUID" -eq 0 ]]')"
 os_check="$(line_of 'case "$OS_ID" in')"
 symlink_check="$(line_of 'if [[ -L "$INSTALL_DIR" ]]')"
-checkout_check="$(line_of 'if [[ -e "$INSTALL_DIR" && ! -d "$INSTALL_DIR/.git" ]]')"
+checkout_check="$(line_of 'if [[ -e "$INSTALL_DIR" && ( ! -d "$INSTALL_DIR/.git" || -L "$INSTALL_DIR/.git" ) ]]')"
+git_metadata_check="$(line_of 'if [[ -d "$INSTALL_DIR/.git" && ! -L "$INSTALL_DIR/.git" ]]')"
 clean_check="$(line_of 'git -C "$INSTALL_DIR" status --porcelain --untracked-files=all')"
 license_check="$(line_of 'bash "$SCRIPT_DIR/scripts/license.sh" verify')"
 apt_update="$(line_of 'apt-get update')"
 fetch_reset="$(line_of 'git -C "$INSTALL_DIR" reset --hard')"
 
 (( root_check < os_check && os_check < symlink_check ))
-(( symlink_check < checkout_check && checkout_check < clean_check ))
+(( symlink_check < checkout_check && checkout_check < git_metadata_check && git_metadata_check < clean_check ))
 (( clean_check < license_check && license_check < apt_update ))
 (( license_check < fetch_reset && apt_update < fetch_reset ))
 
 grep -Fq '[[ -r "$SCRIPT_DIR/scripts/license.sh" ]]' "$FILE"
+grep -Fq '|| -L "$INSTALL_DIR/.git"' "$FILE"
 grep -Fq 'git -C "$INSTALL_DIR" status --porcelain --untracked-files=all' "$FILE"
 echo "Installer ordering and overwrite safeguards validation passed."
