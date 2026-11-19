@@ -132,47 +132,69 @@ xray_add_sni() {
   [[ "$new_sni" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$new_sni" != *..* ]] || { ah_err "Enter a valid DNS hostname."; return 1; }
   # shellcheck disable=SC1090
   . "$XRAY_ENV"
-  local backup_config
-  backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)"
-  cp -a "$XRAY_CONFIG" "$backup_config" || { ah_err "Could not back up the current Xray configuration."; return 1; }
-  if ! python3 - "$XRAY_CONFIG" "$new_sni" <<'PY'
-import json, sys
-path, name = sys.argv[1], sys.argv[2]
-with open(path, encoding="utf-8") as f:
-    config = json.load(f)
-settings = config["inbounds"][0]["streamSettings"]["realitySettings"]
-names = settings.get("serverNames", [])
-if name not in names:
-    names.append(name)
-settings["serverNames"] = names
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(config, f, indent=2)
-    f.write("\\n")
-PY
-  then
-    cp -a "$backup_config" "$XRAY_CONFIG"
-    ah_err "Could not update the SNI list; the previous configuration was restored."
+  local backup_config backup_env env_tmp module_dir
+  module_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  backup_config="${XRAY_CONFIG}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)-$"
+  backup_env="${XRAY_ENV}.africhome-sni-backup-$(date +%Y%m%d%H%M%S)-$"
+  env_tmp="$(mktemp "${XRAY_ENV}.tmp.XXXXXX")" || { ah_err "Could not prepare a temporary client environment file."; return 1; }
+  if ! cp -a "$XRAY_CONFIG" "$backup_config" || ! cp -a "$XRAY_ENV" "$backup_env" || ! cp -a "$XRAY_ENV" "$env_tmp"; then
+    rm -f "$env_tmp"
+    ah_err "Could not back up the current Xray configuration and client environment."
     return 1
   fi
-  chown root:xray "$XRAY_CONFIG"
-  chmod 640 "$XRAY_CONFIG"
+  if ! python3 "$module_dir/scripts/update-reality-sni.py" "$XRAY_CONFIG" "$new_sni"; then
+    rm -f "$env_tmp"
+    ah_err "Could not update the SNI list; the previous configuration was retained."
+    return 1
+  fi
+  chown root:xray "$XRAY_CONFIG" && chmod 640 "$XRAY_CONFIG" || {
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    rm -f "$env_tmp"
+    ah_err "Could not preserve Xray configuration permissions; the previous configuration was restored."
+    return 1
+  }
   if ! xray run -test -config "$XRAY_CONFIG"; then
     cp -a "$backup_config" "$XRAY_CONFIG"
+    rm -f "$env_tmp"
     ah_err "Xray rejected the updated SNI list; the previous configuration was restored."
     return 1
   fi
+  if grep -q '^XRAY_SERVER_NAME=' "$env_tmp"; then
+    sed -i "s/^XRAY_SERVER_NAME=.*/XRAY_SERVER_NAME=$new_sni/" "$env_tmp" || {
+      cp -a "$backup_config" "$XRAY_CONFIG"
+      rm -f "$env_tmp"
+      ah_err "Could not prepare the client environment update; configuration restored."
+      return 1
+    }
+  else
+    printf 'XRAY_SERVER_NAME=%s\n' "$new_sni" >> "$env_tmp" || {
+      cp -a "$backup_config" "$XRAY_CONFIG"
+      rm -f "$env_tmp"
+      ah_err "Could not prepare the client environment update; configuration restored."
+      return 1
+    }
+  fi
+  chown root:root "$env_tmp" && chmod 600 "$env_tmp" || {
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    rm -f "$env_tmp"
+    ah_err "Could not secure the client environment update; configuration restored."
+    return 1
+  }
   if ! systemctl restart xray; then
     cp -a "$backup_config" "$XRAY_CONFIG"
     systemctl restart xray >/dev/null 2>&1 || true
+    rm -f "$env_tmp"
     ah_err "Xray failed to restart; the previous configuration was restored."
     return 1
   fi
-  if grep -q '^XRAY_SERVER_NAME=' "$XRAY_ENV"; then
-    sed -i "s/^XRAY_SERVER_NAME=.*/XRAY_SERVER_NAME=$new_sni/" "$XRAY_ENV"
-  else
-    printf 'XRAY_SERVER_NAME=%s\\n' "$new_sni" >> "$XRAY_ENV"
+  if ! mv -f "$env_tmp" "$XRAY_ENV"; then
+    cp -a "$backup_config" "$XRAY_CONFIG"
+    cp -a "$backup_env" "$XRAY_ENV"
+    systemctl restart xray >/dev/null 2>&1 || true
+    rm -f "$env_tmp"
+    ah_err "Could not save the client environment; server and client settings were rolled back."
+    return 1
   fi
-  chmod 600 "$XRAY_ENV"
   ah_ok "SNI hostname added and selected: $new_sni"
   ah_info "The client URI will now use this SNI. The REALITY destination remains unchanged."
   ah_warn "This hostname is accepted by Xray only; it must also be compatible with the configured REALITY destination to connect successfully."

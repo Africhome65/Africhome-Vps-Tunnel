@@ -2,20 +2,29 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/wireguard.sh" && -f "$BASE_DIR/modules/slowdns.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" ]] || {
+[[ -f "$BASE_DIR/scripts/update-reality-sni.py" && -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" && -f "$BASE_DIR/modules/openvpn.sh" && -f "$BASE_DIR/modules/ssh_tls.sh" && -f "$BASE_DIR/modules/central_router.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
 . "$BASE_DIR/lib/common.sh"
 . "$BASE_DIR/modules/security.sh"
 . "$BASE_DIR/modules/ssh_users.sh"
-. "$BASE_DIR/modules/wireguard.sh"
-. "$BASE_DIR/modules/slowdns.sh"
+. "$BASE_DIR/modules/port_routing.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
 . "$BASE_DIR/modules/trojan.sh"
 . "$BASE_DIR/modules/shadowsocks.sh"
 . "$BASE_DIR/modules/protocol_users.sh"
+. "$BASE_DIR/modules/account_registry.sh"
+. "$BASE_DIR/modules/hysteria.sh"
+. "$BASE_DIR/modules/hysteria_users.sh"
+. "$BASE_DIR/modules/domain_manager.sh"
+. "$BASE_DIR/modules/cert_deploy.sh"
+. "$BASE_DIR/modules/backup.sh"
+. "$BASE_DIR/modules/service_modes.sh"
+. "$BASE_DIR/modules/openvpn.sh"
+. "$BASE_DIR/modules/ssh_tls.sh"
+. "$BASE_DIR/modules/central_router.sh"
 
 while true; do
   clear
@@ -26,15 +35,28 @@ while true; do
   echo "1) System information"
   echo "2) Security management"
   echo "3) SSH account management"
-  echo "4) WireGuard management"
-  echo "5) SlowDNS SSH management"
-  echo "6) Xray management (VLESS REALITY)"
-  echo "7) VMess management (WebSocket + TLS)"
-  echo "8) Trojan management (TLS)"
-  echo "9) Shadowsocks management"
-  echo "10) Protocol account management (expiry)"
-  echo "11) Other protocols (under development)"
-  echo "12) Installation information"
+  echo "4) Xray management (VLESS REALITY)"
+  echo "5) VMess management (WebSocket + TLS)"
+  echo "6) Trojan management (TLS)"
+  echo "7) Shadowsocks management"
+  echo "8) Protocol account management (expiry)"
+  echo "9) Hysteria 2 management (custom domain + UDP port)"
+  echo "10) Port & routing manager (read-only discovery)"
+  echo "11) Unified account registry (Xray/SSH/Hysteria accounts)"
+  echo "12) Central domain & certificate manager"
+  echo "13) Certificate deployment targets"
+  echo "14) Installation information"
+  echo "15) Backups and staged restore"
+  echo "16) Requested service modes and compatibility notes"
+  echo "17) Read-only Xray inbound inventory"
+  echo "18) Read-only DNSTT deployment inventory"
+  echo "19) Read-only OpenVPN deployment inventory"
+  echo "20) OpenVPN server and certificate management"
+  echo "21) Generate central HAProxy candidate (no live changes)"
+  echo "22) Read-only central-router preflight (no changes)"
+  echo "23) SSH over TLS backend (loopback only)"
+  echo "24) Guarded HAProxy apply (requires TCP 80/443 to be free)"
+  echo "25) Generate VLESS REALITY loopback backend candidate (no live changes)"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -48,15 +70,33 @@ while true; do
       ;;
     2) security_menu ;;
     3) ssh_users_menu ;;
-    4) wg_menu ;;
-    5) slowdns_menu ;;
-    6) xray_menu ;;
-    7) vmess_menu ;;
-    8) trojan_menu ;;
-    9) shadowsocks_menu ;;
-    10) pu_menu ;;
-    11) echo "Other protocols are not implemented yet."; ah_pause ;;
-    12) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    4) xray_menu ;;
+    5) vmess_menu ;;
+    6) trojan_menu ;;
+    7) shadowsocks_menu ;;
+    8) pu_menu ;;
+    9) hy2_menu ;;
+    10) pr_port_routing_menu ;;
+    11) ar_menu ;;
+    12) dm_menu ;;
+    13) cd_menu ;;
+    14) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    15) backup_menu ;;
+    16) af_modes_menu ;;
+    17) bash "$BASE_DIR/scripts/xray-inventory.sh"; ah_pause ;;
+    18) bash "$BASE_DIR/scripts/dnstt-inventory.sh"; ah_pause ;;
+    19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
+    20) ovpn_menu ;;
+    21) cr_render_candidate; ah_pause ;;
+    22) bash "$BASE_DIR/scripts/central-router-preflight.sh"; ah_pause ;;
+    23) ssh_tls_menu ;;
+    24)
+      ah_warn "This starts HAProxy on public TCP 80 and 443. Existing listeners will cause a safe refusal."
+      read -r -p "Proceed to guarded activation checks? [y/N]: " apply_confirm
+      if [[ "$apply_confirm" =~ ^[Yy]$ ]]; then bash "$BASE_DIR/scripts/apply-central-haproxy.sh" --apply; fi
+      ah_pause
+      ;;
+    25) cr_render_reality_backend_candidate; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac

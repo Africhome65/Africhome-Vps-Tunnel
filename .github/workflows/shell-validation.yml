@@ -2,9 +2,9 @@ name: Shell validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'repair/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'feature/**']
 
 jobs:
   bash-validation:
@@ -12,6 +12,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Install YAML test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
       - name: Check Bash syntax
         shell: bash
         run: |
@@ -20,8 +24,62 @@ jobs:
             echo "Checking $file"
             bash -n "$file"
           done < <(find . -type f -name '*.sh' -print0)
-      - name: Run ShellCheck errors
+      - name: Test installer safety and licence ordering
+        run: bash tests/installer-safety-validation.sh
+      - name: Test Hysteria input validation
+        run: bash tests/hysteria-validation.sh
+      - name: Test security module safeguards
+        run: bash tests/security-validation.sh
+      - name: Test protected backups, retention, and staged restore
+        run: bash tests/backup-validation.sh
+      - name: Test privacy-safe admin audit logging
+        run: bash tests/admin-audit-validation.sh
+      - name: Test account-management audit integration
+        run: bash tests/account-audit-integration-validation.sh
+      - name: Test read-only port routing inventory
+        run: bash tests/port-routing-validation.sh
+      - name: Test SSH TLS backend
+        run: bash tests/ssh-tls-validation.sh
+      - name: Test native OpenVPN management module
+        run: bash tests/openvpn-module-validation.sh
+      - name: Test Xray and OpenVPN inventory privacy
+        run: bash tests/service-inventory-validation.sh
+      - name: Test DNSTT inventory privacy
+        run: bash tests/dnstt-inventory-validation.sh
+      - name: Test protocol account config permissions
+        run: bash tests/protocol-users-validation.sh
+      - name: Test Xray config ownership and service readability
+        run: bash tests/xray-config-permissions-validation.sh
+      - name: Test atomic Xray REALITY SNI updates
+        run: python3 tests/xray-reality-sni-validation.py
+      - name: Test candidate-only REALITY loopback backend renderer
+        run: python3 tests/reality-backend-render-validation.py
+      - name: Test central account registry
+        run: bash tests/account-registry-validation.sh
+      - name: Test Hysteria userpass account adapter
+        run: bash tests/hysteria-users-validation.sh
+      - name: Test central domain manager
+        run: bash tests/domain-manager-validation.sh
+      - name: Test certificate deployment safety
+        run: bash tests/cert-deploy-validation.sh
+      - name: Install isolated routing test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck
+          sudo apt-get install -y shellcheck haproxy openssl iproute2 jq python3-yaml
+      - name: Test central-router route validation and menu wiring
+        run: bash tests/central-router-validation.sh
+      - name: Test read-only central-router preflight
+        run: sudo bash tests/central-router-preflight-validation.sh
+      - name: Test HAProxy ordinary TLS SNI passthrough
+        run: bash tests/haproxy-sni-validation.sh
+      - name: Test HAProxy central-router config renderer
+        run: python3 tests/central-router-render-validation.py
+      - name: Test HAProxy HTTP Host path renderer
+        run: python3 tests/http-router-render-validation.py
+      - name: Test combined HAProxy TCP 80 and 443 renderer
+        run: python3 tests/central-haproxy-render-validation.py
+      - name: Test guarded HAProxy apply and rollback transaction
+        run: sudo bash tests/central-haproxy-apply-validation.sh
+      - name: Run ShellCheck errors
+        run: |
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck --severity=error

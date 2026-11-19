@@ -1,0 +1,14 @@
+name: Shell syntax validation
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  bash-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate changed shell entry points
+        run: bash -n install.sh menu.sh modules/hysteria.sh modules/port_routing.sh modules/domain_manager.sh modules/cert_deploy.sh scripts/africhome-cert-deploy-hook.sh tests/port-routing-validation.sh tests/haproxy-sni-validation.sh tests/domain-manager-validation.sh tests/cert-deploy-validation.sh
