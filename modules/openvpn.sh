@@ -192,7 +192,7 @@ ovpn_add_client(){
   cat > "$tmp" <<EOF
 client
 dev tun
-proto $OVPN_PROTO
+proto $(ovpn_client_proto "$OVPN_PROTO")
 remote $OVPN_REMOTE $OVPN_PORT
 resolv-retry infinite
 nobind
