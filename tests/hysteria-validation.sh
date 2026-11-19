@@ -88,7 +88,7 @@ check_listener_result() {
 SS_MODE="free"; check_listener_result "free requested ports accepted" 0
 SS_MODE="fail-udp"; check_listener_result "UDP inventory failure refuses setup" 1
 SS_MODE="fail-tcp"; check_listener_result "TCP inventory failure refuses setup" 1
-SS_MODE="udp-busy"; check_listener_result "UDP listener in requested range blocks setup" 1
+SS_MODE="udp-busy"; check_listener_result "UDP listener in requested range blocks setup" 1 24000 24000
 SS_MODE="tcp-busy"; check_listener_result "TCP port 80 listener blocks setup" 1
 SS_MODE="near-port"; check_listener_result "nearby UDP port 21194 does not collide with 1194" 0
 unset -f ss ah_err
