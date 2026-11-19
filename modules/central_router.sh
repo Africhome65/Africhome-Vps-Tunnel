@@ -60,9 +60,10 @@ cr_validate_route(){
   if [[ "$hostname" != "-" ]]; then
     cr_valid_hostname "$hostname" || { cr_error "Invalid hostname/SNI."; return 1; }
   fi
-  local expected_transport expected_port
+  local expected_transport expected_port_status expected_port
   expected_transport="${expected%%/*}"
-  expected_port="${expected#*/}"
+  expected_port_status="${expected#*/}"
+  expected_port="${expected_port_status%%:*}"
   [[ "$transport" == "$expected_transport" ]] || { cr_error "$mode expects $expected_transport transport."; return 1; }
   [[ "$expected_port" == custom || "$public_port" == "$expected_port" ]] || {
     cr_error "$mode expects public port $expected_port."; return 1;
