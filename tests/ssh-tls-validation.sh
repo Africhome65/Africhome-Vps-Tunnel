@@ -48,7 +48,216 @@ grep -q '^RestrictSUIDSGID=true$' "$TMP/service.unit"
 grep -q '^LockPersonality=true$' "$TMP/service.unit"
 grep -q '^MemoryDenyWriteExecute=true$' "$TMP/service.unit"
 grep -q '^RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX$' "$TMP/service.unit"
-grep -q '^SystemCallArchitectures=native$' "$TMP/service.unit"
+grep -q '^SystemCallArchitectures=native
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
+grep -q '^TimeoutStartSec=30
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
+grep -q '^TimeoutStopSec=15
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
+grep -q '^KillMode=control-group
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
+grep -q '^TasksMax=64
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
+grep -q '^LimitNOFILE=4096
+# Rollback removes files only after confirming that the service stopped.
+SSH_TLS_SERVICE="africhome-ssh-tls.service"
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=0
+systemctl(){
+  case "$1" in
+    stop) [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1; MOCK_ACTIVE=0 ;;
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    disable) MOCK_ENABLED=0 ;;
+    daemon-reload) return 0 ;;
+    *) return 2 ;;
+  esac
+}
+ROLLBACK_CONF="$TMP/rollback.conf"
+ROLLBACK_UNIT="$TMP/rollback.unit"
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ ! -e "$ROLLBACK_CONF" && ! -e "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 0 ]]
+
+# If stop fails and the process remains active, retain both files.
+MOCK_ACTIVE=1
+MOCK_ENABLED=1
+MOCK_STOP_FAIL=1
+printf 'config\n' > "$ROLLBACK_CONF"
+printf 'unit\n' > "$ROLLBACK_UNIT"
+! ssh_tls_rollback_failed_start "$ROLLBACK_CONF" "$ROLLBACK_UNIT"
+[[ -f "$ROLLBACK_CONF" && -f "$ROLLBACK_UNIT" && "$MOCK_ENABLED" == 1 ]]
+unset -f systemctl
+
+echo "SSH TLS backend validation passed."
+ "$TMP/service.unit"
 
 # Rollback removes files only after confirming that the service stopped.
 SSH_TLS_SERVICE="africhome-ssh-tls.service"
