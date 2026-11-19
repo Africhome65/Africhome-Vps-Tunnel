@@ -140,3 +140,46 @@ cr_pick_udp_port(){
   cr_error "No free UDP port in requested range."
   return 1
 }
+
+# Render a reviewed candidate only. This never installs or reloads HAProxy.
+cr_render_candidate(){
+  ah_require_root || return 1
+  command -v python3 >/dev/null 2>&1 || { ah_err "python3 is required."; return 1; }
+  local manifest output tmp
+  output="/root/africhome-haproxy-candidate.cfg"
+  [[ ! -e "$output" && ! -L "$output" ]] || {
+    ah_err "Candidate already exists at $output. Review or move it manually before generating another."
+    return 1
+  }
+  read -r -p "Path to the combined routes JSON manifest: " manifest
+  [[ -n "$manifest" && -f "$manifest" && ! -L "$manifest" ]] || {
+    ah_err "Manifest must be an existing regular file, not a symlink."
+    return 1
+  }
+  [[ -f "$BASE_DIR/scripts/render-central-haproxy.py" ]] || {
+    ah_err "Combined HAProxy renderer is missing."
+    return 1
+  }
+  tmp="$(mktemp /root/.africhome-haproxy-candidate.XXXXXX)" || return 1
+  if ! python3 "$BASE_DIR/scripts/render-central-haproxy.py" "$manifest" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod 0600 "$tmp" || { rm -f "$tmp"; return 1; }
+  if command -v haproxy >/dev/null 2>&1; then
+    if ! haproxy -c -f "$tmp"; then
+      rm -f "$tmp"
+      ah_err "HAProxy rejected the candidate; no system configuration was changed."
+      return 1
+    fi
+  else
+    ah_warn "HAProxy is not installed here; candidate syntax was not checked by the HAProxy binary."
+  fi
+  if ! mv -n -- "$tmp" "$output" || [[ -e "$tmp" ]]; then
+    rm -f "$tmp"
+    ah_err "Could not safely save the candidate file."
+    return 1
+  fi
+  ah_ok "Candidate configuration saved: $output"
+  ah_warn "This file has not been applied. Do not replace /etc/haproxy/haproxy.cfg until all backends, listeners, backups and rollback steps are reviewed."
+}
