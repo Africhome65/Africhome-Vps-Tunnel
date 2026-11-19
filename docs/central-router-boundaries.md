@@ -117,3 +117,10 @@ backends exist, that a particular client protocol is compatible, or that a
 live listener can safely be migrated. Do not apply it to the live VPS until
 backend modules, port ownership, service rollback, and client interoperability
 have all been verified.
+
+
+The terminal menu also provides a **Generate central HAProxy candidate** action.
+It reads a user-supplied regular JSON manifest, validates and renders it, and
+stores a root-only candidate at `/root/africhome-haproxy-candidate.cfg`.
+When HAProxy is installed, its parser checks the candidate. This action never
+writes `/etc/haproxy`, binds ports, changes firewall rules, or reloads services.
