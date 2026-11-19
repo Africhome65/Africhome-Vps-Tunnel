@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Guarded HAProxy apply transaction. Requires a free-port preflight and explicit confirmation.
 set -Eeuo pipefail
-CANDIDATE="\${AFRICHOME_HAPROXY_CANDIDATE:-/root/africhome-haproxy-candidate.cfg}"
-CONFIG_DIR="\${AFRICHOME_HAPROXY_CONFIG_DIR:-/etc/haproxy}"
-CONFIG_FILE="\${AFRICHOME_HAPROXY_CONFIG_FILE:-$CONFIG_DIR/haproxy.cfg}"
-BACKUP_ROOT="\${AFRICHOME_HAPROXY_BACKUP_ROOT:-/var/backups/africhome-haproxy}"
-LOCK_FILE="\${AFRICHOME_HAPROXY_LOCK_FILE:-/run/lock/africhome-haproxy-apply.lock}"
-HAPROXY_BIN="\${AFRICHOME_HAPROXY_BIN:-haproxy}"
-SYSTEMCTL_BIN="\${AFRICHOME_SYSTEMCTL_BIN:-systemctl}"
-SS_BIN="\${AFRICHOME_SS_BIN:-ss}"
+CANDIDATE="${AFRICHOME_HAPROXY_CANDIDATE:-/root/africhome-haproxy-candidate.cfg}"
+CONFIG_DIR="${AFRICHOME_HAPROXY_CONFIG_DIR:-/etc/haproxy}"
+CONFIG_FILE="${AFRICHOME_HAPROXY_CONFIG_FILE:-$CONFIG_DIR/haproxy.cfg}"
+BACKUP_ROOT="${AFRICHOME_HAPROXY_BACKUP_ROOT:-/var/backups/africhome-haproxy}"
+LOCK_FILE="${AFRICHOME_HAPROXY_LOCK_FILE:-/run/lock/africhome-haproxy-apply.lock}"
+HAPROXY_BIN="${AFRICHOME_HAPROXY_BIN:-haproxy}"
+SYSTEMCTL_BIN="${AFRICHOME_SYSTEMCTL_BIN:-systemctl}"
+SS_BIN="${AFRICHOME_SS_BIN:-ss}"
 fail(){ printf '[ERROR] %s\n' "$*" >&2; }
 info(){ printf '[INFO] %s\n' "$*"; }
 [[ "$#" -eq 1 && "$1" == "--apply" ]] || { fail "Usage: $0 --apply (interactive APPLY confirmation required)"; exit 2; }
@@ -59,7 +59,7 @@ if [[ -e "$CONFIG_FILE" ]]; then
   had_config=1
 fi
 tmp="$(mktemp "$CONFIG_DIR/.africhome-haproxy.XXXXXX")" || { rm -rf -- "$backup_dir"; exit 1; }
-cleanup(){ [[ -z "\${tmp:-}" ]] || rm -f -- "$tmp"; }
+cleanup(){ [[ -z "${tmp:-}" ]] || rm -f -- "$tmp"; }
 trap cleanup EXIT
 if ! install -o root -g root -m 0640 "$CANDIDATE" "$tmp" ||
    ! "$HAPROXY_BIN" -c -f "$tmp" ||
