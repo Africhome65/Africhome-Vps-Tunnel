@@ -223,7 +223,12 @@ ovpn_configure_server(){
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
   fi
-  if ! install -d -o root -g nogroup -m 0750 "$OVPN_RUNTIME_DIR" ||
+  if ! mkdir -m 0750 -- "$OVPN_RUNTIME_DIR"; then
+    rmdir /var/log/africhome-openvpn 2>/dev/null || true
+    ovpn_error "Runtime directory appeared or could not be created; refusing to use it."
+    return 1
+  fi
+  if ! chown root:nogroup "$OVPN_RUNTIME_DIR" ||
      ! install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" ||
      ! install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_RUNTIME_DIR/server.key" ||
      ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_RUNTIME_DIR/ca.crt" ||
