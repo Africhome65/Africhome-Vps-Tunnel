@@ -94,6 +94,29 @@ ssh_tls_install_packages(){
   command -v stunnel4 >/dev/null 2>&1 || { ssh_tls_error "stunnel4 executable not found."; return 1; }
   ah_ok "stunnel4 backend dependencies installed."
 }
+# Roll back only files created by this attempt, and never remove config
+# while the backend may still be running.
+ssh_tls_rollback_failed_start(){
+  local config="$1" unit="$2"
+  systemctl stop "$SSH_TLS_SERVICE" >/dev/null 2>&1 || true
+  if systemctl is-active --quiet "$SSH_TLS_SERVICE" 2>/dev/null; then
+    ssh_tls_error "CRITICAL: SSH TLS backend remains active; config and unit were retained for manual recovery."
+    return 1
+  fi
+  if systemctl is-enabled --quiet "$SSH_TLS_SERVICE" 2>/dev/null; then
+    systemctl disable "$SSH_TLS_SERVICE" >/dev/null 2>&1 || {
+      ssh_tls_error "Could not disable the failed SSH TLS unit; config and unit were retained."
+      return 1
+    }
+  fi
+  rm -f -- "$config" "$unit" || {
+    ssh_tls_error "Could not remove failed SSH TLS config/unit; inspect them manually."
+    return 1
+  }
+  systemctl daemon-reload >/dev/null 2>&1 || ah_warn "systemd daemon-reload failed after SSH TLS rollback."
+  return 0
+}
+
 ssh_tls_configure(){
   ah_require_root || return 1
   command -v stunnel4 >/dev/null 2>&1 || { ssh_tls_error "Install stunnel4 first."; return 1; }
@@ -108,6 +131,10 @@ ssh_tls_configure(){
   [[ ! -L /usr/bin/stunnel4 && -x /usr/bin/stunnel4 ]] || { ssh_tls_error "Expected /usr/bin/stunnel4 executable is missing or unsafe."; return 1; }
   if systemctl is-active --quiet "$SSH_TLS_SERVICE" 2>/dev/null; then
     ssh_tls_error "SSH TLS backend is already active."; return 1
+  fi
+  if systemctl is-enabled --quiet "$SSH_TLS_SERVICE" 2>/dev/null; then
+    ssh_tls_error "SSH TLS backend is already enabled but inactive; review its existing unit before setup."
+    return 1
   fi
   local host cert key port conf_tmp unit_tmp
   read -r -p "SSH TLS certificate hostname (SNI): " host
@@ -140,11 +167,11 @@ ssh_tls_configure(){
   fi
   if ! systemctl daemon-reload || ! systemctl enable --now "$SSH_TLS_SERVICE" ||
      ! systemctl is-active --quiet "$SSH_TLS_SERVICE"; then
-    systemctl stop "$SSH_TLS_SERVICE" >/dev/null 2>&1 || true
-    systemctl disable "$SSH_TLS_SERVICE" >/dev/null 2>&1 || true
-    rm -f "$SSH_TLS_CONFIG" "$SSH_TLS_UNIT"
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    ssh_tls_error "SSH TLS backend failed to start; its new files were rolled back."
+    if ssh_tls_rollback_failed_start "$SSH_TLS_CONFIG" "$SSH_TLS_UNIT"; then
+      ssh_tls_error "SSH TLS backend failed to start; its new files were rolled back."
+    else
+      ssh_tls_error "SSH TLS startup failed and automatic rollback was incomplete. Inspect the active service and retained files."
+    fi
     journalctl -u "$SSH_TLS_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
