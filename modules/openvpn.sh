@@ -25,6 +25,7 @@ ovpn_valid_remote(){
      "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
   if [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
     local part
+    local -a _ovpn_octets=()
     IFS=. read -r -a _ovpn_octets <<< "$value"
     for part in "${_ovpn_octets[@]}"; do (( 10#$part <= 255 )) || return 1; done
   fi
@@ -188,7 +189,7 @@ ovpn_configure_server(){
 ovpn_add_client(){
   ah_require_root || return 1
   [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && -f "$OVPN_STATE" && ! -L "$OVPN_STATE" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "Configure the OpenVPN server first or review unsafe paths."; return 1; }
-  local name remote port proto output tmp
+  local name output tmp
   read -r -p "New client name (letters/numbers/_/-): " name
   ovpn_valid_name "$name" || { ovpn_error "Invalid client name."; return 1; }
   [[ ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "Client export directory must not be a symlink."; return 1; }
