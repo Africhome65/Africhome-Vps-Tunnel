@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -19,6 +19,7 @@ BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
 . "$BASE_DIR/modules/hysteria.sh"
 . "$BASE_DIR/modules/hysteria_users.sh"
 . "$BASE_DIR/modules/domain_manager.sh"
+. "$BASE_DIR/modules/cert_deploy.sh"
 
 while true; do
   clear
@@ -38,7 +39,8 @@ while true; do
   echo "10) Port & routing manager (read-only discovery)"
   echo "11) Unified account registry (Xray/SSH/Hysteria accounts)"
   echo "12) Central domain & certificate manager"
-  echo "13) Installation information"
+  echo "13) Certificate deployment targets"
+  echo "14) Installation information"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -61,7 +63,8 @@ while true; do
     10) pr_port_routing_menu ;;
     11) ar_menu ;;
     12) dm_menu ;;
-    13) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
+    13) cd_menu ;;
+    14) echo "Install path: $BASE_DIR"; echo "Update: re-run the repository installer after updates are published."; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
