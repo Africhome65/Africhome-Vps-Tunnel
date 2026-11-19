@@ -46,7 +46,8 @@ while true; do
   echo "15) Backups and staged restore"
   echo "16) Requested service modes and compatibility notes"
   echo "17) Read-only Xray inbound inventory"
-  echo "18) Read-only DNSTT deployment inventory"\n  echo "19) Read-only OpenVPN deployment inventory"
+  echo "18) Read-only DNSTT deployment inventory"
+  echo "19) Read-only OpenVPN deployment inventory"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -74,7 +75,8 @@ while true; do
     15) backup_menu ;;
     16) af_modes_menu ;;
     17) bash "$BASE_DIR/scripts/xray-inventory.sh"; ah_pause ;;
-    18) bash "$BASE_DIR/scripts/dnstt-inventory.sh"; ah_pause ;;\n    19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
+    18) bash "$BASE_DIR/scripts/dnstt-inventory.sh"; ah_pause ;;
+    19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
