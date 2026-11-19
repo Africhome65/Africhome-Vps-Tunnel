@@ -43,6 +43,8 @@ ip(){
   printf '%s\n' "default via 192.0.2.1 dev eth0" "192.168.0.0/16 dev eth0"
 }
 ovpn_subnet_available
+ip(){ return 1; }
+! ovpn_subnet_available
 unset -f ip
 
 TMP="$(mktemp -d)"
