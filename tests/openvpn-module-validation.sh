@@ -24,6 +24,9 @@ ss(){ printf 'LISTEN 0 128 0.0.0.0:1194 0.0.0.0:*\n'; }
 ! ovpn_port_available tcp 1194
 ss(){ printf 'UNCONN 0 0 [::]:1194 [::]:*\n'; }
 ! ovpn_port_available udp 1194
+# A longer port ending in the requested digits must not be a collision.
+ss(){ printf 'LISTEN 0 128 0.0.0.0:21194 0.0.0.0:*\n'; }
+ovpn_port_available tcp 1194
 ss(){ :; }
 ovpn_port_available tcp 1194
 ovpn_port_available udp 1194
