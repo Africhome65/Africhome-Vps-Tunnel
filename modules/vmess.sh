@@ -110,7 +110,7 @@ vmess_remove() {
   tmp="$(mktemp)"
   cp -a "$VMESS_CONFIG" "$backup"
   jq --arg tag "$VMESS_TAG" '.inbounds = [.inbounds[]? | select(.tag != $tag)]' "$VMESS_CONFIG" > "$tmp"
-  install -m 600 "$tmp" "$VMESS_CONFIG"
+  install -m 640 -o root -g xray "$tmp" "$VMESS_CONFIG"
   rm -f "$tmp"
   if ! xray run -test -config "$VMESS_CONFIG" || ! systemctl restart xray; then
     cp -a "$backup" "$VMESS_CONFIG"
