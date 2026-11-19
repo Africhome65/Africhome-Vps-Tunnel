@@ -260,7 +260,6 @@ ovpn_revoke_client(){
 }
 
 ovpn_list_clients(){
-  ah_require_root || return 1
   local index="$OVPN_EASYRSA_DIR/pki/index.txt"
   [[ -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found."; return 1; }
   printf '%-10s %s\n' "STATUS" "CLIENT"
