@@ -123,16 +123,34 @@ try:
             path = pathlib.PurePosixPath(name)
             if path.is_absolute() or ".." in path.parts or not allowed_path(name):
                 raise ValueError(f"unexpected archive path: {name}")
-            if not (member.isdir() or member.isfile()):
-                raise ValueError(f"links and special files are not restorable: {name}")
-            target = (destination / pathlib.Path(*path.parts)).resolve()
+            if not (member.isdir() or member.isfile() or member.issym()):
+                raise ValueError(f"hard links and special files are not restorable: {name}")
+            raw_target = destination / pathlib.Path(*path.parts)
+            target = raw_target.resolve()
             if target != destination and destination not in target.parents:
                 raise ValueError(f"path escapes staging directory: {name}")
-            checked.append((member, target))
-        for member, target in checked:
+            if member.issym():
+                link = pathlib.PurePosixPath(member.linkname)
+                if link.is_absolute():
+                    raise ValueError(f"absolute symlink target is not allowed: {name}")
+                resolved_link = (raw_target.parent / pathlib.Path(*link.parts)).resolve()
+                if resolved_link != destination and destination not in resolved_link.parents:
+                    raise ValueError(f"symlink escapes staging directory: {name}")
+            checked.append((member, raw_target))
+        for member, raw_target in checked:
+            target = raw_target
+            # Never traverse an already-created symlink as a parent directory.
+            for parent in target.parents:
+                if parent == destination:
+                    break
+                if parent.is_symlink():
+                    raise ValueError(f"archive path traverses a symlink: {member.name}")
             if member.isdir():
                 target.mkdir(parents=True, exist_ok=True, mode=0o700)
                 target.chmod(0o700)
+            elif member.issym():
+                target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                target.symlink_to(member.linkname)
             else:
                 target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                 source = tf.extractfile(member)
