@@ -186,12 +186,12 @@ dt_trial_account_create() {
     return 1
   fi
 
-  service_tmp="$(mktemp /etc/systemd/system/.africhome-trial-service.XXXXXX)" || {
+  service_tmp="$(mktemp "/etc/systemd/system/africhome-trial-${username}.XXXXXX.service")" || {
     userdel --remove "$username" 2>/dev/null || true
     unset password
     return 1
   }
-  timer_tmp="$(mktemp /etc/systemd/system/.africhome-trial-timer.XXXXXX)" || {
+  timer_tmp="$(mktemp "/etc/systemd/system/africhome-trial-${username}.XXXXXX.timer")" || {
     rm -f -- "$service_tmp"
     userdel --remove "$username" 2>/dev/null || true
     unset password
