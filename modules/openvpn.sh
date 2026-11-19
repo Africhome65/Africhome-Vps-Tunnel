@@ -5,6 +5,7 @@ set -Eeuo pipefail
 
 OVPN_CONFIG_DIR="${OVPN_CONFIG_DIR:-/etc/openvpn/server}"
 OVPN_EASYRSA_DIR="${OVPN_EASYRSA_DIR:-/etc/openvpn/easy-rsa}"
+OVPN_EASYRSA_SOURCE="${OVPN_EASYRSA_SOURCE:-/usr/share/easy-rsa}"
 OVPN_CLIENT_DIR="${OVPN_CLIENT_DIR:-/root/africhome-openvpn-clients}"
 OVPN_CONFIG="${OVPN_CONFIG:-$OVPN_CONFIG_DIR/africhome.conf}"
 OVPN_STATE="${OVPN_STATE:-/etc/africhome-openvpn.env}"
@@ -93,13 +94,28 @@ ovpn_install_packages(){
 ovpn_init_pki(){
   ah_require_root || return 1
   [[ ! -e "$OVPN_EASYRSA_DIR" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "PKI directory already exists; refusing to replace it."; return 1; }
-  [[ -x /usr/share/easy-rsa/easyrsa ]] || { ovpn_error "Install OpenVPN/Easy-RSA packages first."; return 1; }
-  install -d -o root -g root -m 0700 "$OVPN_EASYRSA_DIR" || return 1
-  cp -a /usr/share/easy-rsa/. "$OVPN_EASYRSA_DIR/" || return 1
-  chmod 0700 "$OVPN_EASYRSA_DIR"
-  if ! ovpn_easyrsa init-pki ||
-     ! ovpn_easyrsa --batch --req-cn=Africhome-CA build-ca nopass; then
-    ovpn_error "CA initialization failed. PKI directory retained for inspection: $OVPN_EASYRSA_DIR"
+  [[ -x "$OVPN_EASYRSA_SOURCE/easyrsa" ]] || { ovpn_error "Easy-RSA executable not found. Install OpenVPN/Easy-RSA packages first."; return 1; }
+  local parent tmpdir
+  parent="$(dirname -- "$OVPN_EASYRSA_DIR")"
+  [[ -d "$parent" && ! -L "$parent" ]] || { ovpn_error "PKI parent directory must exist and must not be a symlink."; return 1; }
+  tmpdir="$(mktemp -d "$parent/.africhome-easyrsa.XXXXXX")" || return 1
+  if ! cp -a "$OVPN_EASYRSA_SOURCE/." "$tmpdir/" ||
+     ! chmod 0700 "$tmpdir"; then
+    rm -rf -- "$tmpdir"
+    ovpn_error "Could not stage Easy-RSA in a protected temporary directory."
+    return 1
+  fi
+  # Build the CA in a private staging directory. Publish the complete PKI
+  # atomically only after both initialization and CA creation succeed.
+  if ! (cd "$tmpdir" && EASYRSA_BATCH=1 ./easyrsa init-pki) ||
+     ! (cd "$tmpdir" && EASYRSA_BATCH=1 ./easyrsa --batch --req-cn=Africhome-CA build-ca nopass); then
+    rm -rf -- "$tmpdir"
+    ovpn_error "CA initialization failed. No partial PKI directory was published."
+    return 1
+  fi
+  if ! mv -T -n -- "$tmpdir" "$OVPN_EASYRSA_DIR" || [[ -e "$tmpdir" ]]; then
+    rm -rf -- "$tmpdir"
+    ovpn_error "Could not safely publish the completed PKI; the target may have appeared during setup."
     return 1
   fi
   ah_ok "Private certificate authority created."
