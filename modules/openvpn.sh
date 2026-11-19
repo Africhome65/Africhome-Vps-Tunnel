@@ -134,7 +134,7 @@ ovpn_client_proto(){
   case "${1:-}" in tcp) printf 'tcp-client\n' ;; udp) printf 'udp\n' ;; *) return 1 ;; esac
 }
 ovpn_write_server_config(){
-  local output="$1" port="$2" proto="$3" runtime_dir="${4:-/etc/openvpn/server/africhome-pki}"
+  local output="$1" port="$2" proto="$3" runtime_dir="${4:-/etc/openvpn/server/africhome-pki}" log_dir="${5:-/var/log/africhome-openvpn}"
   local server_proto="$proto"
   [[ "$proto" != tcp ]] || server_proto="tcp-server"
   cat > "$output" <<EOF
@@ -143,7 +143,7 @@ proto $server_proto
 dev tun
 topology subnet
 server 10.8.0.0 255.255.255.0
-ifconfig-pool-persist /var/log/africhome-openvpn/ipp.txt
+ifconfig-pool-persist $log_dir/ipp.txt
 keepalive 10 120
 user nobody
 group nogroup
@@ -159,7 +159,7 @@ key $runtime_dir/server.key
 crl-verify $runtime_dir/crl.pem
 dh none
 ecdh-curve prime256v1
-status /var/log/africhome-openvpn/status.log
+status $log_dir/status.log
 verb 3
 EOF
   [[ "$proto" != udp ]] || printf 'explicit-exit-notify 1\n' >> "$output"
@@ -249,7 +249,7 @@ ovpn_configure_server(){
     rm -f "$tmp"; ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"; return 1;
   }
   backup=""
-  if ! ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR" ||
+  if ! ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR" "$log_dir" ||
      ! chmod 0640 "$tmp" || ! chown root:nogroup "$tmp"; then
     rm -f "$tmp" "$state_tmp"
     ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
