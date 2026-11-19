@@ -187,21 +187,21 @@ backup_retention_preview() {
   root="$(realpath -e -- "$AH_BACKUP_ROOT")" || return 1
   [[ "$root" == "$AH_BACKUP_ROOT" ]] || { ah_err "Backup root must be a canonical, non-symlink path."; return 1; }
   cutoff=$(( $(date +%s) - days * 86400 ))
-  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\\n' | sort -rn)
-  printf 'Retention preview: keep newest %s archives; prune only archives at least %s days old.\\n' "$keep" "$days"
+  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\n' | sort -rn)
+  printf 'Retention preview: keep newest %s archives; prune only archives at least %s days old.\n' "$keep" "$days"
   for row in "${_backup_retention_rows[@]}"; do
     mtime="${row%% *}"
     archive="${row#* }"
     ((index+=1))
     [[ -f "$archive" && ! -L "$archive" ]] || continue
-    if (( index > keep )) && [[ "$mtime" =~ ^[0-9]+(\\.[0-9]+)?$ ]] && (( ${mtime%%.*} <= cutoff )); then
+    if (( index > keep )) && [[ "$mtime" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (( ${mtime%%.*} <= cutoff )); then
       if [[ -f "$archive.sha256" && ! -L "$archive.sha256" ]]; then
-        printf 'WOULD PRUNE: %s\\n' "$(basename -- "$archive")"
+        printf 'WOULD PRUNE: %s\n' "$(basename -- "$archive")"
       else
-        printf 'SKIP (missing/unsafe checksum): %s\\n' "$(basename -- "$archive")"
+        printf 'SKIP (missing/unsafe checksum): %s\n' "$(basename -- "$archive")"
       fi
     else
-      printf 'KEEP: %s\\n' "$(basename -- "$archive")"
+      printf 'KEEP: %s\n' "$(basename -- "$archive")"
     fi
   done
 }
@@ -222,13 +222,13 @@ backup_retention_prune() {
   fi
   root="$(realpath -e -- "$AH_BACKUP_ROOT")" || return 1
   [[ "$root" == "$AH_BACKUP_ROOT" && -d "$root" && ! -L "$AH_BACKUP_ROOT" ]] || return 1
-  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\\n' | sort -rn)
+  mapfile -t _backup_retention_rows < <(find "$root" -mindepth 1 -maxdepth 1 -type f -name 'africhome-*.tar.gz' -printf '%T@ %p\n' | sort -rn)
   for row in "${_backup_retention_rows[@]}"; do
     mtime="${row%% *}"
     archive="${row#* }"
     ((index+=1))
     [[ "$archive" == "$root"/africhome-*.tar.gz && -f "$archive" && ! -L "$archive" ]] || continue
-    [[ "$mtime" =~ ^[0-9]+(\\.[0-9]+)?$ ]] || continue
+    [[ "$mtime" =~ ^[0-9]+(\.[0-9]+)?$ ]] || continue
     if (( index > keep && ${mtime%%.*} <= $(date +%s) - days * 86400 )) &&
        [[ -f "$archive.sha256" && ! -L "$archive.sha256" ]]; then
       rm -f -- "$archive.sha256" "$archive" || return 1
