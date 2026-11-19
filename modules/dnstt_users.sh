@@ -228,7 +228,7 @@ dt_trial_timer_cleanup() {
   local service_file="/etc/systemd/system/africhome-trial-${username}.service"
   local timer_file="/etc/systemd/system/africhome-trial-${username}.timer"
   local unit_name="africhome-trial-${username}.timer"
-  local service_name="africhome-trial-${username}.service"
+  local service_name="africhome-trial-${username}.service" path
 
   # These paths are derived only from a validated Linux username. Never
   # follow or remove a symlink if an administrator has replaced a unit.
