@@ -78,9 +78,41 @@ ovpn_load_state(){
     }
 }
 
+# The fixed VPN pool must not overlap any existing non-default IPv4 route.
+# Checking overlap (not just exact equality) avoids collisions with Docker,
+# container, cloud, and manually configured networks.
+ovpn_subnet_available(){
+  local routes
+  routes="$(ip -4 route show table all 2>/dev/null)" || {
+    ovpn_error "Could not inspect IPv4 routes; refusing to assume the VPN subnet is free."
+    return 1
+  }
+  python3 -c '
+import ipaddress
+import sys
+target = ipaddress.ip_network("10.8.0.0/24")
+for line in sys.stdin:
+    fields = line.split()
+    if not fields:
+        continue
+    try:
+        route = ipaddress.ip_network(fields[0], strict=False)
+    except ValueError:
+        continue
+    if route.prefixlen == 0:
+        continue
+    if target.overlaps(route):
+        print("Conflicting IPv4 route detected: " + str(route), file=sys.stderr)
+        sys.exit(1)
+sys.exit(0)
+' <<< "$routes" || {
+    ovpn_error "The default OpenVPN subnet 10.8.0.0/24 overlaps an existing IPv4 route."
+    return 1
+  }
+}
 ovpn_require_tools(){
   local missing=0 cmd
-  for cmd in openvpn systemctl ss install openssl; do
+  for cmd in openvpn systemctl ss install openssl python3 ip; do
     command -v "$cmd" >/dev/null 2>&1 || { ah_warn "Missing command: $cmd"; missing=1; }
   done
   (( missing == 0 ))
@@ -199,10 +231,7 @@ ovpn_configure_server(){
   port="${port:-1194}"
   ovpn_valid_port "$port" || { ovpn_error "Invalid port."; return 1; }
   ovpn_port_available "$proto" "$port" || { ovpn_error "$proto/$port is already in use."; return 1; }
-  if ip -4 route show exact 10.8.0.0/24 2>/dev/null | grep -q .; then
-    ovpn_error "The default OpenVPN subnet 10.8.0.0/24 already has a route. Resolve the subnet conflict before setup."
-    return 1
-  fi
+  ovpn_subnet_available || return 1
 
   [[ ! -L "$OVPN_CONFIG_DIR" && ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_STATE" && -d "$(dirname -- "$OVPN_STATE")" && ! -L "$(dirname -- "$OVPN_STATE")" ]] || {
     ovpn_error "OpenVPN config, runtime, or state paths must not be symlinks."; return 1;
