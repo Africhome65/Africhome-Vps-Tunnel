@@ -43,6 +43,20 @@ fi
 
 # Every SNI on a shared TCP socket must be unique, including later entries.
 if cr_check_route_collisions 
+  echo "Repeated SNI in a later route was not detected." >&2; exit 1
+fi
+
+# Catalogue identifiers must have a planner transport mapping.
+for mode in ssh-direct-ssl ssh-payload-direct ssh-payload-proxy ssh-payload-proxy-sni \
+  v2ray-ssl v2ray-payload-proxy v2ray-direct v2ray-ws vless-reality \
+  trojan-tls trojan-tls-80 openvpn-tls-sni openvpn-ws openvpn-direct-tcp \
+  openvpn-direct-80 openvpn-direct-443 openvpn-direct-udp udp-direct hysteria2 dnstt; do
+  cr_mode_transport "$mode" >/dev/null || {
+    echo "Missing central-router mode mapping: $mode" >&2; exit 1;
+  }
+done
+
+echo "Central-router validation checks passed."
 tcp|443|first.example.com|route-a\ntcp|443|second.example.com|route-b\ntcp|443|second.example.com|route-c' >/dev/null 2>&1; then
   echo "Repeated SNI in a later route was not detected." >&2; exit 1
 fi
