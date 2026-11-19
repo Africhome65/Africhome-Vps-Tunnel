@@ -37,5 +37,14 @@ grep -q 'input hidden' "$MODULE"
 grep -q 'Confirm your password' "$MODULE"
 grep -q 'root-owned regular file with mode 0600' "$MODULE"
 grep -q 'root-owned regular file with mode 0644' "$MODULE"
+for entry in '26) bash "$BASE_DIR/scripts/install-dnstt.sh"' '27) bash "$BASE_DIR/scripts/configure-dnstt-domain.sh"' '28) bash "$BASE_DIR/scripts/install-dnstt-service.sh"' '29) dnstt_users_menu'; do
+  grep -Fq "$entry" "$MENU" || {
+    echo "Missing DNSTT menu action: $entry" >&2
+    exit 1
+  }
+done
+grep -Fq '"$INSTALL_DIR/scripts/install-dnstt.sh"' "$ROOT_DIR/install.sh"
+grep -Fq '"$INSTALL_DIR/scripts/configure-dnstt-domain.sh"' "$ROOT_DIR/install.sh"
+grep -Fq '"$INSTALL_DIR/scripts/install-dnstt-service.sh"' "$ROOT_DIR/install.sh"
 
 echo "DNSTT customer-account and resolver safety checks passed."
