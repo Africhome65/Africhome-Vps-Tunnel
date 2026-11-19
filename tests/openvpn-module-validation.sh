@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../modules/openvpn.sh
 source "$ROOT/modules/openvpn.sh"
 ovpn_valid_port 1194
@@ -29,10 +29,7 @@ grep -q "^crl-verify $TMP/runtime/crl.pem$" "$TMP/server.conf"
 grep -q '^dh none$' "$TMP/server.conf"
 grep -q '^explicit-exit-notify 1$' "$TMP/server.conf"
 ovpn_write_server_config "$TMP/server-tcp.conf" 443 tcp "$TMP/runtime"
-grep -q '^proto tcp-server
-! grep -q '^explicit-exit-notify' "$TMP/server-tcp.conf"
-echo "OpenVPN module validation passed."
- "$TMP/server-tcp.conf"
+grep -q '^proto tcp-server$' "$TMP/server-tcp.conf"
 [[ "$(ovpn_client_proto tcp)" == tcp-client ]]
 [[ "$(ovpn_client_proto udp)" == udp ]]
 ! grep -q '^explicit-exit-notify' "$TMP/server-tcp.conf"
