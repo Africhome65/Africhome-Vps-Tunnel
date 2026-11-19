@@ -226,8 +226,7 @@ fi
 [[ ! -e "$OVPN_CONFIG" && ! -e "$OVPN_STATE" && ! -e "$OVPN_RUNTIME_DIR" ]]
 compgen -G "$OVPN_CONFIG.failed.*" >/dev/null
 [[ ! -e "$OVPN_LOG_DIR" ]]
-grep -q '^disable openvpn-server@africhome
- "$MOCK_SYSTEMCTL_LOG"
+grep -q '^disable openvpn-server@africhome$' "$MOCK_SYSTEMCTL_LOG"
 
 # If stop fails and OpenVPN remains active, retain all files rather than
 # deleting a configuration that a live process may still depend on.
