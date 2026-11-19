@@ -187,10 +187,11 @@ ovpn_configure_server(){
 }
 ovpn_add_client(){
   ah_require_root || return 1
-  [[ -s "$OVPN_CONFIG" && -r "$OVPN_STATE" ]] || { ovpn_error "Configure the OpenVPN server first."; return 1; }
+  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && -f "$OVPN_STATE" && ! -L "$OVPN_STATE" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "Configure the OpenVPN server first or review unsafe paths."; return 1; }
   local name remote port proto output tmp
   read -r -p "New client name (letters/numbers/_/-): " name
   ovpn_valid_name "$name" || { ovpn_error "Invalid client name."; return 1; }
+  [[ ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "Client export directory must not be a symlink."; return 1; }
   [[ ! -e "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && ! -e "$OVPN_CLIENT_DIR/$name.ovpn" ]] || {
     ovpn_error "Client already exists."; return 1;
   }
@@ -201,7 +202,6 @@ ovpn_add_client(){
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/$name.key" ]] || {
     ovpn_error "Client certificate/key generation incomplete."; return 1;
   }
-  [[ ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "Client export directory must not be a symlink."; return 1; }
   install -d -m 0700 "$OVPN_CLIENT_DIR"
   output="$OVPN_CLIENT_DIR/$name.ovpn"
   tmp="$(mktemp "$OVPN_CLIENT_DIR/.$name.XXXXXX")" || return 1
@@ -244,10 +244,11 @@ EOF
 }
 ovpn_revoke_client(){
   ah_require_root || return 1
-  [[ -s "$OVPN_CONFIG" ]] || { ovpn_error "Configure OpenVPN first."; return 1; }
+  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "Configure OpenVPN first or review unsafe paths."; return 1; }
   local name
   read -r -p "Client name to revoke: " name
-  ovpn_valid_name "$name" || { ovpn_error "Invalid client name."; return 1; }
+  ovpn_valid_name "$name" && [[ "$name" != server ]] || { ovpn_error "Invalid or reserved client name."; return 1; }
+  [[ ! -L "$OVPN_RUNTIME_DIR" && ! -L "$OVPN_CLIENT_DIR" ]] || { ovpn_error "OpenVPN runtime/client path is a symlink."; return 1; }
   [[ -s "$OVPN_EASYRSA_DIR/pki/issued/$name.crt" ]] || { ovpn_error "Client certificate not found."; return 1; }
   read -r -p "Revoke $name and disconnect future connections? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
@@ -261,7 +262,7 @@ ovpn_revoke_client(){
 
 ovpn_list_clients(){
   local index="$OVPN_EASYRSA_DIR/pki/index.txt"
-  [[ -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found."; return 1; }
+  [[ ! -L "$OVPN_EASYRSA_DIR" && -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found or unsafe."; return 1; }
   printf '%-10s %s\n' "STATUS" "CLIENT"
   awk -F '\t' '
     /^[VR]\t/ {
