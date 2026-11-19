@@ -30,6 +30,10 @@ ovpn_port_available tcp 1194
 ss(){ :; }
 ovpn_port_available tcp 1194
 ovpn_port_available udp 1194
+# Failed socket inspection and unsupported transports must fail closed.
+ss(){ return 1; }
+! ovpn_port_available tcp 1194
+! ovpn_port_available sctp 1194
 unset -f ss
 
 # Subnet safety must detect broad and narrow overlaps, ignore the default
