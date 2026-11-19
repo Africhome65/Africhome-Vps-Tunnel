@@ -16,6 +16,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
+- Read-only DNSTT deployment inventory showing common file presence, service units, and UDP listeners without exposing keys
+- Read-only OpenVPN inventory showing standard configuration metadata, systemd units, and common listeners without exposing credentials
 
 ## Central routing status
 
@@ -23,7 +25,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - The requested shared-port modes remain planned until their protocol handlers and client interoperability are implemented and verified.
 - VLESS REALITY is preserve-only for the shared-router work and must not be treated as ordinary TLS.
 - SSH account management creates Linux users only; it does not provide an SSH TLS/payload gateway.
-- OpenVPN integration is not yet present.
+- OpenVPN protocol installation, server configuration, payload/WebSocket wrappers, and client provisioning are not yet implemented; the current OpenVPN component is inventory-only.
 - See [the central routing architecture contract](docs/CENTRAL-ROUTING-ARCHITECTURE.md) for required backend, safety, and compatibility rules.
 
 ## Planned / not yet implemented
