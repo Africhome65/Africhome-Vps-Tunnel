@@ -160,15 +160,21 @@ ovpn_init_pki(){
 }
 ovpn_port_available(){
   local proto="$1" port="$2" output
-  case "$proto" in
-    udp) output="$(ss -H -lun 2>/dev/null)" ;;
-    tcp) output="$(ss -H -ltn 2>/dev/null)" ;;
-    *) ovpn_error "Unsupported OpenVPN transport for port check."; return 1 ;;
-  esac
   # A failed socket inventory is not evidence that the port is free.
-  case "$?" in
-    0) ;;
-    *) ovpn_error "Could not inspect listening sockets; refusing to assume port $port is free."; return 1 ;;
+  case "$proto" in
+    udp)
+      if ! output="$(ss -H -lun 2>/dev/null)"; then
+        ovpn_error "Could not inspect listening sockets; refusing to assume port $port is free."
+        return 1
+      fi
+      ;;
+    tcp)
+      if ! output="$(ss -H -ltn 2>/dev/null)"; then
+        ovpn_error "Could not inspect listening sockets; refusing to assume port $port is free."
+        return 1
+      fi
+      ;;
+    *) ovpn_error "Unsupported OpenVPN transport for port check."; return 1 ;;
   esac
   if awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}' <<< "$output"; then
     return 1
