@@ -30,7 +30,21 @@ grep -q '^connect = 127.0.0.1:22$' "$TMP/stunnel.conf"
 grep -q '^sslVersionMin = TLSv1.2$' "$TMP/stunnel.conf"
 ! grep -q '^accept = 0.0.0.0' "$TMP/stunnel.conf"
 ssh_tls_write_unit "$TMP/service.unit"
-grep -q '^ExecStart=/usr/bin/stunnel4 /etc/stunnel/africhome-ssh.conf
+grep -q '^ExecStart=/usr/bin/stunnel4 /etc/stunnel/africhome-ssh.conf$' "$TMP/service.unit"
+grep -q '^UMask=0077$' "$TMP/service.unit"
+grep -q '^NoNewPrivileges=true$' "$TMP/service.unit"
+grep -q '^PrivateDevices=true$' "$TMP/service.unit"
+grep -q '^ProtectSystem=strict$' "$TMP/service.unit"
+grep -q '^ProtectHome=true$' "$TMP/service.unit"
+grep -q '^ProtectKernelTunables=true$' "$TMP/service.unit"
+grep -q '^ProtectKernelModules=true$' "$TMP/service.unit"
+grep -q '^ProtectControlGroups=true$' "$TMP/service.unit"
+grep -q '^RestrictSUIDSGID=true$' "$TMP/service.unit"
+grep -q '^LockPersonality=true$' "$TMP/service.unit"
+grep -q '^MemoryDenyWriteExecute=true$' "$TMP/service.unit"
+grep -q '^RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX$' "$TMP/service.unit"
+grep -q '^SystemCallArchitectures=native$' "$TMP/service.unit"
+
 # Failed-start rollback removes files only after confirming the service stopped.
 SSH_TLS_SERVICE="africhome-ssh-tls.service"
 MOCK_ACTIVE=1
