@@ -20,6 +20,9 @@ cat > "$TMP/bin/systemctl" <<'MOCK'
 #!/usr/bin/env bash
 case "$1" in
   is-active) [[ -f "$MOCK_RUNNING" ]] ;;
+  is-enabled) [[ -f "$MOCK_ENABLED" ]] ;;
+  enable) touch "$MOCK_ENABLED" ;;
+  disable) rm -f "$MOCK_ENABLED" ;;
   start) [[ "\${MOCK_FAIL_START:-0}" != 1 ]] || exit 1; touch "$MOCK_RUNNING" ;;
   stop) rm -f "$MOCK_RUNNING" ;;
   *) exit 2 ;;
@@ -38,6 +41,7 @@ MOCK
 chmod 0700 "$TMP/bin/"*
 export PATH="$TMP/bin:$PATH"
 export MOCK_RUNNING="$TMP/running"
+export MOCK_ENABLED="$TMP/enabled"
 export AFRICHOME_HAPROXY_CANDIDATE="$CANDIDATE"
 export AFRICHOME_HAPROXY_CONFIG_DIR="$TMP/config"
 export AFRICHOME_HAPROXY_CONFIG_FILE="$TMP/config/haproxy.cfg"
@@ -65,6 +69,7 @@ printf 'APPLY\n' | bash "$ROOT/scripts/apply-central-haproxy.sh" --apply
 grep -q '^    bind 0.0.0.0:80$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
 grep -q '^    bind 0.0.0.0:443$' "$AFRICHOME_HAPROXY_CONFIG_FILE"
 [[ -f "$MOCK_RUNNING" ]]
+[[ -f "$MOCK_ENABLED" ]]
 [[ "$(stat -c '%a' "$AFRICHOME_HAPROXY_CONFIG_FILE")" == 640 ]]
 compgen -G "$TMP/backups/transaction.*" >/dev/null
 
