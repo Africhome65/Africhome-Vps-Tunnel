@@ -23,6 +23,7 @@ backup_collect_paths(){
     usr/local/etc/xray
     etc/hysteria
     etc/openvpn
+    etc/stunnel
     etc/africhome-openvpn.env
     etc/letsencrypt
     var/lib/africhome
@@ -107,7 +108,7 @@ import pathlib, sys, tarfile
 archive, destination = sys.argv[1], pathlib.Path(sys.argv[2]).resolve()
 allowed = (
     "etc/ssh/sshd_config", "etc/ssh/sshd_config.d", "etc/fail2ban",
-    "etc/ufw", "etc/nftables.conf", "etc/africhome", "etc/xray", "etc/openvpn", "etc/africhome-openvpn.env",
+    "etc/ufw", "etc/nftables.conf", "etc/africhome", "etc/xray", "etc/openvpn", "etc/stunnel", "etc/africhome-openvpn.env",
     "usr/local/etc/xray", "etc/hysteria", "etc/letsencrypt",
     "var/lib/africhome", "etc/systemd/system/africhome-",
 )
