@@ -255,15 +255,19 @@ ovpn_configure_server(){
     ovpn_error "Could not prepare OpenVPN server config."
     return 1
   fi
-  umask 077
-  if ! printf 'OVPN_REMOTE=%s\nOVPN_PORT=%s\nOVPN_PROTO=%s\n' "$remote" "$port" "$proto" > "$state_tmp" ||
+  if ! ( umask 077; printf 'OVPN_REMOTE=%s\nOVPN_PORT=%s\nOVPN_PROTO=%s\n' "$remote" "$port" "$proto" > "$state_tmp" ) ||
      ! chmod 0600 "$state_tmp"; then
     rm -f "$tmp" "$state_tmp"
     ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
     ovpn_error "Could not prepare protected OpenVPN state."
     return 1
   fi
-  chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"
+  if ! chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"; then
+    rm -f "$tmp" "$state_tmp"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Could not secure the OpenVPN server private key."
+    return 1
+  fi
   if ! mv -n -- "$tmp" "$OVPN_CONFIG" || [[ -e "$tmp" ]]; then
     rm -f "$tmp" "$state_tmp"
     ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
