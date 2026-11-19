@@ -52,6 +52,8 @@ jobs:
         run: bash tests/xray-config-permissions-validation.sh
       - name: Test atomic Xray REALITY SNI updates
         run: python3 tests/xray-reality-sni-validation.py
+      - name: Test candidate-only REALITY loopback backend renderer
+        run: python3 tests/reality-backend-render-validation.py
       - name: Test central account registry
         run: bash tests/account-registry-validation.sh
       - name: Test Hysteria userpass account adapter
