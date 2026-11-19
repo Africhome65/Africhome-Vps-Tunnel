@@ -48,6 +48,7 @@ ssh_users_create(){
     userdel "$username" || true
     ah_err "Could not register SSH account; account creation was rolled back."; return
   fi
+  ah_audit_log ssh.account.create success 2>/dev/null || true
   ah_ok "SSH system account '$username' created and registered."
   echo "Account ID: $account_id"
   [[ -n "$expiry" ]] && ah_info "Account expiry: $expiry"
@@ -80,7 +81,12 @@ ssh_users_lock(){
   read -r -p "Username to lock: " username
   id "$username" >/dev/null 2>&1 || { ah_err "User does not exist."; return; }
   [[ "$username" != root ]] || { ah_err "Refusing to lock root from this menu."; return; }
-  passwd -l "$username" && ah_ok "Password login locked for $username."
+  if passwd -l "$username"; then
+    ah_audit_log ssh.account.lock success 2>/dev/null || true
+    ah_ok "Password login locked for $username."
+  else
+    return 1
+  fi
   ah_warn "Existing SSH sessions may remain active; terminate them separately if required."
 }
 
@@ -90,7 +96,12 @@ ssh_users_unlock(){
   read -r -p "Username to unlock: " username
   id "$username" >/dev/null 2>&1 || { ah_err "User does not exist."; return; }
   [[ "$username" != root ]] || { ah_err "Root unlock is not managed here."; return; }
-  passwd -u "$username" && ah_ok "Password login unlocked for $username."
+  if passwd -u "$username"; then
+    ah_audit_log ssh.account.unlock success 2>/dev/null || true
+    ah_ok "Password login unlocked for $username."
+  else
+    return 1
+  fi
 }
 
 ssh_users_set_expiry(){
@@ -117,6 +128,7 @@ ssh_users_set_expiry(){
   if ! ar_register_service "$account_id" "$username" "ssh" "$username" "$expires_at"; then
     ah_warn "SSH expiry changed, but the central registry could not be synchronized."
   fi
+  ah_audit_log ssh.account.expiry success 2>/dev/null || true
 }
 
 ssh_users_menu(){
