@@ -313,7 +313,7 @@ ovpn_revoke_client(){
   ovpn_easyrsa gen-crl || return 1
   install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem" || return 1
   systemctl restart "$OVPN_SERVICE" || { ovpn_error "CRL generated but OpenVPN restart failed; check service status."; return 1; }
-  rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn"
+  rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn" "$OVPN_EASYRSA_DIR/pki/private/$name.key" "$OVPN_EASYRSA_DIR/pki/reqs/$name.req"
   ah_ok "Client $name revoked; CRL installed and service restarted."
 }
 
