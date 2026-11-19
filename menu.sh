@@ -2,13 +2,14 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/scripts/update-reality-sni.py" && -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" && -f "$BASE_DIR/modules/openvpn.sh" && -f "$BASE_DIR/modules/ssh_tls.sh" && -f "$BASE_DIR/modules/central_router.sh" ]] || {
+[[ -f "$BASE_DIR/scripts/install-dnstt.sh" && -f "$BASE_DIR/scripts/configure-dnstt-domain.sh" && -f "$BASE_DIR/scripts/install-dnstt-service.sh" && -f "$BASE_DIR/modules/dnstt_users.sh" && -f "$BASE_DIR/scripts/update-reality-sni.py" && -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" && -f "$BASE_DIR/modules/openvpn.sh" && -f "$BASE_DIR/modules/ssh_tls.sh" && -f "$BASE_DIR/modules/central_router.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
 . "$BASE_DIR/lib/common.sh"
 . "$BASE_DIR/modules/security.sh"
 . "$BASE_DIR/modules/ssh_users.sh"
+. "$BASE_DIR/modules/dnstt_users.sh"
 . "$BASE_DIR/modules/port_routing.sh"
 . "$BASE_DIR/modules/xray.sh"
 . "$BASE_DIR/modules/vmess.sh"
@@ -57,6 +58,10 @@ while true; do
   echo "23) SSH over TLS backend (loopback only)"
   echo "24) Guarded HAProxy apply (requires TCP 80/443 to be free)"
   echo "25) Generate VLESS REALITY loopback backend candidate (no live changes)"
+  echo "26) Build DNSTT server/client and preserve server keypair"
+  echo "27) Configure DNSTT domain and authoritative nameserver"
+  echo "28) Prepare DNSTT systemd service (not started)"
+  echo "29) DNSTT customer accounts and client configuration export"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -97,6 +102,10 @@ while true; do
       ah_pause
       ;;
     25) cr_render_reality_backend_candidate; ah_pause ;;
+    26) bash "$BASE_DIR/scripts/install-dnstt.sh"; ah_pause ;;
+    27) bash "$BASE_DIR/scripts/configure-dnstt-domain.sh"; ah_pause ;;
+    28) bash "$BASE_DIR/scripts/install-dnstt-service.sh"; ah_pause ;;
+    29) dnstt_users_menu; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
