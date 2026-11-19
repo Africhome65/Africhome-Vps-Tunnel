@@ -41,9 +41,8 @@ for expected in (
     "server srv_ws 127.0.0.1:10080 check",
 ):
     assert expected in result.stdout, expected
-assert result.stdout.count("\nglobal\n") == 0
-assert result.stdout.count("global\n") == 1
-assert result.stdout.count("defaults\n") == 1
+assert result.stdout.splitlines().count("global") == 1
+assert result.stdout.splitlines().count("defaults") == 1
 
 if shutil.which("haproxy"):
     with tempfile.TemporaryDirectory() as tmp:
