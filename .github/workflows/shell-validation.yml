@@ -62,6 +62,8 @@ jobs:
           sudo apt-get install -y shellcheck haproxy openssl iproute2 jq python3-yaml
       - name: Test HAProxy ordinary TLS SNI passthrough
         run: bash tests/haproxy-sni-validation.sh
+      - name: Test HAProxy central-router config renderer
+        run: python3 tests/central-router-render-validation.py
       - name: Run ShellCheck errors
         run: |
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck --severity=error
