@@ -29,5 +29,5 @@ ah_audit_log() {
   else
     install -o root -g root -m 0600 /dev/null "$AH_AUDIT_LOG" || return 1
   fi
-  printf '%s event=%s result=%s\\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$event" "$result" >> "$AH_AUDIT_LOG"
+  printf '%s event=%s result=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$event" "$result" >> "$AH_AUDIT_LOG"
 }
