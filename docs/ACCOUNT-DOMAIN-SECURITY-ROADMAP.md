@@ -115,6 +115,14 @@ Add optional connection/rate limits for supported services, with safe defaults a
 
 ## 4. Fail2ban and host hardening
 
+### Current development implementation
+
+The security menu now includes a read-only audit covering effective SSH settings, listening sockets, security service states, firewall summaries, recent SSH authentication failures, and the Africhome torrent filter. It does not alter system configuration.
+
+Fail2ban integration detects effective SSH ports, preserves an existing Africhome jail drop-in, validates configuration before restart, checks service/jail health, and exposes status, banned IP listing, and confirmed IP unban. The SSH jail uses the systemd journal backend with conservative thresholds. This still needs a live-host check that SSH authentication events are available in the journal before it is enabled.
+
+The optional torrent filter is limited to common host INPUT/OUTPUT ports. It is runtime-only, does not cover forwarded tunnel traffic, and cannot reliably identify all BitTorrent use.
+
 ### Fail2ban
 
 - Detect the active SSH daemon port and actual log backend.
@@ -139,7 +147,13 @@ Add optional connection/rate limits for supported services, with safe defaults a
 - Provide a security audit command that reports findings without automatically changing settings.
 - Avoid claiming any VPS script is impossible to hack; document residual risks and keep dependencies updated.
 
-## 5. Unified menu experience
+## 5. Backups and staged restore
+
+`modules/backup.sh` now creates root-only configuration archives under `/var/backups/africhome`, with SHA-256 sidecar checksums. The backup scope is a fixed list of relevant SSH, Fail2ban, UFW/nftables, Africhome, Xray, Hysteria, Let's Encrypt, and Africhome systemd paths. Archives can contain credentials and private keys; they are not encrypted, so operators must protect and copy them to secure off-host storage.
+
+Restore currently verifies the checksum and archive integrity, then extracts only allowlisted regular files, directories, and safe relative symlinks into a root-only staging directory under `/var/lib/africhome/restore-staging`. It rejects path traversal, absolute/escaping symlinks, hard links, and special files. It never overwrites live system files. A separate service-aware restore workflow and rollback validation remain future work.
+
+## 6. Unified menu experience
 
 Proposed top-level menu groups:
 
@@ -156,7 +170,7 @@ Proposed top-level menu groups:
 
 The account manager should allow a single workflow: select username/label, choose one or more supported services, choose duration in days or never-expire, review the plan, confirm, then show generated connection details once.
 
-## 6. Recommended additions
+## 7. Recommended additions
 
 - Per-service online/offline health checks and listener ownership.
 - Account labels, notes, and optional quota/connection policy where the protocol supports it.
@@ -167,7 +181,7 @@ The account manager should allow a single workflow: select username/label, choos
 - Read-only audit mode and dry-run mode for all firewall, routing, and account changes.
 - Structured machine-readable status output for future integrations, without introducing a public web panel.
 
-## 7. Implementation phases and acceptance criteria
+## 8. Implementation phases and acceptance criteria
 
 ### Phase A — Audit existing modules
 
