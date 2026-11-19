@@ -67,10 +67,16 @@ if ! install -o root -g root -m 0640 "$CANDIDATE" "$tmp" ||
   fail "Could not validate and atomically install the candidate."; exit 1
 fi
 tmp=""
-started_by_us=0
+start_attempted=0
 enable_attempted=0
 rollback(){
-  if (( started_by_us == 1 )); then "$SYSTEMCTL_BIN" stop haproxy >/dev/null 2>&1 || true; fi
+  if (( start_attempted == 1 )); then
+    if ! "$SYSTEMCTL_BIN" stop haproxy >/dev/null 2>&1 &&
+       "$SYSTEMCTL_BIN" is-active --quiet haproxy; then
+      fail "CRITICAL: HAProxy could not be stopped; active service was left untouched. Original backup: $backup_dir/haproxy.cfg"
+      return 1
+    fi
+  fi
   if (( enable_attempted == 1 )); then "$SYSTEMCTL_BIN" disable haproxy >/dev/null 2>&1 || true; fi
   if (( had_config == 1 )); then
     local restore_tmp
@@ -87,12 +93,12 @@ rollback(){
   fi
   info "Previous HAProxy configuration restored; service left stopped."
 }
+start_attempted=1
 if ! "$SYSTEMCTL_BIN" start haproxy; then
   fail "HAProxy failed to start. Rolling back."
   rollback || true
   exit 1
 fi
-started_by_us=1
 if ! "$SYSTEMCTL_BIN" is-active --quiet haproxy || ! port_busy 80 || ! port_busy 443; then
   fail "HAProxy did not become active with both expected listeners. Rolling back."
   rollback || true
