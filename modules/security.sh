@@ -15,8 +15,8 @@ security_detect_ssh_log_path(){
     read -r -a candidates <<< "$SECURITY_AUTH_LOG_CANDIDATES"
   fi
   for candidate in "${candidates[@]}"; do
-    if [[ -r "$candidate" ]] && grep -Eq 'sshd\\[[0-9]+\\]:' "$candidate"; then
-      printf '%s\\n' "$candidate"
+    if [[ -r "$candidate" ]] && grep -Eq 'sshd\[[0-9]+\]:' "$candidate"; then
+      printf '%s\n' "$candidate"
       return 0
     fi
   done
