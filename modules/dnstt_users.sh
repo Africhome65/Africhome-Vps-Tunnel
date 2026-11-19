@@ -142,7 +142,7 @@ dt_trial_account_create() {
   dt_require_root || return 1
   command -v systemctl >/dev/null 2>&1 || { echo "systemd is required for timed trial expiry." >&2; return 1; }
 
-  local hours seconds username password expiry_at service_file timer_file service_tmp timer_tmp
+  local hours username password expiry_at service_file timer_file service_tmp timer_tmp path
   echo "Trial duration:"
   echo "1) 1 hour"
   echo "2) 3 hours"
