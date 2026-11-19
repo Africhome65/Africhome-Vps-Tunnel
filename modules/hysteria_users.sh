@@ -112,6 +112,7 @@ hy2u_add() {
     cp -a "$dbbackup" "$HY2_USERS_DB"
     ah_err "Central registry update failed; Hysteria config and local metadata were restored."; return 1
   fi
+  ah_audit_log hysteria.account.create success 2>/dev/null || true
   echo "Hysteria username: $username"
   echo "Password: $password"
   echo "Expires: $expires"
@@ -151,6 +152,7 @@ hy2u_remove() {
   install -m 600 "$tmp" "$HY2_USERS_DB"; rm -f "$tmp"
   ar_set_service_status "$account_id" "hysteria" "$username" "revoked" ||
     ah_warn "Hysteria user revoked, but registry status update failed."
+  ah_audit_log hysteria.account.revoke success 2>/dev/null || true
   ah_ok "Hysteria user $username revoked."
 }
 
@@ -182,6 +184,7 @@ hy2u_expire() {
       ar_set_service_status "$account_id" "hysteria" "$username" "expired" ||
         ah_warn "Expired Hysteria user removed, but registry status update failed."
     done <<< "$expired"
+    ah_audit_log hysteria.account.expire success 2>/dev/null || true
     ah_ok "Expired Hysteria users removed."
   fi
 }
@@ -212,6 +215,7 @@ WantedBy=timers.target
 EOF
   systemctl daemon-reload
   systemctl enable --now africhome-hysteria-expire.timer
+  ah_audit_log hysteria.expiry_timer.enable success 2>/dev/null || true
   ah_ok "Daily Hysteria account expiry timer enabled."
 }
 
