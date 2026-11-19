@@ -22,7 +22,7 @@ cd_target_add() {
   esac
   cd_init || return 1
   jq -e --arg d "$domain" --arg s "$service" 'any(.[]; .domain==$d and .service==$s)' "$CD_CONFIG" >/dev/null && { ah_warn "Target exists."; return 1; }
-  tmp="$(mktemp /etc/africhome/.cert-deploy.XXXXXX)" || return 1
+  tmp="$(mktemp "$(dirname "$CD_CONFIG")/.cert-deploy.XXXXXX")" || return 1
   jq --arg d "$domain" --arg s "$service" --arg c "$cert" --arg k "$key" --arg o "$owner" --arg g "$group" --arg u "$unit" '. + [{domain:$d,service:$s,cert:$c,key:$k,owner:$o,group:$g,unit:$u}]' "$CD_CONFIG" > "$tmp"
   install -m 600 "$tmp" "$CD_CONFIG"; rm -f "$tmp"
 }
@@ -54,7 +54,7 @@ cd_deploy_one() {
     if ((oldc)); then cp -a "$backup/cert" "$cert"; else rm -f "$cert"; fi; if ((oldk)); then cp -a "$backup/key" "$key"; else rm -f "$key"; fi
     systemctl restart "$unit" || ah_err "Service failed after rollback."; rm -rf "$backup"; return 1
   fi
-  rm -rf "$backup"; ah_ok "$service certificate deployed."
+  ah_ok "$service certificate deployed. Rollback backup retained at $backup."
 }
 
 cd_deploy_lineage() {
