@@ -46,6 +46,10 @@ jobs:
         run: bash tests/service-inventory-validation.sh
       - name: Test DNSTT inventory privacy
         run: bash tests/dnstt-inventory-validation.sh
+      - name: Test DNSTT bootstrap and service safety
+        run: bash tests/dnstt-safety-check.sh
+      - name: Test DNSTT customer account and resolver safety
+        run: bash tests/dnstt-accounts-safety-check.sh
       - name: Test protocol account config permissions
         run: bash tests/protocol-users-validation.sh
       - name: Test Xray config ownership and service readability
