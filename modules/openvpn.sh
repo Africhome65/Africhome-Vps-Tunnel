@@ -161,9 +161,9 @@ ovpn_init_pki(){
 ovpn_port_available(){
   local proto="$1" port="$2"
   if [[ "$proto" == udp ]]; then
-    ! ss -H -lun 2>/dev/null | awk -v p=":$port" '$0 ~ p"([[:space:]]|$)" {found=1} END{exit !found}'
+    ! ss -H -lun 2>/dev/null | awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}'
   else
-    ! ss -H -ltn 2>/dev/null | awk -v p=":$port" '$0 ~ p"([[:space:]]|$)" {found=1} END{exit !found}'
+    ! ss -H -ltn 2>/dev/null | awk -v p="$port" '{endpoint=$4; sub(/^.*:/, "", endpoint); if (endpoint == p) found=1} END{exit !found}'
   fi
 }
 ovpn_client_proto(){
