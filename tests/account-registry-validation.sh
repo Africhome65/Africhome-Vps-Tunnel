@@ -52,4 +52,5 @@ grep -Fq "does not discover unmanaged native accounts" <<< "$dashboard"
 if grep -Fq "private-native-ref" <<< "$dashboard" || grep -Eiq 'password|credential|private_key|client_uri' <<< "$dashboard"; then
   echo "Dashboard exposed a native reference or secret-like field." >&2; exit 1
 fi
-\necho "Central account registry and dashboard validation passed."
+
+echo "Central account registry and dashboard validation passed."
