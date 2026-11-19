@@ -13,6 +13,25 @@ ssh_tls_valid_hostname vpn.xn--p1ai
 ! ssh_tls_valid_hostname bad-.example
 ! ssh_tls_valid_hostname https://ssh.example.com
 
+# Socket inspection must fail closed and compare the exact local port.
+SS_MODE="free"
+ss(){
+  case "$SS_MODE" in
+    fail) return 1 ;;
+    busy) printf '%s\\n' 'LISTEN 0 4096 0.0.0.0:443 0.0.0.0:*' ;;
+    near) printf '%s\\n' 'LISTEN 0 4096 0.0.0.0:1443 0.0.0.0:*' ;;
+    *) : ;;
+  esac
+}
+ssh_tls_port_available 443
+SS_MODE="fail"
+! ssh_tls_port_available 443
+SS_MODE="busy"
+! ssh_tls_port_available 443
+SS_MODE="near"
+ssh_tls_port_available 443
+unset -f ss
+
 # Directory safety checks use mocked ownership metadata so CI need not run as root.
 TMP="$(mktemp -d)"
 MOCK_DIR_METADATA="0:755"
