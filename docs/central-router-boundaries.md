@@ -124,3 +124,19 @@ It reads a user-supplied regular JSON manifest, validates and renders it, and
 stores a root-only candidate at `/root/africhome-haproxy-candidate.cfg`.
 When HAProxy is installed, its parser checks the candidate. This action never
 writes `/etc/haproxy`, binds ports, changes firewall rules, or reloads services.
+
+
+## SSH over TLS backend
+
+The menu can configure a stunnel service that accepts TLS only on a loopback
+backend port and forwards decrypted traffic to the local SSH daemon on
+127.0.0.1:22. It validates the supplied SNI hostname, certificate validity,
+certificate/key match, and loopback port availability.
+
+This backend does not bind public TCP 443 or change the central HAProxy
+configuration. A matching SNI route must be added to a reviewed candidate
+manifest, then validated and activated only after the REALITY-preservation
+migration plan is proven. The client must use an SSH-over-TLS wrapper compatible
+with stunnel; raw SSH clients cannot connect directly to the TLS backend.
+
+This is not an HTTP payload gateway or authenticated HTTP CONNECT proxy.
