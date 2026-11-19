@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PUBLIC_KEY="$SCRIPT_DIR/keys/license-public.pem"
 LICENSE_DIR="/etc/africhome"
 LICENSE_FILE="$LICENSE_DIR/license.token"
@@ -20,7 +20,7 @@ verify_token() {
   command -v sha256sum >/dev/null 2>&1 || fail "The sha256sum utility is required."
   [[ "$token" != *$'\n'* && "$token" != *$'\r'* ]] || fail "The licence key must be a single line."
   IFS='.' read -r payload_b64 signature_b64 extra <<<"$token"
-  [[ -n "$payload_b64" && -n "$signature_b64" && -z "\${extra:-}" ]] || fail "Invalid licence-key format."
+  [[ -n "$payload_b64" && -n "$signature_b64" && -z "${extra:-}" ]] || fail "Invalid licence-key format."
   tmp="$(mktemp -d)" || fail "Could not create temporary verification workspace."
   trap 'rm -rf "$tmp"' RETURN
   printf '%s' "$payload_b64" | base64 -d >"$tmp/payload" 2>/dev/null || fail "Invalid licence payload encoding."
@@ -28,7 +28,7 @@ verify_token() {
   openssl pkeyutl -verify -pubin -inkey "$PUBLIC_KEY" -rawin -in "$tmp/payload" -sigfile "$tmp/signature" >/dev/null 2>&1 || fail "Licence signature is invalid."
   payload="$(cat "$tmp/payload")"
   [[ "$payload" == AFRICHOME-LICENSE-V1$'\n'id=* ]] || fail "Unsupported licence format."
-  [[ "$(printf '%s\n' "$payload" | wc -l)" -eq 3 ]] || fail "Malformed licence payload."
+  [[ "$(printf '%s\n' "$payload" | wc -l)" -eq 4 ]] || fail "Malformed licence payload."
   local licence_id expiry fingerprint expected
   licence_id="$(printf '%s\n' "$payload" | sed -n '2s/^id=//p')"
   expiry="$(printf '%s\n' "$payload" | sed -n '3s/^expires=//p')"
@@ -42,10 +42,10 @@ verify_token() {
   [[ "$fingerprint" == "$expected" ]] || fail "This licence belongs to a different VPS."
   printf '%s' "$licence_id"
 }
-case "\${1:-verify}" in
+case "${1:-verify}" in
   fingerprint) machine_fingerprint ;;
   verify)
-    [[ "\${EUID}" -eq 0 ]] || fail "Run the installer as root."
+    [[ "${EUID}" -eq 0 ]] || fail "Run the installer as root."
     printf 'Enter your Africhome VPS licence key: ' >/dev/tty
     IFS= read -r -s token </dev/tty || fail "Could not read licence key."
     printf '\n' >/dev/tty
