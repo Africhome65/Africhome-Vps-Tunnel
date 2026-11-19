@@ -55,6 +55,13 @@ pr_valid_port(){
   (( 10#$port >= 1 && 10#$port <= 65535 ))
 }
 
+# Validate a DNS hostname without accepting empty labels or invalid label lengths.
+pr_valid_hostname(){
+  local hostname="${1:-}"
+  [[ -n "$hostname" && ${#hostname} -le 253 ]] || return 1
+  [[ "$hostname" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$ ]]
+}
+
 # Return 0 when the selected transport/port is free, 1 when occupied, 2 if unknown.
 pr_check_port_available(){
   local protocol="${1:-}" port="${2:-}" output
@@ -69,20 +76,20 @@ pr_check_port_available(){
 pr_route_plan(){
   local protocol port hostname status rc
   pr_section "READ-ONLY ROUTE PLANNER"
-  printf 'No proxy, firewall, service, or configuration changes will be made.\\n'
+  printf 'No proxy, firewall, service, or configuration changes will be made.\n'
   read -r -p "Transport (tcp/udp): " protocol
   protocol="${protocol,,}"
   [[ "$protocol" == tcp || "$protocol" == udp ]] || { pr_warn "Choose tcp or udp."; return 0; }
   read -r -p "Proposed public port (1-65535): " port
   pr_valid_port "$port" || { pr_warn "Invalid port."; return 0; }
   read -r -p "Hostname/SNI (optional): " hostname
-  if [[ -n "$hostname" && ! "$hostname" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+  if [[ -n "$hostname" ]] && ! pr_valid_hostname "$hostname"; then
     pr_warn "Hostname format is invalid."; return 0
   fi
   if pr_check_port_available "$protocol" "$port"; then rc=0; else rc=$?; fi
   case "$rc" in 0) status="CURRENTLY FREE" ;; 1) status="ALREADY IN USE" ;; *) status="UNKNOWN (inspection unavailable)" ;; esac
-  printf '\\nProposed route: %s/%s\\nHostname/SNI: %s\\nSocket status: %s\\n' "$protocol" "$port" "${hostname:-not specified}" "$status"
-  printf 'Planning only: no port has been reserved and no configuration has been written.\\n'
+  printf '\nProposed route: %s/%s\nHostname/SNI: %s\nSocket status: %s\n' "$protocol" "$port" "${hostname:-not specified}" "$status"
+  printf 'Planning only: no port has been reserved and no configuration has been written.\n'
   # A busy or unknown port is a reported planning result, not a fatal menu error.
   return 0
 }
