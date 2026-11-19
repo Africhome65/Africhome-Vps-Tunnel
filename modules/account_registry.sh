@@ -155,7 +155,7 @@ ar_reconcile() {
   ar_init || return 1
   local protocol_db="${AR_PROTOCOL_DB:-/etc/africhome-protocol-users.json}"
   local hysteria_db="${AR_HYSTERIA_DB:-/etc/africhome-hysteria-users.json}"
-  local account_id service name ref status local_only=0 registry_only=0 ssh_candidates=0 skipped=0
+  local account_id service name ref status display_name local_only=0 registry_only=0 ssh_candidates=0 skipped=0
 
   printf '\n=== READ-ONLY ACCOUNT RECONCILIATION ===\n'
   printf '%-12s %-24s %s\n' "SOURCE" "ACCOUNT" "FINDING"
@@ -245,7 +245,8 @@ ar_menu() {
           'any(.[]; .account_id == $id and .protocol == $svc and .email == $ref)' "$protocol_db" >/dev/null 2>&1; then :
         elif [[ "$status" == "revoked" || "$status" == "expired" ]]; then :
         else
-          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$ref" "registry entry has no matching local record"
+          display_name="$(jq -r --arg id "$account_id" '.accounts[] | select(.id == $id) | .label' "$AR_REGISTRY")"
+          printf '%-12s %-24.24s %s\n' "XRAY/$service" "$display_name" "registry entry has no matching local record"
           ((registry_only+=1))
         fi ;;
       hysteria)
