@@ -5,14 +5,14 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 for file in \
   "$ROOT_DIR/scripts/install-dnstt.sh" \
   "$ROOT_DIR/scripts/configure-dnstt-domain.sh" \
-grep -q 'trap cleanup EXIT' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
-grep -Fq '$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S).$$' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
-grep -Fq 'mv -f -- "$tmp" "$CONFIG_FILE"' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
   "$ROOT_DIR/scripts/install-dnstt-service.sh"; do
   [[ -f "$file" ]] || { echo "Missing DNSTT script: $file" >&2; exit 1; }
   bash -n "$file"
 done
 
+grep -q 'trap cleanup EXIT' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
+grep -Fq '$CONFIG_FILE.bak.$(date +%Y%m%d%H%M%S).$$' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
+grep -Fq 'mv -f -- "$tmp" "$CONFIG_FILE"' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
 # The public repository must never ship the maintainer's personal DNS names.
 if grep -R -n -E 'smarty\.uk\.afriko2\.co\.uk|ns-smarty\.uk\.afriko2\.co\.uk' "$ROOT_DIR/scripts"; then
   echo "A maintainer-specific DNS name was found in an install script." >&2
