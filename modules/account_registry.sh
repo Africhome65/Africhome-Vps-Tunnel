@@ -131,8 +131,8 @@ ar_dashboard() {
   local account_count service_count expired_count id label service expiry status host_state expiry_display
   account_count="$(jq '.accounts | length' "$AR_REGISTRY")" || return 1
   service_count="$(jq '[.accounts[].services[]] | length' "$AR_REGISTRY")" || return 1
-  expired_count="$(jq '[.accounts[].services[] as $s | select($s.status == "active") | .] | length' "$AR_REGISTRY")"
   # Expiry is shared at account level, so count each expired account once.
+  expired_count="$(jq '[.accounts[] | select(.expires_at != 0 and .expires_at <= now)] | length' "$AR_REGISTRY")" || return 1
   printf '\n=== AFRICHOME ACCOUNT DASHBOARD ===\n'
   printf 'Registered accounts: %s | Service entries: %s | Expired accounts: %s\n' "$account_count" "$service_count" "$expired_count"
   printf '%-20s %-16s %-10s %-20s %-20s %s\n' "ACCOUNT ID" "LABEL" "SERVICE" "EXPIRES (UTC)" "ACCOUNT STATUS" "HOST SERVICE"
