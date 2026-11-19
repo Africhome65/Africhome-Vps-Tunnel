@@ -4,11 +4,17 @@ set -Eeuo pipefail
 
 ovpn_inventory() {
   local -a configs=()
-  local file unit
+  local file unit dir
   local found=0
+  local -a scan_dirs=()
+  if [[ -n "${OPENVPN_INVENTORY_DIRS:-}" ]]; then
+    IFS=':' read -r -a scan_dirs <<< "$OPENVPN_INVENTORY_DIRS"
+  else
+    scan_dirs=(/etc/openvpn /etc/openvpn/server)
+  fi
 
   printf 'OpenVPN configuration inventory (read-only)\n'
-  for dir in /etc/openvpn /etc/openvpn/server; do
+  for dir in "${scan_dirs[@]}"; do
     [[ -d "$dir" ]] || continue
     while IFS= read -r -d '' file; do
       configs+=("$file")
