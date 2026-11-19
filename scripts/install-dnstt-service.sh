@@ -34,6 +34,26 @@ valid_fqdn() {
   (( ${#value} <= 253 ))
 }
 
+valid_ipv4() {
+  local value="$1" octet
+  local -a octets
+  [[ "$value" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
+  IFS='.' read -r -a octets <<< "$value"
+  (( ${#octets[@]} == 4 )) || return 1
+  for octet in "${octets[@]}"; do
+    (( 10#$octet <= 255 )) || return 1
+  done
+}
+
+valid_upstream_host() {
+  local value="$1"
+  if [[ "$value" =~ ^[0-9.]+$ ]]; then
+    valid_ipv4 "$value"
+  else
+    [[ ${#value} -le 253 && "$value" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$ ]]
+  fi
+}
+
 valid_fqdn "${DNS_DOMAIN:-}" || fail "DNS_DOMAIN in $DOMAIN_CONFIG is invalid."
 valid_fqdn "${DNS_NS_HOST:-}" || fail "DNS_NS_HOST in $DOMAIN_CONFIG is invalid."
 
@@ -59,9 +79,14 @@ read -r -p "SSH upstream address [${old_upstream:-127.0.0.1:22}]: " DNSTT_UPSTRE
 DNSTT_UPSTREAM="${DNSTT_UPSTREAM:-${old_upstream:-127.0.0.1:22}}"
 
 [[ "$DNSTT_UDP_ADDR" =~ ^(:[0-9]{1,5}|[0-9]{1,3}(\.[0-9]{1,3}){3}:[0-9]{1,5})$ ]] || fail "Invalid UDP listen address. Use :53, 0.0.0.0:53, or an IPv4-address:port."
+if [[ "$DNSTT_UDP_ADDR" != :* ]]; then
+  valid_ipv4 "${DNSTT_UDP_ADDR%:*}" || fail "UDP listen address contains an invalid IPv4 address."
+fi
 listen_port="${DNSTT_UDP_ADDR##*:}"
 (( 10#$listen_port >= 1 && 10#$listen_port <= 65535 )) || fail "UDP listen port must be between 1 and 65535."
 [[ "$DNSTT_UPSTREAM" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || fail "Invalid SSH upstream. Use a hostname-or-IPv4:port such as 127.0.0.1:22."
+upstream_host="${DNSTT_UPSTREAM%:*}"
+valid_upstream_host "$upstream_host" || fail "SSH upstream host must be a valid hostname or IPv4 address."
 upstream_port="${DNSTT_UPSTREAM##*:}"
 (( 10#$upstream_port >= 1 && 10#$upstream_port <= 65535 )) || fail "SSH upstream port must be between 1 and 65535."
 
