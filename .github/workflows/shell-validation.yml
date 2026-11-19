@@ -32,6 +32,8 @@ jobs:
         run: bash tests/backup-validation.sh
       - name: Test privacy-safe admin audit logging
         run: bash tests/admin-audit-validation.sh
+      - name: Test account-management audit integration
+        run: bash tests/account-audit-integration-validation.sh
       - name: Test read-only port routing inventory
         run: bash tests/port-routing-validation.sh
       - name: Test protocol account config permissions
