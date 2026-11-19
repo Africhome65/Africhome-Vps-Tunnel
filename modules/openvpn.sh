@@ -258,6 +258,24 @@ ovpn_revoke_client(){
   rm -f -- "$OVPN_CLIENT_DIR/$name.ovpn"
   ah_ok "Client $name revoked; CRL installed and service restarted."
 }
+
+ovpn_list_clients(){
+  ah_require_root || return 1
+  local index="$OVPN_EASYRSA_DIR/pki/index.txt"
+  [[ -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found."; return 1; }
+  printf '%-10s %s\\n' "STATUS" "CLIENT"
+  awk -F '\\t' '
+    /^[VR]\\t/ {
+      status = ($1 == "V" ? "VALID" : "REVOKED")
+      subject = $NF
+      sub(/^.*CN=/, "", subject)
+      sub(/\\/.*/, "", subject)
+      if (subject != "" && subject != "server" && subject != "Africhome-CA")
+        printf "%-10s %s\\n", status, subject
+    }
+  ' "$index"
+}
+
 ovpn_status(){
   ah_require_root || return 1
   systemctl --no-pager --full status "$OVPN_SERVICE" || true
