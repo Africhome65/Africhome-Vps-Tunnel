@@ -17,7 +17,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
 - Read-only DNSTT deployment inventory showing common file presence, service units, and UDP listeners without exposing keys
-- Read-only OpenVPN inventory showing standard configuration metadata, systemd units, and common listeners without exposing credentials
+- Native OpenVPN UDP/TCP server management, Easy-RSA certificate authority, client profile generation, certificate listing/revocation, service status, plus a separate read-only deployment inventory
 
 ## Central routing status
 
@@ -25,7 +25,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - The requested shared-port modes remain planned until their protocol handlers and client interoperability are implemented and verified.
 - VLESS REALITY is preserve-only for the shared-router work and must not be treated as ordinary TLS.
 - SSH account management creates Linux users only; it does not provide an SSH TLS/payload gateway.
-- OpenVPN protocol installation, server configuration, payload/WebSocket wrappers, and client provisioning are not yet implemented; the current OpenVPN component is inventory-only.
+- Native OpenVPN direct UDP/TCP server and certificate-based client management are implemented. OpenVPN WebSocket, payload-proxy, TLS/SNI wrapper modes, automatic firewall/NAT setup, and shared-port router integration are not implemented. The module deliberately does not change UFW/nftables or enable IP forwarding.
 - See [the central routing architecture contract](docs/CENTRAL-ROUTING-ARCHITECTURE.md) for required backend, safety, and compatibility rules.
 
 ## Planned / not yet implemented
@@ -121,7 +121,7 @@ The planned unified account manager, centralized domain/certificate manager, Fai
 
 ## Hysteria 2 notes
 
-- Use menu option 11 to install/update Hysteria 2 and configure the server.
+- Use menu option 9 to install/update Hysteria 2 and configure the server.
 - Each VPS administrator supplies their own domain. Its DNS A/AAAA records must point to the VPS before requesting a certificate. The module obtains a Let's Encrypt certificate using the HTTP-01 standalone challenge, so inbound TCP 80 must be reachable and not occupied during issuance.
 - Choose one UDP port (1-65535), or a port-hopping range such as 20000-30000. Hysteria's native Linux port hopping listens on the first port and redirects the rest of the range using nftables or iptables. The service needs NET_ADMIN capability for this feature.
 - The module adds the selected UDP port/range to UFW only when UFW is already active. The same UDP port/range must also be allowed in the VPS provider firewall/security group. Avoid ports already used by other services; a range must not overlap other listeners or firewall-managed services.
