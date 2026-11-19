@@ -50,7 +50,7 @@ vmess_add() {
   ' "$VMESS_CONFIG" > "$tmp"; then
     rm -f "$tmp"; ah_err "Could not update Xray configuration."; return 1
   fi
-  install -m 600 "$tmp" "$VMESS_CONFIG"
+  install -m 640 -o root -g xray "$tmp" "$VMESS_CONFIG"
   rm -f "$tmp"
   if ! xray run -test -config "$VMESS_CONFIG"; then
     cp -a "$backup" "$VMESS_CONFIG"
