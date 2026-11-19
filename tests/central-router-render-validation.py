@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,15 @@ for expected in (
     assert expected in result.stdout, expected
 assert "bind *:80" not in result.stdout
 assert "ssl crt" not in result.stdout
+if shutil.which("haproxy"):
+    with tempfile.TemporaryDirectory() as tmp:
+        config = Path(tmp) / "haproxy.cfg"
+        config.write_text(result.stdout, encoding="utf-8")
+        checked = subprocess.run(
+            ["haproxy", "-c", "-f", str(config)],
+            text=True, capture_output=True, check=False,
+        )
+        assert checked.returncode == 0, checked.stdout + checked.stderr
 
 invalid_cases = [
     {"routes": []},
