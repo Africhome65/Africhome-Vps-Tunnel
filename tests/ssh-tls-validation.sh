@@ -25,6 +25,7 @@ MOCK_DIR_METADATA="1000:755"
 MOCK_DIR_METADATA="0:755"
 ln -s "$TMP" "$TMP-link"
 ! ssh_tls_safe_directory "$TMP-link"
+rm -f "$TMP-link"
 unset -f stat
 
 trap 'rm -rf "$TMP"' EXIT
