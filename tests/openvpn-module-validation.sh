@@ -150,4 +150,99 @@ chmod 0700 "$OVPN_EASYRSA_SOURCE/easyrsa"
 ! compgen -G "$TMP/.africhome-easyrsa.*" >/dev/null
 unset -f ah_require_root ah_ok ah_warn ovpn_easyrsa
 
+
+# End-to-end setup transaction tests with isolated paths and mocked service tools.
+setup_case(){
+  local root="$1"
+  OVPN_EASYRSA_DIR="$root/easy-rsa"
+  OVPN_CONFIG_DIR="$root/server"
+  OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
+  OVPN_STATE="$root/state"
+  OVPN_RUNTIME_DIR="$root/runtime"
+  OVPN_LOG_DIR="$root/log"
+  OVPN_SERVICE="openvpn-server@africhome"
+  mkdir -p "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_CONFIG_DIR"
+  printf 'ca cert\n' > "$OVPN_EASYRSA_DIR/pki/ca.crt"
+  printf 'ca key\n' > "$OVPN_EASYRSA_DIR/pki/private/ca.key"
+  printf 'server key\n' > "$OVPN_EASYRSA_DIR/pki/private/server.key"
+  printf 'server cert\n' > "$OVPN_EASYRSA_DIR/pki/issued/server.crt"
+  printf 'crl\n' > "$OVPN_EASYRSA_DIR/pki/crl.pem"
+  printf 'tls key\n' > "$OVPN_EASYRSA_DIR/pki/ta.key"
+}
+ah_require_root(){ return 0; }
+ah_ok(){ :; }
+ah_info(){ :; }
+ah_warn(){ :; }
+ovpn_require_tools(){ return 0; }
+ovpn_pki_paths_safe(){ return 0; }
+ovpn_port_available(){ return 0; }
+ip(){ :; }
+chown(){ return 0; }
+install(){
+  local mode="" directory=0
+  local -a paths=()
+  while (($#)); do
+    case "$1" in
+      -d) directory=1; shift ;;
+      -o|-g|-m) if [[ "$1" == -m ]]; then mode="$2"; fi; shift 2 ;;
+      *) paths+=("$1"); shift ;;
+    esac
+  done
+  if (( directory )); then
+    mkdir -p -- "${paths[-1]}"
+    [[ -z "$mode" ]] || chmod "$mode" "${paths[-1]}"
+  else
+    cp -- "${paths[-2]}" "${paths[-1]}"
+    [[ -z "$mode" ]] || chmod "$mode" "${paths[-1]}"
+  fi
+}
+systemctl(){
+  printf '%s\n' "$*" >> "$MOCK_SYSTEMCTL_LOG"
+  case "$1" in
+    is-active) [[ "$MOCK_ACTIVE" == 1 ]] ;;
+    is-enabled) [[ "$MOCK_ENABLED" == 1 ]] ;;
+    enable) MOCK_ENABLED=1 ;;
+    disable) MOCK_ENABLED=0 ;;
+    restart) MOCK_ACTIVE=1; [[ "$MOCK_RESTART_FAIL" != 1 ]] ;;
+    stop)
+      [[ "$MOCK_STOP_FAIL" != 1 ]] || return 1
+      MOCK_ACTIVE=0
+      ;;
+    *) return 2 ;;
+  esac
+}
+journalctl(){ :; }
+
+# A failed start with successful stop must remove new state/runtime and preserve
+# the failed config for diagnostics. It must also undo only its own enable.
+SETUP_TMP="$TMP/setup-rollback"
+mkdir -p "$SETUP_TMP"
+setup_case "$SETUP_TMP"
+export MOCK_SYSTEMCTL_LOG="$SETUP_TMP/systemctl.log"
+: > "$MOCK_SYSTEMCTL_LOG"
+if printf 'vpn.example.com\nudp\n1194\n' | MOCK_ACTIVE=0 MOCK_ENABLED=0 MOCK_RESTART_FAIL=1 MOCK_STOP_FAIL=0 ovpn_configure_server; then
+  echo "Expected OpenVPN startup failure." >&2; exit 1
+fi
+[[ ! -e "$OVPN_CONFIG" && ! -e "$OVPN_STATE" && ! -e "$OVPN_RUNTIME_DIR" ]]
+compgen -G "$OVPN_CONFIG.failed.*" >/dev/null
+[[ ! -e "$OVPN_LOG_DIR" ]]
+grep -q '^disable openvpn-server@africhome
+ "$MOCK_SYSTEMCTL_LOG"
+
+# If stop fails and OpenVPN remains active, retain all files rather than
+# deleting a configuration that a live process may still depend on.
+SETUP_TMP="$TMP/setup-critical"
+mkdir -p "$SETUP_TMP"
+setup_case "$SETUP_TMP"
+: > "$MOCK_SYSTEMCTL_LOG"
+if printf 'vpn.example.com\nudp\n1194\n' | MOCK_ACTIVE=0 MOCK_ENABLED=0 MOCK_RESTART_FAIL=1 MOCK_STOP_FAIL=1 ovpn_configure_server; then
+  echo "Expected critical OpenVPN rollback warning." >&2; exit 1
+fi
+[[ -f "$OVPN_CONFIG" && -f "$OVPN_STATE" && -f "$OVPN_RUNTIME_DIR/server.key" ]]
+[[ -d "$OVPN_LOG_DIR" ]]
+rm -rf "$SETUP_TMP"
+
+unset -f ah_require_root ah_ok ah_info ah_warn ovpn_require_tools ovpn_pki_paths_safe
+unset -f ovpn_port_available ip chown install systemctl journalctl
+
 echo "OpenVPN module validation passed."
