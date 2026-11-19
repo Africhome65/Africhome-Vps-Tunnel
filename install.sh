@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPO_URL="https://github.com/Africhome65/Africhome-Vps-Tunnel.git"
-INSTALL_BRANCH="feature/central-port-routing-architecture"
+INSTALL_BRANCH="feature/central-dnstt-integration"
 INSTALL_DIR="/opt/africhome-vps-tunnel"
 BIN_LINK="/usr/local/bin/africhome"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
