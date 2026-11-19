@@ -6,7 +6,7 @@ CD_LEGACY_HOOK=/etc/letsencrypt/renewal-hooks/deploy/africhome-hysteria.sh
 
 cd_init() {
   command -v jq >/dev/null || { ah_err "jq is required."; return 1; }
-  if [[ ! -e "$CD_CONFIG" ]]; then install -d -m 700 /etc/africhome; printf "[]\n" > "$CD_CONFIG"; chmod 600 "$CD_CONFIG"; fi
+  if [[ ! -e "$CD_CONFIG" ]]; then install -d -m 700 "$(dirname "$CD_CONFIG")"; printf "[]\n" > "$CD_CONFIG"; chmod 600 "$CD_CONFIG"; fi
   [[ -f "$CD_CONFIG" && ! -L "$CD_CONFIG" ]] || { ah_err "Unsafe deploy registry."; return 1; }
   jq -e 'type=="array" and all(.[]; (.service=="xray" or .service=="hysteria"))' "$CD_CONFIG" >/dev/null || { ah_err "Invalid deploy registry."; return 1; }
 }
