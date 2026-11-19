@@ -66,6 +66,7 @@ backup_create(){
   chmod 0600 "$sumtmp" || { rm -f "$archive" "$sumtmp"; return 1; }
   mv -- "$sumtmp" "$archive.sha256" || { rm -f "$archive" "$sumtmp"; return 1; }
   ah_ok "Encrypted? No. Root-only configuration backup created: $archive"
+  type ah_audit_log >/dev/null 2>&1 && ah_audit_log backup.create success || true
   ah_warn "This archive may contain passwords, tokens, certificates, and private keys. Keep it protected and off-host."
   printf 'Included paths:\n'
   printf '  %s\n' "${paths[@]}"
@@ -172,6 +173,7 @@ PY
     return 1
   fi
   ah_ok "Restore staged for inspection: $stage"
+  type ah_audit_log >/dev/null 2>&1 && ah_audit_log backup.restore.stage success || true
   ah_warn "Nothing was copied into live system paths. Review files and plan service-specific restoration separately."
 }
 # Retention is manual and opt-in. Only old, regular Africhome archives and
