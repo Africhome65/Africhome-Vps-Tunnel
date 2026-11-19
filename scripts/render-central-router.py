@@ -97,7 +97,7 @@ def render(routes: list[dict[str, Any]]) -> str:
         lines.extend([
             f"backend be_{route['name']}",
             "    mode tcp",
-            f"    server srv_{route['name']} {route['backend_host']}:{route['backend_port']} check",
+            f"    server srv_{route['name']} [{route['backend_host']}]:{route['backend_port']} check" if route["backend_host"] == "::1" else f"    server srv_{route['name']} {route['backend_host']}:{route['backend_port']} check",
             "",
         ])
     lines.extend([
