@@ -34,6 +34,12 @@ ovpn_easyrsa(){
   [[ -x "$OVPN_EASYRSA_DIR/easyrsa" ]] || { ovpn_error "Easy-RSA is not initialized."; return 1; }
   (cd "$OVPN_EASYRSA_DIR" && EASYRSA_BATCH=1 ./easyrsa "$@")
 }
+ovpn_pki_paths_safe(){
+  local path
+  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued"; do
+    [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
+  done
+}
 ovpn_require_tools(){
   local missing=0 cmd
   for cmd in openvpn systemctl ss install openssl; do
@@ -108,7 +114,8 @@ EOF
 ovpn_configure_server(){
   ah_require_root || return 1
   ovpn_require_tools || return 1
-  [[ -s "$OVPN_EASYRSA_DIR/pki/ca.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/ca.key" ]] || {
+  ovpn_pki_paths_safe || return 1
+  [[ -s "$OVPN_EASYRSA_DIR/pki/ca.crt" && ! -L "$OVPN_EASYRSA_DIR/pki/ca.crt" && -s "$OVPN_EASYRSA_DIR/pki/private/ca.key" && ! -L "$OVPN_EASYRSA_DIR/pki/private/ca.key" ]] || {
     ovpn_error "Initialize the Africhome CA first."; return 1;
   }
   [[ ! -e "$OVPN_CONFIG" ]] || { ovpn_error "OpenVPN config already exists. Refusing to overwrite it."; return 1; }
@@ -188,7 +195,8 @@ ovpn_configure_server(){
 }
 ovpn_add_client(){
   ah_require_root || return 1
-  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && -f "$OVPN_STATE" && ! -L "$OVPN_STATE" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "Configure the OpenVPN server first or review unsafe paths."; return 1; }
+  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && -f "$OVPN_STATE" && ! -L "$OVPN_STATE" ]] || { ovpn_error "Configure the OpenVPN server first or review unsafe paths."; return 1; }
+  ovpn_pki_paths_safe || return 1
   local name output tmp
   read -r -p "New client name (letters/numbers/_/-): " name
   ovpn_valid_name "$name" || { ovpn_error "Invalid client name."; return 1; }
@@ -245,7 +253,8 @@ EOF
 }
 ovpn_revoke_client(){
   ah_require_root || return 1
-  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" && ! -L "$OVPN_EASYRSA_DIR" ]] || { ovpn_error "Configure OpenVPN first or review unsafe paths."; return 1; }
+  [[ -f "$OVPN_CONFIG" && ! -L "$OVPN_CONFIG" ]] || { ovpn_error "Configure OpenVPN first or review unsafe paths."; return 1; }
+  ovpn_pki_paths_safe || return 1
   local name
   read -r -p "Client name to revoke: " name
   ovpn_valid_name "$name" && [[ "$name" != server ]] || { ovpn_error "Invalid or reserved client name."; return 1; }
@@ -263,7 +272,8 @@ ovpn_revoke_client(){
 
 ovpn_list_clients(){
   local index="$OVPN_EASYRSA_DIR/pki/index.txt"
-  [[ ! -L "$OVPN_EASYRSA_DIR" && -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found or unsafe."; return 1; }
+  ovpn_pki_paths_safe || return 1
+  [[ -f "$index" && ! -L "$index" ]] || { ovpn_error "Easy-RSA certificate index not found or unsafe."; return 1; }
   printf '%-10s %s\n' "STATUS" "CLIENT"
   awk -F '\t' '
     /^[VR]\t/ {
