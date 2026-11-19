@@ -20,6 +20,22 @@ dt_valid_username() {
   [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ && "$1" != root ]]
 }
 
+dt_valid_host() {
+  local value="$1" octet
+  local -a octets
+  [[ -n "$value" && ${#value} -le 253 ]] || return 1
+  if [[ "$value" =~ ^[0-9.]+$ ]]; then
+    [[ "$value" =~ ^[0-9]{1,3}(\\.[0-9]{1,3}){3}$ ]] || return 1
+    IFS='.' read -r -a octets <<< "$value"
+    (( ${#octets[@]} == 4 )) || return 1
+    for octet in "${octets[@]}"; do
+      (( 10#$octet <= 255 )) || return 1
+    done
+    return 0
+  fi
+  [[ "$value" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$ ]]
+}
+
 dt_read_domain() {
   [[ -f "$DT_DOMAIN_CONFIG" && ! -L "$DT_DOMAIN_CONFIG" && "$(stat -c '%u:%a' "$DT_DOMAIN_CONFIG" 2>/dev/null || true)" == "0:600" ]] || {
     echo "DNSTT domain config must be a root-owned regular file with mode 0600." >&2
@@ -277,14 +293,14 @@ dt_client_help() {
     1) resolver="8.8.8.8:53"; option="-udp" ;;
     2)
       read -r -p "Custom UDP resolver address (e.g. 1.1.1.1:53 or dns.example.net:53): " resolver
-      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname-or-IPv4:port." >&2; return 1; }
+      [[ "$resolver" == *:* ]] && dt_valid_host "${resolver%:*}" && [[ "${resolver##*:}" =~ ^[0-9]{1,5}$ ]] || { echo "Enter a valid hostname-or-IPv4:port." >&2; return 1; }
       local port="${resolver##*:}"
       (( 10#$port >= 1 && 10#$port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
       option="-udp"
       ;;
     3)
       read -r -p "DoT resolver address (e.g. dns.google:853): " resolver
-      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname:port." >&2; return 1; }
+      [[ "$resolver" == *:* ]] && dt_valid_host "${resolver%:*}" && [[ "${resolver##*:}" =~ ^[0-9]{1,5}$ ]] || { echo "Enter a valid hostname:port." >&2; return 1; }
       local dot_port="${resolver##*:}"
       (( 10#$dot_port >= 1 && 10#$dot_port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
       option="-dot"
@@ -333,7 +349,7 @@ dt_config_export() {
   ssh_host="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')"
   read -r -p "SSH host (public VPS IP or hostname) [${ssh_host:-required}]: " entered
   ssh_host="${entered:-$ssh_host}"
-  [[ "$ssh_host" =~ ^[A-Za-z0-9.-]+$ && "$ssh_host" != .* && "$ssh_host" != *. ]] || {
+  dt_valid_host "$ssh_host" || {
     echo "Enter a valid public IP address or hostname." >&2
     return 1
   }
@@ -356,14 +372,14 @@ dt_config_export() {
     1) resolver="8.8.8.8:53"; option="-udp" ;;
     2)
       read -r -p "Custom UDP resolver address (hostname-or-IP:port): " resolver
-      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname-or-IP:port." >&2; return 1; }
+      [[ "$resolver" == *:* ]] && dt_valid_host "${resolver%:*}" && [[ "${resolver##*:}" =~ ^[0-9]{1,5}$ ]] || { echo "Enter a valid hostname-or-IP:port." >&2; return 1; }
       local udp_port="${resolver##*:}"
       (( 10#$udp_port >= 1 && 10#$udp_port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
       option="-udp"
       ;;
     3)
       read -r -p "DoT resolver address (hostname:port): " resolver
-      [[ "$resolver" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || { echo "Enter hostname:port." >&2; return 1; }
+      [[ "$resolver" == *:* ]] && dt_valid_host "${resolver%:*}" && [[ "${resolver##*:}" =~ ^[0-9]{1,5}$ ]] || { echo "Enter a valid hostname:port." >&2; return 1; }
       local dot_port="${resolver##*:}"
       (( 10#$dot_port >= 1 && 10#$dot_port <= 65535 )) || { echo "Resolver port must be 1-65535." >&2; return 1; }
       option="-dot"
