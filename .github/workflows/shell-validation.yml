@@ -38,6 +38,8 @@ jobs:
         run: bash tests/account-audit-integration-validation.sh
       - name: Test read-only port routing inventory
         run: bash tests/port-routing-validation.sh
+      - name: Test native OpenVPN management module
+        run: bash tests/openvpn-module-validation.sh
       - name: Test Xray and OpenVPN inventory privacy
         run: bash tests/service-inventory-validation.sh
       - name: Test DNSTT inventory privacy
