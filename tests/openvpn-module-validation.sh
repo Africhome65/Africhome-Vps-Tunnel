@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eexuo pipefail
+set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=../modules/openvpn.sh
 source "$ROOT/modules/openvpn.sh"
