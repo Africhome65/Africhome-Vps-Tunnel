@@ -27,20 +27,21 @@ grep -q 'public key must be a root-owned regular file with mode 0644' "$SERVICE"
 # Exercise the same address validators used by the service configurator.
 VALIDATORS="$(sed -n '/^valid_ipv4() {/,/^}/p; /^valid_upstream_host() {/,/^}/p' "$SERVICE")"
 [[ -n "$VALIDATORS" ]] || { echo "DNSTT address validators are missing." >&2; exit 1; }
-eval "$VALIDATORS"
-valid_ipv4 "127.0.0.1"
-valid_ipv4 "255.255.255.255"
-if valid_ipv4 "256.1.1.1" || valid_ipv4 "999.0.0.1" || valid_ipv4 "127.0.0"; then
-  echo "Invalid IPv4 address was accepted." >&2
+bash -c "$VALIDATORS
+valid_ipv4 '127.0.0.1'
+valid_ipv4 '255.255.255.255'
+if valid_ipv4 '256.1.1.1' || valid_ipv4 '999.0.0.1' || valid_ipv4 '127.0.0'; then
+  echo 'Invalid IPv4 address was accepted.' >&2
   exit 1
 fi
-valid_upstream_host "localhost"
-valid_upstream_host "ssh.example.net"
-valid_upstream_host "127.0.0.1"
-if valid_upstream_host "999.1.1.1" || valid_upstream_host "bad..host" || valid_upstream_host "-bad.example"; then
-  echo "Invalid SSH upstream host was accepted." >&2
+valid_upstream_host 'localhost'
+valid_upstream_host 'ssh.example.net'
+valid_upstream_host '127.0.0.1'
+if valid_upstream_host '999.1.1.1' || valid_upstream_host 'bad..host' || valid_upstream_host '-bad.example'; then
+  echo 'Invalid SSH upstream host was accepted.' >&2
   exit 1
 fi
+"
 grep -q 'root-owned regular file with mode 0600' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
 grep -q 'must be a real directory, not a symlink' "$ROOT_DIR/scripts/install-dnstt.sh"
 
