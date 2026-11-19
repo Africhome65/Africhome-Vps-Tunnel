@@ -8,7 +8,7 @@ This document records the implementation boundary for the requested Africhome se
 - `modules/xray.sh` can create a VLESS REALITY inbound, but its current setup flow can replace the whole Xray configuration after confirmation. It must not be used as the shared-router integration mechanism.
 - `modules/vmess.sh` creates a VMess WebSocket + TLS inbound and terminates TLS inside Xray.
 - `modules/trojan.sh` creates a Trojan TLS inbound and terminates TLS inside Xray.
-- There is no OpenVPN integration module in this branch at this time.
+- `modules/openvpn.sh` provides a native OpenVPN UDP/TCP server, Easy-RSA CA and client certificate lifecycle. It does not provide TLS/SNI, WebSocket, payload-proxy, or central-router integration.
 - The central router module is currently a validation/planning layer; it does not bind sockets or configure services.
 
 ## Shared TCP ports: mandatory prerequisites
@@ -55,11 +55,7 @@ An HTTP reverse proxy is not automatically a valid Trojan gateway. Do not advert
 
 ## OpenVPN contracts
 
-No OpenVPN module is present in this branch. Implement separately for:
-- Direct TCP 443, TCP 80, and TCP 1194.
-- Direct UDP 1194.
-- TLS/SNI TCP 443.
-- WebSocket/payload/proxy mode.
+`modules/openvpn.sh` currently implements native UDP/TCP OpenVPN on an operator-selected, conflict-checked port, certificate authority setup, client profile export, revocation and service status. It intentionally does not claim direct TCP 80/443, TLS/SNI TCP 443, WebSocket, payload/proxy, or central-router integration. Its default VPN pool is 10.8.0.0/24; setup inspects all IPv4 routes and refuses any overlapping route or an unavailable route inspection. The module does not change UFW/nftables, IP forwarding, or NAT. TLS/SNI and WebSocket wrapping remain planned until separate loopback backends, matching client configurations, and end-to-end tests exist.
 
 Native OpenVPN TCP/UDP listeners require dedicated sockets unless a tested protocol-aware frontend supports the exact transport. WebSocket wrapping and payload/proxy modes require compatible client-side wrapping; a port mapping alone is insufficient. Keep UDP allocation independent from TCP routing and reject occupied ports.
 
