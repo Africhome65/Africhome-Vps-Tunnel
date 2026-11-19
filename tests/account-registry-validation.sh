@@ -46,6 +46,8 @@ echo "PASS: Hysteria registry fixture added"
 ar_register_service "acct_test_0001" "alice" "ssh" "alice" 12345
 echo "PASS: SSH registry fixture added"
 dashboard="$(ar_dashboard)"
+printf '%s\n' "$dashboard"
+echo "PASS: dashboard rendered"
 grep -Fq "AFRICHOME ACCOUNT DASHBOARD" <<< "$dashboard"
 grep -Fq "Registered accounts: 1" <<< "$dashboard"
 grep -Fq "alice" <<< "$dashboard"
