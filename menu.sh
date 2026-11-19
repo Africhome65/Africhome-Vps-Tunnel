@@ -96,6 +96,7 @@ while true; do
       if [[ "$apply_confirm" =~ ^[Yy]$ ]]; then bash "$BASE_DIR/scripts/apply-central-haproxy.sh" --apply; fi
       ah_pause
       ;;
+    25) cr_render_reality_backend_candidate; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
