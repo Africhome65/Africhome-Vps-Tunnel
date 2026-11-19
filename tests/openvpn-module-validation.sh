@@ -20,6 +20,15 @@ ovpn_valid_remote 192.0.2.10
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+OVPN_STATE="$TMP/state"
+printf 'OVPN_REMOTE=vpn.example.com\\nOVPN_PORT=1194\\nOVPN_PROTO=udp\\n' > "$OVPN_STATE"
+chmod 0600 "$OVPN_STATE"
+stat(){ printf '0:600\\n'; }
+ovpn_load_state
+[[ "$OVPN_REMOTE" == vpn.example.com && "$OVPN_PORT" == 1194 && "$OVPN_PROTO" == udp ]]
+printf 'OVPN_REMOTE=vpn.example.com\\nOVPN_REMOTE=other.example.com\\nOVPN_PORT=1194\\nOVPN_PROTO=udp\\n' > "$OVPN_STATE"
+! ovpn_load_state
+unset -f stat
 OVPN_EASYRSA_DIR="$TMP/easy-rsa"
 OVPN_CONFIG_DIR="$TMP/server"
 OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
