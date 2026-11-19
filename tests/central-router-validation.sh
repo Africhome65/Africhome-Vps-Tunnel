@@ -81,8 +81,91 @@ if cr_check_route_collisions $'tcp|443|SSH.EXAMPLE.COM|route-a\ntcp|443|ssh.exam
   echo "Case-insensitive duplicate SNI was not detected." >&2
   exit 1
 fi
-if cr_check_route_collisions $'tcp|443|bad_host.example.com|route-a' >/dev/null 2>&1; then
+if cr_check_route_collisions 
+
+# UDP allocator uses supplied inventory only and never reserves a socket.
+[[ "$(cr_pick_udp_port 10000 10002 10000,10001)" == "10002" ]]
+[[ "$(cr_pick_udp_port 20000 20002 '')" == "20000" ]]
+if cr_pick_udp_port 10000 10001 10000,10001 >/dev/null 2>&1; then
+  echo "Full UDP range incorrectly returned a free port." >&2
+  exit 1
+fi
+if cr_pick_udp_port 0 10001 '' >/dev/null 2>&1; then
+  echo "Invalid UDP range was accepted." >&2
+  exit 1
+fi
+if cr_pick_udp_port 10000 10001 10000,bad >/dev/null 2>&1; then
+  echo "Malformed occupied-port inventory was accepted." >&2
+  exit 1
+fi
+
+# Validation module must remain non-mutating.
+if grep -Eiq 'apt-get[[:space:]]+(install|remove)|systemctl[[:space:]]+(restart|stop|disable)|ufw[[:space:]]+(allow|deny|delete|enable)|nft[[:space:]]+(add|delete|flush)|iptables[[:space:]]+(-A|-D|-F)' "$MODULE"; then
+  echo "Mutating command found in validation-only router module." >&2
+  exit 1
+fi
+
+for mode in ssh-direct-ssl ssh-payload-direct ssh-payload-proxy ssh-payload-proxy-sni \
+  v2ray-ssl v2ray-payload-proxy v2ray-direct v2ray-ws vless-reality \
+  trojan-tls trojan-tls-80 openvpn-tls-sni openvpn-ws openvpn-direct-tcp \
+  openvpn-direct-80 openvpn-direct-443 openvpn-direct-udp udp-direct hysteria2 dnstt; do
+  cr_mode_transport "$mode" >/dev/null || {
+    echo "Missing central-router mode mapping: $mode" >&2
+    exit 1
+  }
+done
+
+echo "Central-router validation checks passed."
+tcp|443|bad_host.example.com|route-a' >/dev/null 2>&1; then
   echo "Invalid SNI hostname was accepted in route list." >&2
+  exit 1
+fi
+
+if cr_check_route_collisions 
+
+# UDP allocator uses supplied inventory only and never reserves a socket.
+[[ "$(cr_pick_udp_port 10000 10002 10000,10001)" == "10002" ]]
+[[ "$(cr_pick_udp_port 20000 20002 '')" == "20000" ]]
+if cr_pick_udp_port 10000 10001 10000,10001 >/dev/null 2>&1; then
+  echo "Full UDP range incorrectly returned a free port." >&2
+  exit 1
+fi
+if cr_pick_udp_port 0 10001 '' >/dev/null 2>&1; then
+  echo "Invalid UDP range was accepted." >&2
+  exit 1
+fi
+if cr_pick_udp_port 10000 10001 10000,bad >/dev/null 2>&1; then
+  echo "Malformed occupied-port inventory was accepted." >&2
+  exit 1
+fi
+
+# Validation module must remain non-mutating.
+if grep -Eiq 'apt-get[[:space:]]+(install|remove)|systemctl[[:space:]]+(restart|stop|disable)|ufw[[:space:]]+(allow|deny|delete|enable)|nft[[:space:]]+(add|delete|flush)|iptables[[:space:]]+(-A|-D|-F)' "$MODULE"; then
+  echo "Mutating command found in validation-only router module." >&2
+  exit 1
+fi
+
+for mode in ssh-direct-ssl ssh-payload-direct ssh-payload-proxy ssh-payload-proxy-sni \
+  v2ray-ssl v2ray-payload-proxy v2ray-direct v2ray-ws vless-reality \
+  trojan-tls trojan-tls-80 openvpn-tls-sni openvpn-ws openvpn-direct-tcp \
+  openvpn-direct-80 openvpn-direct-443 openvpn-direct-udp udp-direct hysteria2 dnstt; do
+  cr_mode_transport "$mode" >/dev/null || {
+    echo "Missing central-router mode mapping: $mode" >&2
+    exit 1
+  }
+done
+
+echo "Central-router validation checks passed."
+udp|1194|vpn.example.com|udp-route' >/dev/null 2>&1; then
+  echo "UDP hostname/SNI route was incorrectly accepted." >&2
+  exit 1
+fi
+# Every fixed-port route must validate against the numeric public port.
+cr_validate_route ssh-payload-direct tcp 80 - 127.0.0.1 2200 >/dev/null
+cr_validate_route trojan-tls tcp 443 trojan.example.com 127.0.0.1 8443 >/dev/null
+cr_validate_route openvpn-direct-tcp tcp 1194 - 127.0.0.1 1195 >/dev/null
+if cr_validate_route ssh-direct-ssl tcp 80 ssh.example.com 127.0.0.1 2222 >/dev/null 2>&1; then
+  echo "SSH direct SSL accepted the wrong public port." >&2
   exit 1
 fi
 
