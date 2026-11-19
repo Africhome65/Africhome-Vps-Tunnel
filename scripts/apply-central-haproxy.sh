@@ -36,6 +36,8 @@ flock -n 9 || { fail "Another HAProxy apply transaction is running."; exit 1; }
 if "$SYSTEMCTL_BIN" is-active --quiet haproxy 2>/dev/null; then
   fail "HAProxy is already active. Refusing to replace a live service configuration."; exit 1
 fi
+enabled_before=0
+if "$SYSTEMCTL_BIN" is-enabled --quiet haproxy 2>/dev/null; then enabled_before=1; fi
 port_busy(){
   local port="$1"
   "$SS_BIN" -H -ltn 2>/dev/null | awk -v suffix=":$port" '$4 ~ (suffix "$") {found=1} END{exit !found}'
@@ -65,8 +67,11 @@ if ! install -o root -g root -m 0640 "$CANDIDATE" "$tmp" ||
   fail "Could not validate and atomically install the candidate."; exit 1
 fi
 tmp=""
+started_by_us=0
+enable_attempted=0
 rollback(){
-  "$SYSTEMCTL_BIN" stop haproxy >/dev/null 2>&1 || true
+  if (( started_by_us == 1 )); then "$SYSTEMCTL_BIN" stop haproxy >/dev/null 2>&1 || true; fi
+  if (( enable_attempted == 1 )); then "$SYSTEMCTL_BIN" disable haproxy >/dev/null 2>&1 || true; fi
   if (( had_config == 1 )); then
     local restore_tmp
     restore_tmp="$(mktemp "$CONFIG_DIR/.africhome-haproxy-rollback.XXXXXX")" || {
@@ -82,14 +87,25 @@ rollback(){
   fi
   info "Previous HAProxy configuration restored; service left stopped."
 }
-if ! "$SYSTEMCTL_BIN" start haproxy ||
-   ! "$SYSTEMCTL_BIN" is-active --quiet haproxy ||
-   ! port_busy 80 ||
-   ! port_busy 443; then
+if ! "$SYSTEMCTL_BIN" start haproxy; then
+  fail "HAProxy failed to start. Rolling back."
+  rollback || true
+  exit 1
+fi
+started_by_us=1
+if ! "$SYSTEMCTL_BIN" is-active --quiet haproxy || ! port_busy 80 || ! port_busy 443; then
   fail "HAProxy did not become active with both expected listeners. Rolling back."
   rollback || true
   exit 1
 fi
-info "HAProxy started with TCP 80 and 443 listeners."
+if (( enabled_before == 0 )); then
+  enable_attempted=1
+  if ! "$SYSTEMCTL_BIN" enable haproxy; then
+    fail "HAProxy could not be enabled for startup. Rolling back."
+    rollback || true
+    exit 1
+  fi
+fi
+info "HAProxy started and enabled with TCP 80 and 443 listeners."
 info "Previous config backup: $backup_dir"
 info "This transaction did not edit UFW/nftables, Xray, or other services."
