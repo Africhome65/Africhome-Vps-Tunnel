@@ -163,6 +163,12 @@ verb 3
 EOF
   [[ "$proto" != udp ]] || printf 'explicit-exit-notify 1\n' >> "$output"
 }
+# Remove only runtime/log artifacts created by an incomplete setup attempt.
+ovpn_cleanup_unpublished_setup(){
+  local runtime="$1" log_dir="${2:-/var/log/africhome-openvpn}"
+  if [[ -d "$runtime" && ! -L "$runtime" ]]; then rm -rf -- "$runtime" || return 1; fi
+  rmdir -- "$log_dir" 2>/dev/null || true
+}
 ovpn_configure_server(){
   ah_require_root || return 1
   ovpn_require_tools || return 1
@@ -178,7 +184,8 @@ ovpn_configure_server(){
     ovpn_error "$OVPN_SERVICE is already active; refusing to replace or restart it."
     return 1
   fi
-  local remote port proto tmp backup
+  local remote port proto tmp backup state_tmp service_was_enabled=0
+  if systemctl is-enabled --quiet "$OVPN_SERVICE" 2>/dev/null; then service_was_enabled=1; fi
   read -r -p "Public VPS IP/domain for client profiles: " remote
   ovpn_valid_remote "$remote" || { ovpn_error "Invalid public hostname or IPv4 address."; return 1; }
   read -r -p "OpenVPN transport [udp/tcp] (default udp): " proto
@@ -198,7 +205,10 @@ ovpn_configure_server(){
   }
   [[ ! -e /var/log/africhome-openvpn && ! -L /var/log/africhome-openvpn ]] || { ovpn_error "Africhome OpenVPN log directory already exists; review it before setup."; return 1; }
   if [[ ! -d "$OVPN_CONFIG_DIR" ]]; then install -d -m 0755 "$OVPN_CONFIG_DIR" || return 1; fi
-  install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn
+  if ! install -d -o nobody -g nogroup -m 0750 /var/log/africhome-openvpn; then
+    ovpn_error "Could not create OpenVPN log directory."
+    return 1
+  fi
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/private/server.key" ]]; then
     ovpn_easyrsa --req-cn=server gen-req server nopass || return 1
   fi
@@ -213,40 +223,69 @@ ovpn_configure_server(){
   if [[ ! -s "$OVPN_EASYRSA_DIR/pki/ta.key" ]]; then
     openvpn --genkey secret "$OVPN_EASYRSA_DIR/pki/ta.key" || return 1
   fi
-  install -d -o root -g nogroup -m 0750 "$OVPN_RUNTIME_DIR" || return 1
-  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" || return 1
-  install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_RUNTIME_DIR/server.key" || return 1
-  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_RUNTIME_DIR/ca.crt" || return 1
-  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/issued/server.crt" "$OVPN_RUNTIME_DIR/server.crt" || return 1
-  install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem" || return 1
-  tmp="$(mktemp "$OVPN_CONFIG_DIR/.africhome.XXXXXX")" || return 1
+  if ! install -d -o root -g nogroup -m 0750 "$OVPN_RUNTIME_DIR" ||
+     ! install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_RUNTIME_DIR/ta.key" ||
+     ! install -o root -g nogroup -m 0640 "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_RUNTIME_DIR/server.key" ||
+     ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_RUNTIME_DIR/ca.crt" ||
+     ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/issued/server.crt" "$OVPN_RUNTIME_DIR/server.crt" ||
+     ! install -o root -g nogroup -m 0644 "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_RUNTIME_DIR/crl.pem"; then
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Could not stage OpenVPN runtime files; partial runtime data was removed."
+    return 1
+  fi
+  tmp="$(mktemp "$OVPN_CONFIG_DIR/.africhome.XXXXXX")" || {
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"; return 1;
+  }
+  state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || {
+    rm -f "$tmp"; ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"; return 1;
+  }
   backup=""
-  ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR"
-  chmod 0640 "$tmp"
-  chown root:nogroup "$tmp"
-  if ! mv -n -- "$tmp" "$OVPN_CONFIG" || [[ -e "$tmp" ]]; then
-    rm -f "$tmp"
-    ovpn_error "Config path appeared during setup; refusing overwrite."
+  if ! ovpn_write_server_config "$tmp" "$port" "$proto" "$OVPN_RUNTIME_DIR" ||
+     ! chmod 0640 "$tmp" || ! chown root:nogroup "$tmp"; then
+    rm -f "$tmp" "$state_tmp"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Could not prepare OpenVPN server config."
+    return 1
+  fi
+  umask 077
+  if ! printf 'OVPN_REMOTE=%s\nOVPN_PORT=%s\nOVPN_PROTO=%s\n' "$remote" "$port" "$proto" > "$state_tmp" ||
+     ! chmod 0600 "$state_tmp"; then
+    rm -f "$tmp" "$state_tmp"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Could not prepare protected OpenVPN state."
     return 1
   fi
   chmod 0600 "$OVPN_EASYRSA_DIR/pki/private/server.key"
-  local state_tmp
-  state_tmp="$(mktemp "$(dirname -- "$OVPN_STATE")/.africhome-openvpn.XXXXXX")" || return 1
-  umask 077
-  printf 'OVPN_REMOTE=%s\nOVPN_PORT=%s\nOVPN_PROTO=%s\n' "$remote" "$port" "$proto" > "$state_tmp"
-  chmod 0600 "$state_tmp"
+  if ! mv -n -- "$tmp" "$OVPN_CONFIG" || [[ -e "$tmp" ]]; then
+    rm -f "$tmp" "$state_tmp"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Config path appeared during setup; refusing overwrite."
+    return 1
+  fi
   if ! mv -n -- "$state_tmp" "$OVPN_STATE" || [[ -e "$state_tmp" ]]; then
-    rm -f "$state_tmp"
-    ovpn_error "Could not safely save OpenVPN state."
+    rm -f "$state_tmp" "$OVPN_CONFIG"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    ovpn_error "Could not safely publish OpenVPN state; new config/runtime were rolled back."
     return 1
   fi
   if ! systemctl enable "$OVPN_SERVICE" || ! systemctl restart "$OVPN_SERVICE" || ! systemctl is-active --quiet "$OVPN_SERVICE"; then
-    backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
-    mv -- "$OVPN_CONFIG" "$backup"
-    rm -f -- "$OVPN_STATE"
     systemctl stop "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || true
-    ovpn_error "OpenVPN did not start. Failed config preserved at $backup."
+    if systemctl is-active --quiet "$OVPN_SERVICE" 2>/dev/null; then
+      ovpn_error "CRITICAL: OpenVPN remains active after failed startup. Config, state and runtime were retained for manual recovery."
+      journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
+      return 1
+    fi
+    backup="$OVPN_CONFIG.failed.$(date +%Y%m%d%H%M%S)"
+    if ! mv -n -- "$OVPN_CONFIG" "$backup" || [[ -e "$OVPN_CONFIG" ]]; then
+      ovpn_error "Could not preserve failed config; state/runtime were retained for manual recovery."
+      return 1
+    fi
+    rm -f -- "$OVPN_STATE"
+    ovpn_cleanup_unpublished_setup "$OVPN_RUNTIME_DIR"
+    if (( service_was_enabled == 0 )); then
+      systemctl disable "$OVPN_SERVICE" >/dev/null 2>&1 || ovpn_warn "Could not restore the previously-disabled service boot state."
+    fi
+    ovpn_error "OpenVPN did not start. Failed config preserved at $backup; newly-created state/runtime were rolled back."
     journalctl -u "$OVPN_SERVICE" -n 30 --no-pager 2>/dev/null || true
     return 1
   fi
