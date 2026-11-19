@@ -91,12 +91,16 @@ ovpn_subnet_available(){
 import ipaddress
 import sys
 target = ipaddress.ip_network("10.8.0.0/24")
+route_types = {"unicast", "local", "broadcast", "anycast", "multicast", "blackhole", "unreachable", "prohibit", "throw", "nat"}
 for line in sys.stdin:
     fields = line.split()
     if not fields:
         continue
+    # iproute2 prefixes some route entries with a route type, e.g.
+    # "local 10.8.0.1 dev lo". Parse the destination after that type.
+    destination = fields[1] if fields[0] in route_types and len(fields) > 1 else fields[0]
     try:
-        route = ipaddress.ip_network(fields[0], strict=False)
+        route = ipaddress.ip_network(destination, strict=False)
     except ValueError:
         continue
     if route.prefixlen == 0:
