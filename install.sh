@@ -30,6 +30,7 @@ fi
 
 chmod 0755 "$INSTALL_DIR/install.sh" "$INSTALL_DIR/menu.sh"
 chmod 0644 "$INSTALL_DIR/lib/common.sh" "$INSTALL_DIR"/modules/*.sh
+install -D -m 0750 "$INSTALL_DIR/scripts/africhome-cert-deploy-hook.sh" /etc/letsencrypt/renewal-hooks/deploy/africhome-central-deploy.sh
 ln -sfn "$INSTALL_DIR/menu.sh" "$BIN_LINK"
 echo "Africhome VPS Tunnel foundation installed."
 echo "Launch the terminal menu with: sudo africhome"
