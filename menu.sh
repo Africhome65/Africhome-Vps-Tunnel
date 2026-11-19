@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" ]] || {
+[[ -f "$BASE_DIR/scripts/openvpn-inventory.sh" && -f "$BASE_DIR/scripts/dnstt-inventory.sh" && -f "$BASE_DIR/scripts/xray-inventory.sh" && -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/port_routing.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" && -f "$BASE_DIR/modules/account_registry.sh" && -f "$BASE_DIR/modules/hysteria.sh" && -f "$BASE_DIR/modules/hysteria_users.sh" && -f "$BASE_DIR/modules/domain_manager.sh" && -f "$BASE_DIR/modules/cert_deploy.sh" && -f "$BASE_DIR/modules/backup.sh" && -f "$BASE_DIR/modules/service_modes.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
@@ -46,7 +46,7 @@ while true; do
   echo "15) Backups and staged restore"
   echo "16) Requested service modes and compatibility notes"
   echo "17) Read-only Xray inbound inventory"
-  echo "18) Read-only DNSTT deployment inventory"
+  echo "18) Read-only DNSTT deployment inventory"\n  echo "19) Read-only OpenVPN deployment inventory"
   echo "0) Exit"
   read -r -p "Select an option: " choice
   case "$choice" in
@@ -74,7 +74,7 @@ while true; do
     15) backup_menu ;;
     16) af_modes_menu ;;
     17) bash "$BASE_DIR/scripts/xray-inventory.sh"; ah_pause ;;
-    18) bash "$BASE_DIR/scripts/dnstt-inventory.sh"; ah_pause ;;
+    18) bash "$BASE_DIR/scripts/dnstt-inventory.sh"; ah_pause ;;\n    19) bash "$BASE_DIR/scripts/openvpn-inventory.sh"; ah_pause ;;
     0) exit 0 ;;
     *) ah_warn "Invalid choice."; sleep 1 ;;
   esac
