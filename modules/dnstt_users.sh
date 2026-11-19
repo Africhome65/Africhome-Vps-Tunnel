@@ -315,7 +315,7 @@ dt_client_help() {
 dt_config_export() {
   dt_require_root || return 1
   dt_read_domain || return 1
-  [[ -s "$DT_PUBLIC_KEY" ]] || { echo "DNSTT public key is missing; install DNSTT first." >&2; return 1; }
+  [[ -f "$DT_PUBLIC_KEY" && ! -L "$DT_PUBLIC_KEY" && -s "$DT_PUBLIC_KEY" && "$(stat -c '%u:%a' "$DT_PUBLIC_KEY" 2>/dev/null || true)" == "0:644" ]] || { echo "DNSTT public key must be a root-owned regular file with mode 0644; install DNSTT first." >&2; return 1; }
 
   local username resolver mode option ssh_host ssh_port entered export_root export_dir config_file archive_file expiry
   read -r -p "DNSTT customer username: " username
