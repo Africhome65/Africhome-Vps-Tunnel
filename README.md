@@ -5,6 +5,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 ## Implemented modules
 
 - SSH Linux account creation, listing, locking/unlocking, and expiry management
+- Loopback-only SSH-over-TLS backend using stunnel, with certificate/SNI validation and no public listener changes
 - Fail2ban installation and status
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
@@ -24,7 +25,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Central TCP/UDP route validation and planning primitives are available; they do not configure listeners, proxies, firewall rules, or services.
 - The requested shared-port modes remain planned until their protocol handlers and client interoperability are implemented and verified.
 - VLESS REALITY is preserve-only for the shared-router work and must not be treated as ordinary TLS.
-- SSH account management creates Linux users only; it does not provide an SSH TLS/payload gateway.
+- SSH account management creates Linux users; the separate stunnel backend provides an SSH-over-TLS loopback service, but public SNI routing and payload/proxy gateway modes are still pending.
 - Native OpenVPN direct UDP/TCP server and certificate-based client management are implemented. OpenVPN WebSocket, payload-proxy, TLS/SNI wrapper modes, automatic firewall/NAT setup, and shared-port router integration are not implemented. The module deliberately does not change UFW/nftables or enable IP forwarding.
 - See [the central routing architecture contract](docs/CENTRAL-ROUTING-ARCHITECTURE.md) for required backend, safety, and compatibility rules.
 
