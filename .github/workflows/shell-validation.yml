@@ -64,6 +64,8 @@ jobs:
         run: bash tests/haproxy-sni-validation.sh
       - name: Test HAProxy central-router config renderer
         run: python3 tests/central-router-render-validation.py
+      - name: Test HAProxy HTTP Host path renderer
+        run: python3 tests/http-router-render-validation.py
       - name: Run ShellCheck errors
         run: |
           find . -type f -name '*.sh' -print0 | xargs -0 shellcheck --severity=error
