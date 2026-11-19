@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Eexuo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 source "$ROOT/modules/ssh_tls.sh"
 ah_err(){ :; }
