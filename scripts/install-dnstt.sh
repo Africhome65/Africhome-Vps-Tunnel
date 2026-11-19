@@ -15,6 +15,9 @@ info() { printf '[INFO] %s\n' "$*"; }
 ok() { printf '[ OK ] %s\n' "$*"; }
 
 [[ "$EUID" -eq 0 ]] || fail "Run as root: sudo bash scripts/install-dnstt.sh"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+[[ -r "$SCRIPT_DIR/scripts/license.sh" ]] || fail "Licence verifier is missing. Run the main Africhome installer checkout."
+bash "$SCRIPT_DIR/scripts/license.sh" verify
 [[ "$(uname -s)" == "Linux" ]] || fail "Linux is required."
 [[ "$(uname -m)" == "x86_64" ]] || fail "This bootstrap currently supports x86_64/amd64 only."
 
