@@ -167,9 +167,13 @@ class VmessShared443Tests(unittest.TestCase):
         output = self.root / "candidate"
         MODULE.write_candidate_dir(output, candidate, manifest, haproxy)
         self.assertEqual(output.stat().st_mode & 0o777, 0o700)
-        for name in ("xray-config.json", "tls-routes.json", "haproxy-443.cfg", "client-details.txt", "README.txt"):
+        for name in ("xray-config.json", "tls-routes.json", "haproxy-443.cfg", "vmess-state.env", "client-details.txt", "README.txt"):
             self.assertEqual((output / name).stat().st_mode & 0o777, 0o600)
         self.assertIn("Public port: 443/TCP", (output / "client-details.txt").read_text())
+        state = (output / "vmess-state.env").read_text()
+        self.assertIn("VMESS_PORT=443", state)
+        self.assertIn("VMESS_SHARED443=1", state)
+        self.assertIn("VMESS_BACKEND_PORT=8443", state)
         self.assertIn("Review-only candidate", (output / "README.txt").read_text())
         with self.assertRaises(MODULE.CandidateError):
             MODULE.write_candidate_dir(output, candidate, manifest, haproxy)
