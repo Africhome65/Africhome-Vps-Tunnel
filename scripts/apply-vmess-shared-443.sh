@@ -13,6 +13,7 @@ bash "$SCRIPT_DIR/scripts/license.sh" verify
 
 XRAY_CONFIG="${AFRICHOME_XRAY_CONFIG:-/usr/local/etc/xray/config.json}"
 HAPROXY_CONFIG="${AFRICHOME_HAPROXY_CONFIG:-/etc/haproxy/haproxy.cfg}"
+VMESS_STATE="${AFRICHOME_VMESS_STATE:-/etc/africhome-vmess.env}"
 BACKUP_ROOT="${AFRICHOME_SHARED443_BACKUP_ROOT:-/var/backups/africhome}"
 XRAY_SERVICE="${AFRICHOME_XRAY_SERVICE:-xray.service}"
 HAPROXY_SERVICE="${AFRICHOME_HAPROXY_SERVICE:-haproxy.service}"
@@ -31,5 +32,5 @@ NOTICE
 read -r -p "Type APPLY to proceed with the shared TCP/443 migration: " confirmation
 [[ "$confirmation" == "APPLY" ]] || fail "Confirmation not received; no changes made."
 
-shared443_apply_transaction "$candidate_dir" "$XRAY_CONFIG" "$HAPROXY_CONFIG" \
+shared443_apply_transaction "$candidate_dir" "$XRAY_CONFIG" "$HAPROXY_CONFIG" "$VMESS_STATE" \
   "$BACKUP_ROOT" "$XRAY_SERVICE" "$HAPROXY_SERVICE" 1
