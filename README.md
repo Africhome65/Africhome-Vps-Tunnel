@@ -48,7 +48,7 @@ See [deployment readiness](docs/DEPLOYMENT-READINESS.md) for the current impleme
 
 ## Installation
 
-<badge color="warning">Release candidate — not ready for VPS deployment</badge>
+**Release candidate — not ready for VPS deployment.**
 
 The public default `main` branch is not yet the consolidated release candidate. Development work is under draft PRs #4, #5 and #7. Do not run `install.sh` or deploy this branch until those changes are reviewed, consolidated into `main`, and all release gates are passed.
 
