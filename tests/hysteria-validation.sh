@@ -350,6 +350,111 @@ fi
 unset -f mv
 unset -f systemctl
 
+# Exercise the pinned Hysteria installer rollback across binary, units and config.
+install_backup="$tmp_dir/hy2-install-backup"
+install_live="$tmp_dir/hy2-install-live"
+mkdir -p "$install_backup" "$install_live"
+printf 'old-binary\n' > "$install_backup/hysteria"
+printf 'old-unit\n' > "$install_backup/hysteria-server.service"
+printf 'old-template\n' > "$install_backup/hysteria-server@.service"
+printf 'old-config\n' > "$install_backup/config.yaml"
+printf 'new-binary\n' > "$install_live/hysteria"
+printf 'new-unit\n' > "$install_live/hysteria-server.service"
+printf 'new-template\n' > "$install_live/hysteria-server@.service"
+printf 'new-config\n' > "$install_live/config.yaml"
+systemctl() {
+  printf '%s\n' "$*" >> "$tmp_dir/hy2-install-systemctl.log"
+  return 0
+}
+if hy2_restore_install_transaction "$install_backup" "$install_live/hysteria" "$install_live/hysteria-server.service" "$install_live/hysteria-server@.service" "$install_live/config.yaml" 1 1 1 1 1 &&
+   [[ "$(cat "$install_live/hysteria")" == "old-binary" ]] &&
+   [[ "$(cat "$install_live/hysteria-server.service")" == "old-unit" ]] &&
+   [[ "$(cat "$install_live/hysteria-server@.service")" == "old-template" ]] &&
+   [[ "$(cat "$install_live/config.yaml")" == "old-config" ]] &&
+   grep -q '^restart hysteria-server.service
+renew_src="$tmp_dir/letsencrypt/vpn.example.com"
+renew_dest="$tmp_dir/hysteria-certs"
+mkdir -p "$renew_src" "$renew_dest"
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$renew_src/privkey.pem" -out "$renew_src/fullchain.pem" -subj "/CN=vpn.example.com" -days 1 >/dev/null 2>&1
+hook_runtime="$tmp_dir/renewal-runtime.sh"
+sed -e "s|^SRC=.*|SRC=\"$renew_src\"|" \
+    -e "s|^DEST=.*|DEST=\"$renew_dest\"|" \
+    -e 's/install -d -o hysteria -g hysteria -m 750/install -d -m 750/' \
+    -e 's/install -o hysteria -g hysteria -m 640/install -m 640/' \
+    -e 's/systemctl restart hysteria-server.service/:/' \
+    "$hook_file" > "$hook_runtime"
+chmod 0750 "$hook_runtime"
+printf 'old-cert\n' > "$renew_dest/fullchain.pem"
+printf 'old-key\n' > "$renew_dest/privkey.pem"
+bash "$hook_runtime" || { echo "FAIL: renewal hook successful apply"; ((fail+=1)); }
+if cmp -s "$renew_src/fullchain.pem" "$renew_dest/fullchain.pem" && cmp -s "$renew_src/privkey.pem" "$renew_dest/privkey.pem"; then
+  echo "PASS: renewal hook applies a matching certificate/key pair"
+  ((pass+=1))
+else
+  echo "FAIL: renewal hook did not apply the matching certificate/key pair" >&2
+  ((fail+=1))
+fi
+
+# Force the second file replacement to fail after the certificate has moved.
+printf 'previous-cert\n' > "$renew_dest/fullchain.pem"
+printf 'previous-key\n' > "$renew_dest/privkey.pem"
+hook_fail="$tmp_dir/renewal-forced-failure.sh"
+sed 's|mv -f -- "$tmp_key" "$DEST/privkey.pem"|false|' "$hook_runtime" > "$hook_fail"
+chmod 0750 "$hook_fail"
+if bash "$hook_fail"; then
+  echo "FAIL: injected key replacement failure unexpectedly succeeded" >&2
+  ((fail+=1))
+elif [[ "$(cat "$renew_dest/fullchain.pem")" == "previous-cert" && "$(cat "$renew_dest/privkey.pem")" == "previous-key" ]]; then
+  echo "PASS: renewal hook restores the previous pair after injected second-file failure"
+  ((pass+=1))
+else
+  echo "FAIL: renewal hook did not restore the previous pair after injected failure" >&2
+  ((fail+=1))
+fi
+
+printf '\nHysteria validation tests: %d passed, %d failed\n' "$pass" "$fail"
+(( fail == 0 ))
+ "$tmp_dir/hy2-install-systemctl.log"; then
+  echo "PASS: Hysteria installer rollback restores binary, units, config and active service"
+  ((pass+=1))
+else
+  echo "FAIL: Hysteria installer rollback did not restore all previous files" >&2
+  ((fail+=1))
+fi
+unset -f systemctl
+
+# An injected installer rollback rename failure must return failure and retain its backup.
+install_backup_fail="$tmp_dir/hy2-install-backup-fail"
+install_live_fail="$tmp_dir/hy2-install-live-fail"
+mkdir -p "$install_backup_fail" "$install_live_fail"
+printf 'protected-binary\n' > "$install_backup_fail/hysteria"
+printf 'partial-binary\n' > "$install_live_fail/hysteria"
+printf 'protected-unit\n' > "$install_backup_fail/hysteria-server.service"
+printf 'partial-unit\n' > "$install_live_fail/hysteria-server.service"
+printf 'protected-template\n' > "$install_backup_fail/hysteria-server@.service"
+printf 'partial-template\n' > "$install_live_fail/hysteria-server@.service"
+printf 'protected-config\n' > "$install_backup_fail/config.yaml"
+printf 'partial-config\n' > "$install_live_fail/config.yaml"
+systemctl() { return 0; }
+mv() {
+  if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${4:-}" == "$install_live_fail/hysteria" ]]; then
+    return 1
+  fi
+  command mv "$@"
+}
+if hy2_restore_install_transaction "$install_backup_fail" "$install_live_fail/hysteria" "$install_live_fail/hysteria-server.service" "$install_live_fail/hysteria-server@.service" "$install_live_fail/config.yaml" 1 1 1 1 0; then
+  echo "FAIL: injected Hysteria installer rollback failure unexpectedly succeeded" >&2
+  ((fail+=1))
+elif [[ "$(cat "$install_backup_fail/hysteria")" == "protected-binary" ]]; then
+  echo "PASS: failed Hysteria installer rollback leaves protected backup intact"
+  ((pass+=1))
+else
+  echo "FAIL: Hysteria installer rollback lost its protected binary backup" >&2
+  ((fail+=1))
+fi
+unset -f mv
+unset -f systemctl
+
 # Run the generated renewal hook against temporary paths with a real cert/key.
 renew_src="$tmp_dir/letsencrypt/vpn.example.com"
 renew_dest="$tmp_dir/hysteria-certs"
