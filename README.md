@@ -48,14 +48,18 @@ See [deployment readiness](docs/DEPLOYMENT-READINESS.md) for the current impleme
 
 ## Installation
 
-Review scripts before running:
+<badge color="warning">Release candidate — not ready for VPS deployment</badge>
+
+The public default `main` branch is not yet the consolidated release candidate. Development work is under draft PRs #4, #5 and #7. Do not run `install.sh` or deploy this branch until those changes are reviewed, consolidated into `main`, and all release gates are passed.
+
+For source review only:
 
 ```bash
-git clone --branch feature/central-dnstt-integration https://github.com/Africhome65/Africhome-Vps-Tunnel.git
+git clone --branch fix/dnstt-transactional-install https://github.com/Africhome65/Africhome-Vps-Tunnel.git
 cd Africhome-Vps-Tunnel
-sudo bash install.sh
-sudo africhome
 ```
+
+The deployment command will be restored here when the public `main` branch is ready.
 
 ## DNSTT setup and customer accounts
 
