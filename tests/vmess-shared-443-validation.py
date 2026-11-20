@@ -153,9 +153,14 @@ class VmessShared443Tests(unittest.TestCase):
     def test_vmess_menu_wires_candidate_and_checks_xray_file_access(self):
         module_text = (ROOT / "modules" / "vmess.sh").read_text()
         self.assertIn('5) Generate shared TCP 443 candidate (no live changes)', module_text)
+        self.assertIn('6) Apply reviewed shared TCP 443 candidate (restarts Xray/HAProxy)', module_text)
         self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$cert"', module_text)
         self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$key"', module_text)
         self.assertIn('render-vmess-shared-443.py', module_text)
+        apply_text = (ROOT / "scripts" / "apply-vmess-shared-443.sh").read_text()
+        self.assertIn('bash "$SCRIPT_DIR/scripts/license.sh" verify', apply_text)
+        self.assertIn('Type APPLY to proceed', apply_text)
+        self.assertIn('shared443_apply_transaction', apply_text)
 
     def test_candidate_directory_is_private_and_review_only(self):
         candidate, manifest, haproxy = self.render()
