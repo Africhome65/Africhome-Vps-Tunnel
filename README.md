@@ -17,6 +17,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
+- DNSTT server/client bootstrap, protected keypair preservation, operator-owned domain and nameserver configuration, and a prepared systemd service that is not started automatically
+- DNSTT customer SSH accounts with expiry, timed trials, renew/disable/reset/delete controls, recursive resolver guidance (UDP/DoT/DoH), and a password-free TXT + public-key configuration export
 - Read-only DNSTT deployment inventory showing common file presence, service units, and UDP listeners without exposing keys
 - Native OpenVPN UDP/TCP server management, Easy-RSA certificate authority, client profile generation, certificate listing/revocation, service status, plus a separate read-only deployment inventory
 
@@ -54,6 +56,16 @@ cd Africhome-Vps-Tunnel
 sudo bash install.sh
 sudo africhome
 ```
+
+## DNSTT setup and customer accounts
+
+- Menu options 26-28 build the official DNSTT binaries, preserve or create the protected server keypair, save the operator's own tunnel domain and authoritative nameserver, and prepare the systemd unit.
+- Menu option 28 deliberately does not enable or start the service, stop another DNS tunnel, edit registrar records, or change firewall rules. Public UDP activation is a separate migration that requires checking current listeners and provider firewall settings.
+- The DNSTT UDP listener accepts a selected port from 1 through 65535. The default is UDP 53; the chosen port must be free and reachable through the provider firewall.
+- Menu option 29 manages separate non-root SSH customer accounts, validity, timed trial accounts, and client configuration export. DNSTT transports TCP over DNS; SSH authenticates each customer.
+- Client configuration exports contain the DNSTT public key and resolver command, but never the SSH password or server private key. The password for a generated account is shown once; custom passwords are entered with hidden input and confirmation.
+- Client resolver guidance supports UDP, DNS-over-TLS, and DNS-over-HTTPS. The recursive resolver is not the authoritative nameserver used for DNS delegation.
+- Android client compatibility and external UDP reachability still require testing with the exact client app and network.
 
 ## Xray VLESS REALITY notes
 

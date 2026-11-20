@@ -17,7 +17,7 @@
 - OpenVPN WebSocket, payload/proxy, and SNI wrapper backends.
 - Safe central-router activation, port ownership checks, staged backup, service rollback, and migration plan for the existing VLESS REALITY listener.
 - End-to-end tests for each requested mode, including reconnects, invalid credentials, certificate renewal/revocation, and TCP/UDP conflict cases.
-- Integrate and validate DNSTT management files from the preserved VPS work without overwriting or exposing existing keys/configuration.
+- Complete disposable-VPS and external-client validation of the integrated DNSTT bootstrap, domain configuration, prepared service, account lifecycle, resolver modes, and configuration export. The scripts preserve existing keypairs and deliberately do not start DNSTT or change live DNS/firewall state.
 - Review firewall/provider rules, IP forwarding/NAT requirements, DNS/certificates, and rollback steps for the target VPS.
 
 ## Safety boundaries

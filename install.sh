@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPO_URL="https://github.com/Africhome65/Africhome-Vps-Tunnel.git"
-INSTALL_BRANCH="feature/central-port-routing-architecture"
+INSTALL_BRANCH="feature/central-dnstt-integration"
 INSTALL_DIR="/opt/africhome-vps-tunnel"
 BIN_LINK="/usr/local/bin/africhome"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,7 +49,7 @@ else
   git clone --depth=1 --branch "$INSTALL_BRANCH" "$REPO_URL" "$INSTALL_DIR"
 fi
 
-chmod 0755 "$INSTALL_DIR/install.sh" "$INSTALL_DIR/menu.sh" "$INSTALL_DIR/scripts/license.sh" "$INSTALL_DIR/scripts/xray-inventory.sh" "$INSTALL_DIR/scripts/dnstt-inventory.sh" "$INSTALL_DIR/scripts/openvpn-inventory.sh" "$INSTALL_DIR/scripts/update-reality-sni.py" "$INSTALL_DIR/scripts/render-central-router.py" "$INSTALL_DIR/scripts/render-http-router.py" "$INSTALL_DIR/scripts/render-central-haproxy.py" "$INSTALL_DIR/scripts/render-reality-backend.py" "$INSTALL_DIR/scripts/central-router-preflight.sh" "$INSTALL_DIR/scripts/apply-central-haproxy.sh"
+chmod 0755 "$INSTALL_DIR/install.sh" "$INSTALL_DIR/menu.sh" "$INSTALL_DIR/scripts/license.sh" "$INSTALL_DIR/scripts/xray-inventory.sh" "$INSTALL_DIR/scripts/dnstt-inventory.sh" "$INSTALL_DIR/scripts/openvpn-inventory.sh" "$INSTALL_DIR/scripts/update-reality-sni.py" "$INSTALL_DIR/scripts/render-central-router.py" "$INSTALL_DIR/scripts/render-http-router.py" "$INSTALL_DIR/scripts/render-central-haproxy.py" "$INSTALL_DIR/scripts/render-reality-backend.py" "$INSTALL_DIR/scripts/central-router-preflight.sh" "$INSTALL_DIR/scripts/apply-central-haproxy.sh" "$INSTALL_DIR/scripts/install-dnstt.sh" "$INSTALL_DIR/scripts/configure-dnstt-domain.sh" "$INSTALL_DIR/scripts/install-dnstt-service.sh"
 chmod 0644 "$INSTALL_DIR/lib/common.sh" "$INSTALL_DIR"/modules/*.sh
 install -D -m 0750 "$INSTALL_DIR/scripts/africhome-cert-deploy-hook.sh" /etc/letsencrypt/renewal-hooks/deploy/africhome-central-deploy.sh
 ln -sfn "$INSTALL_DIR/menu.sh" "$BIN_LINK"
