@@ -499,16 +499,27 @@ hy2_setup() {
   install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/fullchain.pem" "$tmp_cert" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
   install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/privkey.pem" "$tmp_key" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
   openssl x509 -in "$tmp_cert" -noout && openssl pkey -in "$tmp_key" -noout || { ah_err "Issued Hysteria certificate/key validation failed."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
-  cert_pub="$(openssl x509 -in "$tmp_cert" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | awk '{print $1}')"
-  key_pub="$(openssl pkey -in "$tmp_key" -pubout -outform DER | sha256sum | awk '{print $1}')"
+  if ! cert_pub="$(openssl x509 -in "$tmp_cert" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | awk '{print $1}')" ||
+     ! key_pub="$(openssl pkey -in "$tmp_key" -pubout -outform DER | sha256sum | awk '{print $1}')"; then
+    ah_err "Could not derive Hysteria certificate/key public-key fingerprints."
+    hy2_setup_cleanup_staged
+    rm -rf -- "$backup_dir"
+    return 1
+  fi
   [[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || { ah_err "Issued Hysteria certificate and private key do not match."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
 
   hy2_write_renewal_hook "$hook_tmp" "$domain" || { ah_err "Could not prepare Hysteria renewal hook."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
-  hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
+  hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password" || { ah_err "Could not prepare Hysteria config."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
   chown root:hysteria "$config_tmp" && chmod 0640 "$config_tmp" || { ah_err "Could not secure Hysteria config."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
   old_umask="$(umask)"
   umask 077
-  printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$state_tmp"
+  if ! printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$state_tmp"; then
+    umask "$old_umask"
+    ah_err "Could not write Hysteria state file."
+    hy2_setup_cleanup_staged
+    rm -rf -- "$backup_dir"
+    return 1
+  fi
   umask "$old_umask"
   chown root:root "$state_tmp" && chmod 0600 "$state_tmp" || { ah_err "Could not secure Hysteria state file."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
 
