@@ -86,8 +86,11 @@ EOF
 }
 
 hy2_write_renewal_hook() {
-  local output="$1" domain="$2"
-  cat > "$output" <<'HOOK'
+  local output="$1" domain="$2" source_tmp target_tmp output_dir
+  output_dir="$(dirname -- "$output")"
+  source_tmp="$(mktemp)" || return 1
+  target_tmp="$(mktemp "$output_dir/.africhome-hysteria-hook.XXXXXX")" || { rm -f -- "$source_tmp"; return 1; }
+  cat > "$source_tmp" <<'HOOK'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 DOMAIN="@@DOMAIN@@"
@@ -95,6 +98,7 @@ DEST="/etc/hysteria/certs"
 SRC="/etc/letsencrypt/live/$DOMAIN"
 [[ -s "$SRC/fullchain.pem" && -s "$SRC/privkey.pem" ]] || exit 1
 install -d -o hysteria -g hysteria -m 750 "$DEST"
+[[ ! -L "$DEST/fullchain.pem" && ! -L "$DEST/privkey.pem" ]] || exit 1
 tmp_cert="$(mktemp "$DEST/.fullchain.XXXXXX")"
 tmp_key="$(mktemp "$DEST/.privkey.XXXXXX")"
 backup_cert="$(mktemp "$DEST/.fullchain.backup.XXXXXX")"
@@ -117,12 +121,12 @@ rollback() {
   exit "$rc"
 }
 trap rollback EXIT
-if [[ -e "$DEST/fullchain.pem" ]]; then
+if [[ -e "$DEST/fullchain.pem" || -L "$DEST/fullchain.pem" ]]; then
   [[ -s "$DEST/fullchain.pem" && -f "$DEST/fullchain.pem" && ! -L "$DEST/fullchain.pem" ]] || exit 1
   cp -a -- "$DEST/fullchain.pem" "$backup_cert"
   had_cert=1
 fi
-if [[ -e "$DEST/privkey.pem" ]]; then
+if [[ -e "$DEST/privkey.pem" || -L "$DEST/privkey.pem" ]]; then
   [[ -s "$DEST/privkey.pem" && -f "$DEST/privkey.pem" && ! -L "$DEST/privkey.pem" ]] || exit 1
   cp -a -- "$DEST/privkey.pem" "$backup_key"
   had_key=1
@@ -142,9 +146,13 @@ systemctl restart hysteria-server.service
 trap - EXIT
 rm -f -- "$backup_cert" "$backup_key"
 HOOK
-  sed "s/@@DOMAIN@@/$domain/g" "$output" > "$output.tmp"
-  mv -f "$output.tmp" "$output"
-  chmod 750 "$output"
+  if ! sed "s/@@DOMAIN@@/$domain/g" "$source_tmp" > "$target_tmp" ||
+     ! chmod 0750 "$target_tmp" || ! bash -n "$target_tmp" ||
+     ! mv -f -- "$target_tmp" "$output"; then
+    rm -f -- "$source_tmp" "$target_tmp"
+    return 1
+  fi
+  rm -f -- "$source_tmp"
 }
 
 hy2_install() {
