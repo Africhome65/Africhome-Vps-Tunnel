@@ -24,9 +24,10 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 
 ## Central routing status
 
-- Central TCP/UDP route validation and planning primitives are available; they do not configure listeners, proxies, firewall rules, or services.
-- The requested shared-port modes remain planned until their protocol handlers and client interoperability are implemented and verified.
-- VLESS REALITY is preserve-only for the shared-router work and must not be treated as ordinary TLS.
+- Central TCP 443 SNI, TCP 80 HTTP Host/path, and combined HAProxy renderers are available.
+- VMess + VLESS REALITY shared TCP 443 has a review-only candidate generator and an explicit transactional apply command. It changes Xray/HAProxy only after root/licence checks and typed APPLY confirmation; it does not change DNS or firewall rules.
+- Shared TCP 443 client interoperability remains unverified on a disposable VPS. Other shared-port modes remain planned until their handlers and client interoperability are implemented and tested.
+- VLESS REALITY is passed through by SNI and must not be treated as ordinary TLS termination.
 - SSH account management creates Linux users; the separate stunnel backend provides an SSH-over-TLS loopback service, but public SNI routing and payload/proxy gateway modes are still pending.
 - Native OpenVPN direct UDP/TCP server and certificate-based client management are implemented. OpenVPN WebSocket, payload-proxy, TLS/SNI wrapper modes, automatic firewall/NAT setup, and shared-port router integration are not implemented. The module deliberately does not change UFW/nftables or enable IP forwarding.
 - See [the central routing architecture contract](docs/CENTRAL-ROUTING-ARCHITECTURE.md) for required backend, safety, and compatibility rules.
