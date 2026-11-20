@@ -82,11 +82,19 @@ The deployment command will be restored here when the public `main` branch is re
 
 ## VMess WebSocket + TLS notes
 
-- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first. Direct mode defaults to TCP 8443. VMess TCP 443 sharing with VLESS REALITY is not implemented/verified; do not assume the central route planner alone makes it work.
+- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first. Direct mode defaults to TCP 8443. Menu option 5 can render a review-only shared TCP 443 candidate: it moves the VLESS REALITY and VMess Xray inbounds to distinct loopback ports and generates HAProxy TLS SNI passthrough routes. This does not apply the candidate or change live services; external VLESS REALITY and VMess client interoperability on the shared listener remains unverified.
 - Supply a domain and matching certificate/key files already installed on the VPS. The module does not issue certificates or configure DNS.
 - The module validates the resulting config before restarting Xray and restores the backup if validation or restart fails.
 - Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
 - Client import URIs contain account credentials; keep them private.
+
+## Shared TCP 443 candidate
+
+- The VMess menu's shared-443 candidate generator reads the existing Xray config and requires exactly one VLESS REALITY inbound with valid `serverNames`.
+- It generates a new Xray candidate with VLESS REALITY on loopback TCP 1443 and VMess WebSocket + TLS on loopback TCP 8443, plus a TLS SNI passthrough HAProxy candidate on public TCP 443.
+- The VMess SNI domain must be covered by the supplied certificate and must differ from all VLESS REALITY `serverNames`. The generator checks certificate hostname coverage and certificate/private-key matching.
+- Candidate files are written under a root-only directory and include a TLS route manifest and VMess client details. No active Xray config, HAProxy config, service, firewall rule or DNS record is changed.
+- Review the generated Xray and HAProxy candidates before deployment. HAProxy must be able to inspect the ClientHello SNI for the selected VLESS REALITY clients; confirm this with real clients before production use.
 
 ## Security and limitations
 
