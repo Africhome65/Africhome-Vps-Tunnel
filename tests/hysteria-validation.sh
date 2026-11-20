@@ -17,6 +17,14 @@ grep -Fq 'a30c618690b4aecf521c10ea2ec199aa13cff54696d3cecd5fa4502abdb2985a' "$RO
 grep -Fq 'git hash-object "$installer"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'bash "$installer" --local "$binary"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'sha256sum -c' "$ROOT_DIR/modules/hysteria.sh"
+
+grep -Fq 'backup_dir="$(mktemp -d /var/backups/africhome-hysteria-install.XXXXXX)"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'Protected backups retained at $backup_dir.' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'getent group hysteria' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'chown root:hysteria "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'chmod 0640 "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
+
 grep -Fq 'install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
 
 pass=0
