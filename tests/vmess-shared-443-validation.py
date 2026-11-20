@@ -157,6 +157,8 @@ class VmessShared443Tests(unittest.TestCase):
         self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$cert"', module_text)
         self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$key"', module_text)
         self.assertIn('render-vmess-shared-443.py', module_text)
+        self.assertIn('VMESS_SHARED443:-0', module_text)
+        self.assertIn('Generic removal is disabled', module_text)
         apply_text = (ROOT / "scripts" / "apply-vmess-shared-443.sh").read_text()
         self.assertIn('bash "$SCRIPT_DIR/scripts/license.sh" verify', apply_text)
         self.assertIn('Type APPLY to proceed', apply_text)
