@@ -79,6 +79,9 @@ else
   ((fail+=1))
 fi
 
+printf 'new-server\n' > "$TMP/server-new"
+printf 'new-client\n' > "$TMP/client-new"
+
 # A successful binary pair replacement must publish both candidates together.
 success_bindir="$TMP/bin-success"
 mkdir -p "$success_bindir"
@@ -98,8 +101,6 @@ bindir="$TMP/bin-pair"
 mkdir -p "$bindir"
 printf 'old-server\n' > "$bindir/dnstt-server"
 printf 'old-client\n' > "$bindir/dnstt-client"
-printf 'new-server\n' > "$TMP/server-new"
-printf 'new-client\n' > "$TMP/client-new"
 inject_client_fail=1
 mv() {
   if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${3:-}" == "$bindir"/.dnstt-client.new.* && "${4:-}" == "$bindir/dnstt-client" && "$inject_client_fail" == "1" ]]; then
