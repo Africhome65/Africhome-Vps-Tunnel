@@ -34,6 +34,8 @@ jobs:
           done < <(find . -type f -name '*.sh' -print0)
       - name: Test installer safety and licence ordering
         run: bash tests/installer-safety-validation.sh
+      - name: Test Ed25519 licence verification and rejection matrix
+        run: bash tests/license-validation.sh
       - name: Test Hysteria input validation
         run: bash tests/hysteria-validation.sh
       - name: Test security module safeguards
