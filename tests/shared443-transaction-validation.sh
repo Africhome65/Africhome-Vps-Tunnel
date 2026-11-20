@@ -151,7 +151,7 @@ backup_root="${preserve_paths[3]}"
 xray_active=1; haproxy_active=0; haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=1; fail_ss=0; ss_mode=normal
 mv() {
-  if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${3:-}" == "$xray_config".restore.* && "${4:-}" == "$xray_config" ]]; then
+  if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${3:-}" == "$(dirname -- "$xray_config")"/.africhome-restore.* && "${4:-}" == "$xray_config" ]]; then
     return 1
   fi
   command mv "$@"
