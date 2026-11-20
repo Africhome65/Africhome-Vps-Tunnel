@@ -86,7 +86,7 @@ shared443_apply_transaction() {
   fi
 
   if (( rollback_ok )); then
-    if ! listeners="$(ss -H -ltn 'sport = :443' 2>/dev/null)"; then
+    if ! listeners="$(ss -H -ltnp 'sport = :443' 2>/dev/null)"; then
       echo "Could not inspect TCP/443 after moving Xray backends to loopback." >&2
       rollback_ok=0
     elif [[ -n "$listeners" ]]; then
@@ -123,8 +123,8 @@ shared443_apply_transaction() {
     if ! listeners="$(ss -H -ltn 'sport = :443' 2>/dev/null)"; then
       echo "Could not verify the HAProxy TCP/443 listener." >&2
       rollback_ok=0
-    elif [[ -z "$listeners" ]]; then
-      echo "HAProxy did not establish a TCP/443 listener." >&2
+    elif [[ -z "$listeners" || "$listeners" != *haproxy* ]]; then
+      echo "HAProxy did not establish its own TCP/443 listener." >&2
       rollback_ok=0
     fi
   fi
