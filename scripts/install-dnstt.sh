@@ -99,8 +99,8 @@ else
   trap 'rm -rf -- "$src_stage"' EXIT
   git -C "$src_stage" init -q
   git -C "$src_stage" remote add origin "$DNSTT_REPO"
-  git -C "$src_stage" fetch --depth=1 origin "$DNSTT_COMMIT"
-  git -C "$src_stage" checkout --detach FETCH_HEAD
+  git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"
+  git -C "$src_stage" checkout --detach "$DNSTT_TAG"
   fetched_commit="$(git -C "$src_stage" rev-parse HEAD)"
   [[ "$fetched_commit" == "$DNSTT_COMMIT" ]] || fail "Fetched DNSTT source does not match the pinned release commit."
   mv -- "$src_stage" "$DNSTT_SRC"
