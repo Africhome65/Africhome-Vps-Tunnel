@@ -99,7 +99,8 @@ if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$s
    grep -q 'VMESS_SHARED443=1' "$state_file" &&
    (( xray_active && haproxy_active )) &&
    [[ "$mock_haproxy_enabled_state" == "enabled" ]] &&
-   compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null; then
+   compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null &&
+   grep -R -q 'old-state-success' "$backup_root"/africhome-vmess-shared443.*/vmess-state.env; then
   echo "PASS: shared TCP/443 apply updates both configs and enables HAProxy with protected backups"
   ((pass+=1))
 else
