@@ -4,8 +4,10 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 for file in \
   "$ROOT_DIR/scripts/install-dnstt.sh" \
+  "$ROOT_DIR/scripts/lib/dnstt-transaction.sh" \
   "$ROOT_DIR/scripts/configure-dnstt-domain.sh" \
-  "$ROOT_DIR/scripts/install-dnstt-service.sh"; do
+  "$ROOT_DIR/scripts/install-dnstt-service.sh" \
+  "$ROOT_DIR/tests/dnstt-transaction-validation.sh"; do
   [[ -f "$file" ]] || { echo "Missing DNSTT script: $file" >&2; exit 1; }
   bash -n "$file"
 done
@@ -86,26 +88,17 @@ if grep -E -q '^[[:space:]]*systemctl[[:space:]]+(stop|disable|enable|start|rest
 fi
 
 
-# Installer replacement must have explicit rollback paths for the Go toolchain
-# and for both DNSTT binaries. These assertions prevent accidental regression
-# to one-way mv/install operations.
+# Installer must source the reusable transaction helpers after the licence gate.
 INSTALLER="$ROOT_DIR/scripts/install-dnstt.sh"
-grep -Fq 'go_backup="/usr/local/go.africhome-backup.$(date +%s%N)"' "$INSTALLER"
-grep -Fq 'previous toolchain could not be restored' "$INSTALLER"
-grep -Fq 'Staged Go toolchain failed its version check; previous toolchain restored.' "$INSTALLER"
-grep -Fq 'server_existed=0' "$INSTALLER"
-grep -Fq 'client_existed=0' "$INSTALLER"
-grep -Fq 'previous server/client pair restored.' "$INSTALLER"
-grep -Fq 'server_new="$(mktemp /usr/local/bin/.dnstt-server.new.XXXXXX)"' "$INSTALLER"
-grep -Fq 'client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"' "$INSTALLER"
-
-grep -Fq 'bin_backup="$(mktemp -d /usr/local/bin/.africhome-dnstt-backup.XXXXXX)"' "$INSTALLER"
-grep -Fq 'preserve_bin_backup=1' "$INSTALLER"
-grep -Fq 'Protected backups retained at $bin_backup.' "$INSTALLER"
-grep -Fq 'restore_binary() {' "$INSTALLER"
-grep -Fq 'restore_tmp="$(mktemp "${destination}.restore.XXXXXX")"' "$INSTALLER"
-
-grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$INSTALLER"
-grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$INSTALLER"
+TRANSACTION_LIB="$ROOT_DIR/scripts/lib/dnstt-transaction.sh"
+grep -Fq '. "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh"' "$INSTALLER"
+grep -Fq 'dnstt_install_go_toolchain() {' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_replace_binary_pair() {' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_restore_file() {' "$TRANSACTION_LIB"
+grep -Fq 'go_is_new_enough "$target/bin/go"' "$TRANSACTION_LIB"
+grep -Fq 'Protected backups retained at $backup.' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_replace_binary_pair "$build_tmp/dnstt-server" "$build_tmp/dnstt-client" /usr/local/bin' "$INSTALLER"
+grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$TRANSACTION_LIB"
+grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$TRANSACTION_LIB"
 
 echo "DNSTT repository safety checks passed."
