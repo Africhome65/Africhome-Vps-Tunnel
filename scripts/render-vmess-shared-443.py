@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import sys
 import uuid as uuidlib
 from pathlib import Path
@@ -42,6 +43,34 @@ def read_regular_file(path: str, label: str) -> bytes:
         if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
             raise CandidateError(f"{label} must be a non-empty regular file, not a symlink")
         return stream.read()
+
+
+def validate_tls_pair(certificate: str, private_key: str, domain: str) -> None:
+    if not Path(certificate).is_absolute() or not Path(private_key).is_absolute():
+        raise CandidateError("TLS certificate and key paths must be absolute")
+    read_regular_file(certificate, "TLS certificate")
+    read_regular_file(private_key, "TLS private key")
+    try:
+        subprocess.run(
+            ["openssl", "x509", "-in", certificate, "-noout", "-checkhost", domain],
+            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        cert_pub_pem = subprocess.run(
+            ["openssl", "x509", "-in", certificate, "-pubkey", "-noout"],
+            check=True, capture_output=True,
+        ).stdout
+        cert_pub_der = subprocess.run(
+            ["openssl", "pkey", "-pubin", "-outform", "DER"],
+            input=cert_pub_pem, check=True, capture_output=True,
+        ).stdout
+        key_pub_der = subprocess.run(
+            ["openssl", "pkey", "-in", private_key, "-pubout", "-outform", "DER"],
+            check=True, capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise CandidateError("TLS certificate/key validation failed or certificate does not cover the VMess domain") from exc
+    if not cert_pub_der or cert_pub_der != key_pub_der:
+        raise CandidateError("TLS certificate and private key do not match")
 
 
 def load_xray_config(path: str) -> dict[str, Any]:
@@ -85,9 +114,8 @@ def render_candidates(
     if vmess_backend_port == reality_backend_port:
         raise CandidateError("VMess and VLESS REALITY backend ports must be different")
 
-    # Verify that the supplied TLS files are present and are not symlinks.
-    read_regular_file(certificate, "TLS certificate")
-    read_regular_file(private_key, "TLS private key")
+    # Verify that the supplied TLS certificate covers the VMess SNI and matches its key.
+    validate_tls_pair(certificate, private_key, vmess_domain)
 
     result = copy.deepcopy(config)
     realities: list[dict[str, Any]] = []
@@ -129,6 +157,8 @@ def render_candidates(
         if not isinstance(inbound, dict) or inbound is reality:
             continue
         port = inbound.get("port")
+        if port == 443:
+            raise CandidateError("Another Xray inbound already uses TCP/443; free it before creating the shared listener candidate")
         if port in (vmess_backend_port, reality_backend_port):
             raise CandidateError(f"Backend port {port} is already used by another Xray inbound")
 
@@ -185,6 +215,13 @@ def write_candidate_dir(output_dir: Path, config: dict[str, Any], manifest: dict
             "xray-config.json": json.dumps(config, indent=2) + "\n",
             "tls-routes.json": json.dumps(manifest, indent=2) + "\n",
             "haproxy-443.cfg": haproxy,
+            "client-details.txt": (
+                f"VMess domain: {manifest['routes'][-1]['sni']}\n"
+                "Public port: 443/TCP\n"
+                f"UUID: {config['inbounds'][-1]['settings']['clients'][0]['id']}\n"
+                "Transport: WebSocket over TLS\n"
+                f"WebSocket path: {config['inbounds'][-1]['streamSettings']['wsSettings']['path']}\n"
+            ),
             "README.txt": (
                 "REVIEW-ONLY candidate. No active Xray/HAProxy config, service, DNS or firewall was changed.\n"
                 "Xray: install xray-config.json only after reviewing and backing up the active config.\n"
