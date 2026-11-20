@@ -222,94 +222,8 @@ if hy2_restore_setup_transaction "$setup_backup" "$setup_live/config.yaml" "$set
    [[ "$(cat "$setup_live/certs/privkey.pem")" == "previous-key" ]] &&
    [[ "$(cat "$setup_live/hooks/renewal-hook.sh")" == "previous-hook" ]] &&
    [[ "$(cat "$setup_live/state.env")" == "previous-state" ]] &&
-   grep -q '^enable hysteria-server.service
-renew_src="$tmp_dir/letsencrypt/vpn.example.com"
-renew_dest="$tmp_dir/hysteria-certs"
-mkdir -p "$renew_src" "$renew_dest"
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "$renew_src/privkey.pem" -out "$renew_src/fullchain.pem" -subj "/CN=vpn.example.com" -days 1 >/dev/null 2>&1
-hook_runtime="$tmp_dir/renewal-runtime.sh"
-sed -e "s|^SRC=.*|SRC=\"$renew_src\"|" \
-    -e "s|^DEST=.*|DEST=\"$renew_dest\"|" \
-    -e 's/install -d -o hysteria -g hysteria -m 750/install -d -m 750/' \
-    -e 's/install -o hysteria -g hysteria -m 640/install -m 640/' \
-    -e 's/systemctl restart hysteria-server.service/:/' \
-    "$hook_file" > "$hook_runtime"
-chmod 0750 "$hook_runtime"
-printf 'old-cert\n' > "$renew_dest/fullchain.pem"
-printf 'old-key\n' > "$renew_dest/privkey.pem"
-bash "$hook_runtime" || { echo "FAIL: renewal hook successful apply"; ((fail+=1)); }
-if cmp -s "$renew_src/fullchain.pem" "$renew_dest/fullchain.pem" && cmp -s "$renew_src/privkey.pem" "$renew_dest/privkey.pem"; then
-  echo "PASS: renewal hook applies a matching certificate/key pair"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not apply the matching certificate/key pair" >&2
-  ((fail+=1))
-fi
-
-# Force the second file replacement to fail after the certificate has moved.
-printf 'previous-cert\n' > "$renew_dest/fullchain.pem"
-printf 'previous-key\n' > "$renew_dest/privkey.pem"
-hook_fail="$tmp_dir/renewal-forced-failure.sh"
-sed 's|mv -f -- "$tmp_key" "$DEST/privkey.pem"|false|' "$hook_runtime" > "$hook_fail"
-chmod 0750 "$hook_fail"
-if bash "$hook_fail"; then
-  echo "FAIL: injected key replacement failure unexpectedly succeeded" >&2
-  ((fail+=1))
-elif [[ "$(cat "$renew_dest/fullchain.pem")" == "previous-cert" && "$(cat "$renew_dest/privkey.pem")" == "previous-key" ]]; then
-  echo "PASS: renewal hook restores the previous pair after injected second-file failure"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not restore the previous pair after injected failure" >&2
-  ((fail+=1))
-fi
-
-printf '\nHysteria validation tests: %d passed, %d failed\n' "$pass" "$fail"
-(( fail == 0 ))
- "$tmp_dir/systemctl.log" &&
-   grep -q '^restart hysteria-server.service
-renew_src="$tmp_dir/letsencrypt/vpn.example.com"
-renew_dest="$tmp_dir/hysteria-certs"
-mkdir -p "$renew_src" "$renew_dest"
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "$renew_src/privkey.pem" -out "$renew_src/fullchain.pem" -subj "/CN=vpn.example.com" -days 1 >/dev/null 2>&1
-hook_runtime="$tmp_dir/renewal-runtime.sh"
-sed -e "s|^SRC=.*|SRC=\"$renew_src\"|" \
-    -e "s|^DEST=.*|DEST=\"$renew_dest\"|" \
-    -e 's/install -d -o hysteria -g hysteria -m 750/install -d -m 750/' \
-    -e 's/install -o hysteria -g hysteria -m 640/install -m 640/' \
-    -e 's/systemctl restart hysteria-server.service/:/' \
-    "$hook_file" > "$hook_runtime"
-chmod 0750 "$hook_runtime"
-printf 'old-cert\n' > "$renew_dest/fullchain.pem"
-printf 'old-key\n' > "$renew_dest/privkey.pem"
-bash "$hook_runtime" || { echo "FAIL: renewal hook successful apply"; ((fail+=1)); }
-if cmp -s "$renew_src/fullchain.pem" "$renew_dest/fullchain.pem" && cmp -s "$renew_src/privkey.pem" "$renew_dest/privkey.pem"; then
-  echo "PASS: renewal hook applies a matching certificate/key pair"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not apply the matching certificate/key pair" >&2
-  ((fail+=1))
-fi
-
-# Force the second file replacement to fail after the certificate has moved.
-printf 'previous-cert\n' > "$renew_dest/fullchain.pem"
-printf 'previous-key\n' > "$renew_dest/privkey.pem"
-hook_fail="$tmp_dir/renewal-forced-failure.sh"
-sed 's|mv -f -- "$tmp_key" "$DEST/privkey.pem"|false|' "$hook_runtime" > "$hook_fail"
-chmod 0750 "$hook_fail"
-if bash "$hook_fail"; then
-  echo "FAIL: injected key replacement failure unexpectedly succeeded" >&2
-  ((fail+=1))
-elif [[ "$(cat "$renew_dest/fullchain.pem")" == "previous-cert" && "$(cat "$renew_dest/privkey.pem")" == "previous-key" ]]; then
-  echo "PASS: renewal hook restores the previous pair after injected second-file failure"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not restore the previous pair after injected failure" >&2
-  ((fail+=1))
-fi
-
-printf '\nHysteria validation tests: %d passed, %d failed\n' "$pass" "$fail"
-(( fail == 0 ))
- "$tmp_dir/systemctl.log"; then
+   grep -q '^enable hysteria-server.service$' "$tmp_dir/systemctl.log" &&
+   grep -q '^restart hysteria-server.service$' "$tmp_dir/systemctl.log"; then
   echo "PASS: Hysteria setup rollback restores all files and prior enabled/active service state"
   ((pass+=1))
 else
@@ -373,50 +287,7 @@ if hy2_restore_install_transaction "$install_backup" "$install_live/hysteria" "$
    [[ "$(cat "$install_live/hysteria-server.service")" == "old-unit" ]] &&
    [[ "$(cat "$install_live/hysteria-server@.service")" == "old-template" ]] &&
    [[ "$(cat "$install_live/config.yaml")" == "old-config" ]] &&
-   grep -q '^restart hysteria-server.service
-renew_src="$tmp_dir/letsencrypt/vpn.example.com"
-renew_dest="$tmp_dir/hysteria-certs"
-mkdir -p "$renew_src" "$renew_dest"
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "$renew_src/privkey.pem" -out "$renew_src/fullchain.pem" -subj "/CN=vpn.example.com" -days 1 >/dev/null 2>&1
-hook_runtime="$tmp_dir/renewal-runtime.sh"
-sed -e "s|^SRC=.*|SRC=\"$renew_src\"|" \
-    -e "s|^DEST=.*|DEST=\"$renew_dest\"|" \
-    -e 's/install -d -o hysteria -g hysteria -m 750/install -d -m 750/' \
-    -e 's/install -o hysteria -g hysteria -m 640/install -m 640/' \
-    -e 's/systemctl restart hysteria-server.service/:/' \
-    "$hook_file" > "$hook_runtime"
-chmod 0750 "$hook_runtime"
-printf 'old-cert\n' > "$renew_dest/fullchain.pem"
-printf 'old-key\n' > "$renew_dest/privkey.pem"
-bash "$hook_runtime" || { echo "FAIL: renewal hook successful apply"; ((fail+=1)); }
-if cmp -s "$renew_src/fullchain.pem" "$renew_dest/fullchain.pem" && cmp -s "$renew_src/privkey.pem" "$renew_dest/privkey.pem"; then
-  echo "PASS: renewal hook applies a matching certificate/key pair"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not apply the matching certificate/key pair" >&2
-  ((fail+=1))
-fi
-
-# Force the second file replacement to fail after the certificate has moved.
-printf 'previous-cert\n' > "$renew_dest/fullchain.pem"
-printf 'previous-key\n' > "$renew_dest/privkey.pem"
-hook_fail="$tmp_dir/renewal-forced-failure.sh"
-sed 's|mv -f -- "$tmp_key" "$DEST/privkey.pem"|false|' "$hook_runtime" > "$hook_fail"
-chmod 0750 "$hook_fail"
-if bash "$hook_fail"; then
-  echo "FAIL: injected key replacement failure unexpectedly succeeded" >&2
-  ((fail+=1))
-elif [[ "$(cat "$renew_dest/fullchain.pem")" == "previous-cert" && "$(cat "$renew_dest/privkey.pem")" == "previous-key" ]]; then
-  echo "PASS: renewal hook restores the previous pair after injected second-file failure"
-  ((pass+=1))
-else
-  echo "FAIL: renewal hook did not restore the previous pair after injected failure" >&2
-  ((fail+=1))
-fi
-
-printf '\nHysteria validation tests: %d passed, %d failed\n' "$pass" "$fail"
-(( fail == 0 ))
- "$tmp_dir/hy2-install-systemctl.log"; then
+   grep -q '^restart hysteria-server.service$' "$tmp_dir/hy2-install-systemctl.log"; then
   echo "PASS: Hysteria installer rollback restores binary, units, config and active service"
   ((pass+=1))
 else
