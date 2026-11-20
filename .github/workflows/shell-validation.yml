@@ -58,6 +58,8 @@ jobs:
         run: bash tests/dnstt-inventory-validation.sh
       - name: Test DNSTT bootstrap and service safety
         run: bash tests/dnstt-safety-check.sh
+      - name: Fault-inject DNSTT Go and binary pair rollback
+        run: bash tests/dnstt-transaction-validation.sh
       - name: Test DNSTT customer account and resolver safety
         run: bash tests/dnstt-accounts-safety-check.sh
       - name: Test protocol account config permissions
