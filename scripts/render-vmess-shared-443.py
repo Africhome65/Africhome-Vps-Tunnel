@@ -223,7 +223,7 @@ def write_candidate_dir(output_dir: Path, config: dict[str, Any], manifest: dict
                 f"WebSocket path: {config['inbounds'][-1]['streamSettings']['wsSettings']['path']}\n"
             ),
             "README.txt": (
-                "REVIEW-ONLY candidate. No active Xray/HAProxy config, service, DNS or firewall was changed.\n"
+                "Review-only candidate. No active Xray/HAProxy config, service, DNS or firewall was changed.\n"
                 "Xray: install xray-config.json only after reviewing and backing up the active config.\n"
                 "HAProxy: review haproxy-443.cfg, then use the guarded HAProxy apply workflow.\n"
                 "Both Xray backends bind to loopback; HAProxy routes by TLS SNI on TCP/443.\n"
