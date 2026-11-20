@@ -28,6 +28,8 @@ grep -Fq 'chmod 0640 "$config_tmp"' "$ROOT_DIR/modules/hysteria.sh"
 
 # First-time and replacement setup must back up and restore every active file.
 grep -Fq 'hy2_restore_path() {' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'hy2_restore_setup_transaction() {' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'hy2_restore_setup_transaction "$backup_dir"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'backup_dir="$(mktemp -d /var/backups/africhome-hysteria-setup.XXXXXX)"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'files_touched=1' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'hy2_setup_rollback() {' "$ROOT_DIR/modules/hysteria.sh"
