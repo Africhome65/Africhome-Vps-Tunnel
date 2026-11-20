@@ -37,4 +37,4 @@
 
 ## Validation interpretation
 
-The full GitHub Actions suite passed on commit 398baf7cd37f4438c735bb4bef9740f1851fa97d (run 44708847611). Checks include shell syntax, ShellCheck, licence tests, DNSTT/Hysteria rollback fault injection, VMess shared-443 candidate tests and shared-443 apply/rollback fault injection. The checklist-only follow-up commit triggers another full run. These automated checks do not replace disposable-VPS and external-client integration testing.
+The full GitHub Actions suite passed on commit 390f3e881e23b24a34b05b7ac7797fd35f148359 (run 44709017981). Checks include shell syntax, ShellCheck, licence tests, DNSTT/Hysteria rollback fault injection, VMess shared-443 candidate tests and shared-443 apply/rollback fault injection. The checklist-only follow-up commit triggers another full run. These automated checks do not replace disposable-VPS and external-client integration testing.
