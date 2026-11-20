@@ -337,8 +337,9 @@ hy2_restore_install_transaction() {
   systemctl daemon-reload || rollback_ok=0
   if (( service_active )); then
     systemctl restart hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
-  else
-    systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+  elif ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
+       systemctl is-active --quiet hysteria-server.service; then
+    rollback_ok=0
   fi
   (( rollback_ok ))
 }
