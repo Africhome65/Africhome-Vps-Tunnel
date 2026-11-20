@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the official DNSTT server/client and create a local keypair.
-# This bootstrap deliberately does NOT stop iodine, bind UDP/53, change DNS,
+# This bootstrap deliberately does NOT stop services, bind UDP/53, change DNS,
 # change firewall rules, or install/start a DNSTT systemd service.
 set -Eeuo pipefail
 
@@ -55,13 +55,31 @@ else
   install -d -m 0755 "$stage"
   tar -C "$stage" --strip-components=1 -xzf "$archive"
   [[ -x "$stage/bin/go" ]] || fail "Go extraction did not produce a working toolchain."
-  if [[ -d /usr/local/go ]]; then
-    mv /usr/local/go "/usr/local/go.backup.$(date +%Y%m%d%H%M%S)"
+  # Keep the old toolchain until the staged toolchain is in place and usable.
+  go_backup=""
+  if [[ -e /usr/local/go || -L /usr/local/go ]]; then
+    [[ -d /usr/local/go && ! -L /usr/local/go ]] || fail "/usr/local/go must be a real directory."
+    go_backup="/usr/local/go.africhome-backup.$"
+    [[ ! -e "$go_backup" && ! -L "$go_backup" ]] || fail "Go backup path already exists."
+    mv -- /usr/local/go "$go_backup" || fail "Could not stage the existing Go toolchain for rollback."
   fi
-  mv "$stage" /usr/local/go
+  if ! mv -- "$stage" /usr/local/go; then
+    if [[ -n "$go_backup" && -d "$go_backup" ]]; then
+      mv -- "$go_backup" /usr/local/go || fail "CRITICAL: Go install failed and the previous toolchain could not be restored from $go_backup."
+    fi
+    fail "Could not install the staged Go toolchain; previous toolchain restored."
+  fi
+  if ! /usr/local/go/bin/go version >/dev/null 2>&1; then
+    rm -rf -- /usr/local/go
+    if [[ -n "$go_backup" && -d "$go_backup" ]]; then
+      mv -- "$go_backup" /usr/local/go || fail "CRITICAL: Go validation failed and rollback could not restore $go_backup."
+    fi
+    fail "Staged Go toolchain failed its version check; previous toolchain restored."
+  fi
   GO_BIN="/usr/local/go/bin/go"
+  [[ -z "$go_backup" ]] || rm -rf -- "$go_backup"
   trap - EXIT
-  rm -rf "$tmpdir"
+  rm -rf -- "$tmpdir"
 fi
 
 info "Using $("$GO_BIN" version)"
@@ -87,11 +105,43 @@ trap 'rm -rf "$build_tmp"' EXIT
   cd "$DNSTT_SRC/dnstt-client"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-client" .
 )
-install -m 0755 "$build_tmp/dnstt-server" /usr/local/bin/dnstt-server.new
-install -m 0755 "$build_tmp/dnstt-client" /usr/local/bin/dnstt-client.new
-mv -f /usr/local/bin/dnstt-server.new /usr/local/bin/dnstt-server
-mv -f /usr/local/bin/dnstt-client.new /usr/local/bin/dnstt-client
-rm -rf "$build_tmp"
+# Stage both candidates and preserve the current pair before replacing either one.
+bin_backup="$build_tmp/previous-bin"
+install -d -m 0700 "$bin_backup"
+server_existed=0
+client_existed=0
+if [[ -e /usr/local/bin/dnstt-server || -L /usr/local/bin/dnstt-server ]]; then
+  [[ -f /usr/local/bin/dnstt-server && ! -L /usr/local/bin/dnstt-server ]] || fail "Existing dnstt-server is not a regular non-symlink file."
+  cp -a -- /usr/local/bin/dnstt-server "$bin_backup/dnstt-server"
+  server_existed=1
+fi
+if [[ -e /usr/local/bin/dnstt-client || -L /usr/local/bin/dnstt-client ]]; then
+  [[ -f /usr/local/bin/dnstt-client && ! -L /usr/local/bin/dnstt-client ]] || fail "Existing dnstt-client is not a regular non-symlink file."
+  cp -a -- /usr/local/bin/dnstt-client "$bin_backup/dnstt-client"
+  client_existed=1
+fi
+install -m 0755 "$build_tmp/dnstt-server" /usr/local/bin/.dnstt-server.new.$
+install -m 0755 "$build_tmp/dnstt-client" /usr/local/bin/.dnstt-client.new.$
+if ! mv -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/dnstt-server; then
+  rm -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/.dnstt-client.new.$
+  fail "Could not install DNSTT server binary; existing binaries were not changed."
+fi
+if ! mv -f -- /usr/local/bin/.dnstt-client.new.$ /usr/local/bin/dnstt-client; then
+  # Restore the server/client pair to its exact pre-install state.
+  if (( server_existed )); then
+    cp -a -- "$bin_backup/dnstt-server" /usr/local/bin/dnstt-server
+  else
+    rm -f -- /usr/local/bin/dnstt-server
+  fi
+  if (( client_existed )); then
+    cp -a -- "$bin_backup/dnstt-client" /usr/local/bin/dnstt-client
+  else
+    rm -f -- /usr/local/bin/dnstt-client
+  fi
+  rm -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/.dnstt-client.new.$
+  fail "Could not install DNSTT client binary; previous server/client pair restored."
+fi
+rm -rf -- "$build_tmp"
 trap - EXIT
 
 install -d -o root -g root -m 0700 "$KEY_DIR"
@@ -120,5 +170,5 @@ printf 'Source commit: %s\n' "$(git -C "$DNSTT_SRC" rev-parse --short HEAD)"
 printf 'Public key: '
 cat "$KEY_DIR/server.pub"
 echo
-info "No DNS, firewall, UDP/53, iodine, or systemd service settings were changed."
-info "Next: configure and externally test DNSTT before any SlowDNS migration."
+info "No DNS, firewall, UDP/53, or systemd service settings were changed."
+info "Next: configure and externally test DNSTT before enabling its service."
