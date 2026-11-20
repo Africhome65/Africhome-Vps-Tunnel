@@ -95,6 +95,13 @@ grep -Fq 'client_existed=0' "$INSTALLER"
 grep -Fq 'previous server/client pair restored.' "$INSTALLER"
 grep -Fq 'server_new="$(mktemp /usr/local/bin/.dnstt-server.new.XXXXXX)"' "$INSTALLER"
 grep -Fq 'client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"' "$INSTALLER"
+
+grep -Fq 'bin_backup="$(mktemp -d /usr/local/bin/.africhome-dnstt-backup.XXXXXX)"' "$INSTALLER"
+grep -Fq 'preserve_bin_backup=1' "$INSTALLER"
+grep -Fq 'Protected backups retained at $bin_backup.' "$INSTALLER"
+grep -Fq 'restore_binary() {' "$INSTALLER"
+grep -Fq 'restore_tmp="$(mktemp "${destination}.restore.XXXXXX")"' "$INSTALLER"
+
 grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$INSTALLER"
 grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$INSTALLER"
 
