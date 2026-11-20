@@ -67,7 +67,10 @@ ss() {
 }
 
 make_case() {
-  local name="$1" candidate="$TMP/$name/candidate" active="$TMP/$name/active" backup="$TMP/$name/backups"
+  local name="$1" candidate active backup
+  candidate="$TMP/$name/candidate"
+  active="$TMP/$name/active"
+  backup="$TMP/$name/backups"
   mkdir -p "$candidate" "$active"
   chmod 0700 "$candidate"
   printf '{"inbounds":[]}\n' > "$candidate/xray-config.json"
