@@ -24,7 +24,7 @@ This checklist is a release gate. A passing shell-syntax workflow is not proof t
 
 ## Automated checks
 
-Latest GitHub Actions run for PR #7: `44703468125` — passed on commit `0b0f70c90bc8023d440c814d892fdacf28ff8b54`. This is CI evidence only; it does not replace VPS/client integration testing.
+Latest GitHub Actions run for PR #7: `44703842759` — passed on commit `bc098509674b3cb5446867604b1b45768c750f6a`. This is CI evidence only; it does not replace VPS/client integration testing.
 
 - [x] All shell scripts pass `bash -n`.
 - [x] ShellCheck passes with no errors.
