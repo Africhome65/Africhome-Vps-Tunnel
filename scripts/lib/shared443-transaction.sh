@@ -20,7 +20,7 @@ shared443_apply_transaction() {
   local backup_dir="" xray_tmp="" haproxy_tmp="" xray_group="" haproxy_enabled_state=""
   local xray_was_active=0 haproxy_was_active=0 haproxy_was_enabled=0
   local xray_changed=0 haproxy_changed=0 rollback_ok=1
-  local file
+  local file listeners
 
   [[ -d "$candidate_dir" && ! -L "$candidate_dir" ]] || { echo "Candidate directory must be a real directory." >&2; return 1; }
   [[ "$(stat -c '%a' "$candidate_dir")" == "700" ]] || { echo "Candidate directory must have mode 0700." >&2; return 1; }
@@ -46,9 +46,9 @@ shared443_apply_transaction() {
   if systemctl is-active --quiet "$haproxy_service"; then haproxy_was_active=1; fi
   haproxy_enabled_state="$(systemctl is-enabled "$haproxy_service" 2>/dev/null || true)"
   case "$haproxy_enabled_state" in
-    enabled|enabled-runtime) haproxy_was_enabled=1 ;;
+    enabled) haproxy_was_enabled=1 ;;
     disabled) haproxy_was_enabled=0 ;;
-    *) echo "HAProxy unit must be enabled or disabled (not static/masked)." >&2; return 1 ;;
+    *) echo "HAProxy unit must be persistently enabled or disabled (not static/runtime-enabled/masked)." >&2; return 1 ;;
   esac
   xray_group="$(systemctl show -p Group --value "$xray_service" 2>/dev/null || true)"
   [[ -n "$xray_group" ]] || xray_group="root"
@@ -78,7 +78,10 @@ shared443_apply_transaction() {
   fi
 
   if (( rollback_ok )); then
-    if ss -H -ltn 'sport = :443' 2>/dev/null | grep -q .; then
+    if ! listeners="$(ss -H -ltn 'sport = :443' 2>/dev/null)"; then
+      echo "Could not inspect TCP/443 after moving Xray backends to loopback." >&2
+      rollback_ok=0
+    elif [[ -n "$listeners" ]]; then
       echo "TCP/443 is still occupied after moving Xray backends to loopback." >&2
       rollback_ok=0
     fi
@@ -91,7 +94,10 @@ shared443_apply_transaction() {
     fi
     if (( rollback_ok )); then
       mv -f -- "$haproxy_tmp" "$haproxy_config" || rollback_ok=0
-      (( rollback_ok )) && haproxy_tmp=""
+      if (( rollback_ok )); then
+        haproxy_tmp=""
+        haproxy_changed=1
+      fi
     fi
   fi
 
@@ -102,7 +108,10 @@ shared443_apply_transaction() {
     fi
   fi
   if (( rollback_ok )); then
-    if ! ss -H -ltn 'sport = :443' 2>/dev/null | grep -q .; then
+    if ! listeners="$(ss -H -ltn 'sport = :443' 2>/dev/null)"; then
+      echo "Could not verify the HAProxy TCP/443 listener." >&2
+      rollback_ok=0
+    elif [[ -z "$listeners" ]]; then
       echo "HAProxy did not establish a TCP/443 listener." >&2
       rollback_ok=0
     fi
