@@ -368,7 +368,7 @@ hy2_setup() {
   local domain email port_spec first_port last_port ufw_port_spec username password replace
   local backup_dir tmp_cert="" tmp_key="" hook_tmp="" config_tmp="" state_tmp=""
   local old_config=0 old_cert=0 old_key=0 old_hook=0 old_state=0
-  local was_enabled=0 was_active=0 files_touched=0 rollback_ok=1 cert_pub key_pub old_umask
+  local was_enabled=0 was_active=0 files_touched=0 rollback_ok=1 cert_pub key_pub old_umask ufw_http_added=0
   read -r -p "Your domain (DNS A/AAAA must point to this VPS): " domain
   domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   hy2_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
@@ -400,10 +400,17 @@ hy2_setup() {
   hy2_check_listener_conflicts "$first_port" "$last_port" || return 1
 
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
-    ufw allow 80/tcp || ah_warn "Could not add TCP 80 to UFW; certificate issuance/renewal may fail."
+    if ! ufw status 2>/dev/null | grep -Eq '80/tcp.*ALLOW'; then
+      if ufw allow 80/tcp; then ufw_http_added=1
+      else ah_warn "Could not add TCP 80 to UFW; certificate issuance/renewal may fail."
+      fi
+    fi
   fi
   ah_info "Requesting a certificate. DNS must point to this VPS and inbound TCP 80 must be reachable."
   certbot certonly --standalone --non-interactive --agree-tos --email "$email" -d "$domain" || {
+    if (( ufw_http_added )); then
+      ufw --force delete allow 80/tcp || ah_warn "Could not remove the temporary TCP 80 UFW rule after certificate issuance failed."
+    fi
     ah_err "Certificate issuance failed. Check DNS and TCP 80 in UFW/provider firewall."
     return 1
   }
