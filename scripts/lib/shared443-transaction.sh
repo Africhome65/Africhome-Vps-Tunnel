@@ -40,6 +40,10 @@ shared443_apply_transaction() {
   [[ -d "$(dirname -- "$vmess_state")" && ! -L "$(dirname -- "$vmess_state")" ]] || { echo "VMess state directory is missing or unsafe." >&2; return 1; }
   if [[ -e "$vmess_state" || -L "$vmess_state" ]]; then
     [[ -f "$vmess_state" && ! -L "$vmess_state" ]] || { echo "Existing VMess state is not a regular non-symlink file." >&2; return 1; }
+    [[ "$(stat -c '%a' "$vmess_state")" == "600" ]] || { echo "Existing VMess state must have mode 0600." >&2; return 1; }
+    if (( strict_owner )) && [[ "$(stat -c '%u' "$vmess_state")" != "0" ]]; then
+      echo "Existing VMess state must be root-owned." >&2; return 1
+    fi
     vmess_state_existed=1
   fi
   command -v xray >/dev/null 2>&1 || { echo "Xray binary is required." >&2; return 1; }
