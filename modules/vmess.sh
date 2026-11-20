@@ -175,6 +175,15 @@ vmess_shared_443_candidate() {
   ah_warn "This is a review-only candidate. External VLESS REALITY and VMess client tests are still required before applying it."
 }
 
+vmess_apply_shared_443_candidate() {
+  ah_require_root || return 1
+  local script_dir candidate_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  read -r -p "Full path to the reviewed shared-443 candidate directory: " candidate_dir
+  [[ -n "$candidate_dir" ]] || { ah_err "Candidate directory is required."; return 1; }
+  bash "$script_dir/scripts/apply-vmess-shared-443.sh" "$candidate_dir"
+}
+
 vmess_menu() {
   while true; do
     echo
@@ -184,6 +193,7 @@ vmess_menu() {
     echo "3) Xray service status and logs"
     echo "4) Remove VMess inbound"
     echo "5) Generate shared TCP 443 candidate (no live changes)"
+    echo "6) Apply reviewed shared TCP 443 candidate (restarts Xray/HAProxy)"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -192,6 +202,7 @@ vmess_menu() {
       3) vmess_status; ah_pause ;;
       4) vmess_remove; ah_pause ;;
       5) vmess_shared_443_candidate; ah_pause ;;
+      6) vmess_apply_shared_443_candidate; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
