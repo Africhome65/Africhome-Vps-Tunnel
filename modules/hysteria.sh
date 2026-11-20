@@ -357,6 +357,33 @@ hy2_restore_path() {
   fi
 }
 
+hy2_restore_setup_transaction() {
+  local backup_dir="$1" config_path="$2" fullchain_path="$3" privkey_path="$4"
+  local hook_path="$5" state_path="$6" old_config="$7" old_cert="$8" old_key="$9"
+  local old_hook="${10}" old_state="${11}" was_enabled="${12}" was_active="${13}"
+  local rollback_ok=1
+  if ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
+     systemctl is-active --quiet hysteria-server.service; then rollback_ok=0; fi
+  hy2_restore_path "$backup_dir/config.yaml" "$config_path" "$old_config" || rollback_ok=0
+  hy2_restore_path "$backup_dir/fullchain.pem" "$fullchain_path" "$old_cert" || rollback_ok=0
+  hy2_restore_path "$backup_dir/privkey.pem" "$privkey_path" "$old_key" || rollback_ok=0
+  hy2_restore_path "$backup_dir/renewal-hook.sh" "$hook_path" "$old_hook" || rollback_ok=0
+  hy2_restore_path "$backup_dir/state.env" "$state_path" "$old_state" || rollback_ok=0
+  systemctl daemon-reload || rollback_ok=0
+  if (( was_enabled )); then
+    systemctl enable hysteria-server.service || rollback_ok=0
+  else
+    systemctl disable hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
+  fi
+  if (( was_active )); then
+    systemctl restart hysteria-server.service || rollback_ok=0
+  elif ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
+       systemctl is-active --quiet hysteria-server.service; then
+    rollback_ok=0
+  fi
+  (( rollback_ok ))
+}
+
 hy2_setup() {
   ah_require_root || return 1
   command -v hysteria >/dev/null 2>&1 || { ah_warn "Install Hysteria 2 first."; return 1; }
@@ -473,26 +500,8 @@ hy2_setup() {
     [[ -z "$state_tmp" ]] || rm -f -- "$state_tmp"
   }
   hy2_setup_rollback() {
-    if ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
-       systemctl is-active --quiet hysteria-server.service; then rollback_ok=0; fi
     if (( files_touched )); then
-      hy2_restore_path "$backup_dir/config.yaml" "$HY2_CONFIG" "$old_config" || rollback_ok=0
-      hy2_restore_path "$backup_dir/fullchain.pem" "$HY2_CERT_DIR/fullchain.pem" "$old_cert" || rollback_ok=0
-      hy2_restore_path "$backup_dir/privkey.pem" "$HY2_CERT_DIR/privkey.pem" "$old_key" || rollback_ok=0
-      hy2_restore_path "$backup_dir/renewal-hook.sh" "$HY2_HOOK" "$old_hook" || rollback_ok=0
-      hy2_restore_path "$backup_dir/state.env" "$HY2_STATE" "$old_state" || rollback_ok=0
-      systemctl daemon-reload || rollback_ok=0
-      if (( was_enabled )); then
-        systemctl enable hysteria-server.service || rollback_ok=0
-      else
-        systemctl disable hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
-      fi
-      if (( was_active )); then
-        systemctl restart hysteria-server.service || rollback_ok=0
-      elif ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
-           systemctl is-active --quiet hysteria-server.service; then
-        rollback_ok=0
-      fi
+      hy2_restore_setup_transaction "$backup_dir" "$HY2_CONFIG" "$HY2_CERT_DIR/fullchain.pem" "$HY2_CERT_DIR/privkey.pem" "$HY2_HOOK" "$HY2_STATE" "$old_config" "$old_cert" "$old_key" "$old_hook" "$old_state" "$was_enabled" "$was_active" || rollback_ok=0
     fi
     hy2_setup_cleanup_staged
     if (( rollback_ok )); then
