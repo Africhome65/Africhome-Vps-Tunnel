@@ -106,18 +106,25 @@ backup_key="$(mktemp "$DEST/.privkey.backup.XXXXXX")"
 had_cert=0
 had_key=0
 pair_touched=0
+preserve_backups=0
 rollback() {
   rc=$?
+  rollback_ok=1
   if (( rc != 0 && pair_touched )); then
-    if (( had_cert )); then cp -a -- "$backup_cert" "$DEST/fullchain.pem" || echo "CRITICAL: certificate rollback failed." >&2
-    else rm -f -- "$DEST/fullchain.pem"
+    if (( had_cert )); then cp -a -- "$backup_cert" "$DEST/fullchain.pem" || rollback_ok=0
+    else rm -f -- "$DEST/fullchain.pem" || rollback_ok=0
     fi
-    if (( had_key )); then cp -a -- "$backup_key" "$DEST/privkey.pem" || echo "CRITICAL: key rollback failed." >&2
-    else rm -f -- "$DEST/privkey.pem"
+    if (( had_key )); then cp -a -- "$backup_key" "$DEST/privkey.pem" || rollback_ok=0
+    else rm -f -- "$DEST/privkey.pem" || rollback_ok=0
     fi
-    systemctl restart hysteria-server.service || true
+    systemctl restart hysteria-server.service || rollback_ok=0
+    if (( ! rollback_ok )); then
+      preserve_backups=1
+      echo "CRITICAL: Hysteria certificate rollback failed; protected backups retained in $DEST." >&2
+    fi
   fi
-  rm -f -- "$tmp_cert" "$tmp_key" "$backup_cert" "$backup_key"
+  rm -f -- "$tmp_cert" "$tmp_key"
+  if (( ! preserve_backups )); then rm -f -- "$backup_cert" "$backup_key"; fi
   exit "$rc"
 }
 trap rollback EXIT
