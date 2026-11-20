@@ -81,6 +81,7 @@ make_case() {
   printf 'old-xray-%s\n' "$name" > "$active/xray.json"
   printf 'old-haproxy-%s\n' "$name" > "$active/haproxy.cfg"
   printf 'old-state-%s\n' "$name" > "$active/vmess-state.env"
+  chmod 0600 "$active/vmess-state.env"
   printf '%s\n' "$candidate" "$active/xray.json" "$active/haproxy.cfg" "$active/vmess-state.env" "$backup"
 }
 
