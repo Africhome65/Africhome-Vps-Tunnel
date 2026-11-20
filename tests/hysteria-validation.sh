@@ -143,9 +143,7 @@ else
   ((pass+=1))
 fi
 
-set -x
 hy2_write_renewal_hook "$hook_file" "vpn.example.com" || { echo "FAIL: renewal hook generation"; exit 1; }
-set +x
 bash -n "$hook_file" || { echo "FAIL: generated renewal hook syntax"; ((fail+=1)); }
 grep -Fxq 'DOMAIN="vpn.example.com"' "$hook_file" || { echo "FAIL: renewal hook domain"; ((fail+=1)); }
 grep -Fq 'install -o hysteria -g hysteria -m 640' "$hook_file" || { echo "FAIL: renewal hook certificate permissions"; ((fail+=1)); }
