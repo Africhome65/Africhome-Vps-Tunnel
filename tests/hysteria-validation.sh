@@ -39,7 +39,7 @@ grep -Fq 'systemctl is-enabled --quiet hysteria-server.service' "$ROOT_DIR/modul
 grep -Fq 'systemctl is-active --quiet hysteria-server.service' "$ROOT_DIR/modules/hysteria.sh"
 
 grep -Fq 'old_service_active=0' "$ROOT_DIR/modules/hysteria.sh"
-grep -Fq 'if (( old_service_active )); then' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'if (( service_active )); then' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'systemctl disable hysteria-server.service >/dev/null 2>&1 || rollback_ok=0' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'ufw_http_added=0' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'ufw --force delete allow 80/tcp' "$ROOT_DIR/modules/hysteria.sh"
