@@ -92,7 +92,7 @@ The deployment command will be restored here when the public `main` branch is re
 
 - The VMess menu's shared-443 candidate generator reads the existing Xray config and requires exactly one VLESS REALITY inbound with valid `serverNames`.
 - It generates a new Xray candidate with VLESS REALITY on loopback TCP 1443 and VMess WebSocket + TLS on loopback TCP 8443, plus a TLS SNI passthrough HAProxy candidate on public TCP 443.
-- The VMess SNI domain must be covered by the supplied certificate and must differ from all VLESS REALITY `serverNames`. The generator checks certificate hostname coverage and certificate/private-key matching.
+- The VMess SNI domain must be covered by the supplied certificate and must differ from all VLESS REALITY `serverNames`. The generator checks certificate hostname coverage and certificate/private-key matching, safely supports normal Let's Encrypt live symlinks, and the menu checks that the Xray service account can read both files.
 - Candidate files are written under a root-only directory and include a TLS route manifest and VMess client details. No active Xray config, HAProxy config, service, firewall rule or DNS record is changed.
 - Review the generated Xray and HAProxy candidates before deployment. HAProxy must be able to inspect the ClientHello SNI for the selected VLESS REALITY clients; confirm this with real clients before production use.
 
