@@ -87,6 +87,8 @@ fi
 
 info "Using $("$GO_BIN" version)"
 
+[[ ! -L "$DNSTT_SRC" ]] || fail "$DNSTT_SRC must not be a symlink."
+[[ ! -L "$DNSTT_SRC/.git" ]] || fail "$DNSTT_SRC/.git must not be a symlink."
 if [[ -e "$DNSTT_SRC" && ! -d "$DNSTT_SRC/.git" ]]; then
   fail "$DNSTT_SRC exists but is not a Git checkout; move it aside and retry."
 fi
