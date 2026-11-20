@@ -153,7 +153,7 @@ hy2_install() {
   command -v git >/dev/null 2>&1 || ah_apt_install git || return 1
   command -v sha256sum >/dev/null 2>&1 || { ah_err "sha256sum is required."; return 1; }
 
-  local arch asset_sha installer_url binary_url tmpdir backup_dir installer binary
+  local arch asset_sha installer_url binary_url tmpdir backup_dir installer binary installer_sha
   local old_binary=0 old_unit=0 old_template=0 rollback_ok=1 installed_sha installed_version existing_user
   case "$(uname -m)" in
     x86_64|amd64)
@@ -182,6 +182,11 @@ hy2_install() {
     existing_user="$(sed -n 's/^User=//p' /etc/systemd/system/hysteria-server.service | tail -n1)"
     if [[ -n "$existing_user" && "$existing_user" != "hysteria" ]]; then
       ah_err "Existing Hysteria service runs as '$existing_user'. Africhome currently requires the official hysteria service user; refusing to change it automatically."
+      return 1
+    fi
+    existing_user="$(sed -n 's/^Group=//p' /etc/systemd/system/hysteria-server.service | tail -n1)"
+    if [[ -n "$existing_user" && "$existing_user" != "hysteria" ]]; then
+      ah_err "Existing Hysteria service runs as group '$existing_user'. Africhome currently requires the official hysteria group; refusing to change it automatically."
       return 1
     fi
   fi
@@ -339,6 +344,7 @@ hy2_setup() {
     ah_err "Certificate files were not created."; return 1;
   }
   getent passwd hysteria >/dev/null 2>&1 || { ah_err "Hysteria service user missing. Re-run the official installer."; return 1; }
+  getent group hysteria >/dev/null 2>&1 || { ah_err "Hysteria service group missing. Re-run the official installer."; return 1; }
   install -d -o hysteria -g hysteria -m 750 "$HY2_CERT_DIR"
   install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/fullchain.pem" "$HY2_CERT_DIR/fullchain.pem"
   install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/privkey.pem" "$HY2_CERT_DIR/privkey.pem"
