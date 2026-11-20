@@ -6,6 +6,19 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../modules/hysteria.sh
 . "$ROOT_DIR/modules/hysteria.sh"
 
+# Hysteria supply chain is pinned to a release-commit installer and checksummed assets.
+grep -Fq 'HY2_VERSION="v2.14.0"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'HY2_INSTALLER_COMMIT="c2b181e0b0e72b077e4b0b7297735af14d1f9929"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'HY2_INSTALLER_BLOB_SHA="0120aa8e9fab0974be2e4f2340b6efb15f88e361"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'fc25edff9948708cb00a4ff01f3bccde677660aca050133bb1ad46c6860362d2' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'e7c52241299fe85aba11e9d36e85d8d88ddbb5799ac0e33d272219d20e313bab' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq '50a7a9ac1ab0660ebfae0651f03faa234c7d99d0701806e10a7f5060857647ab' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'a30c618690b4aecf521c10ea2ec199aa13cff54696d3cecd5fa4502abdb2985a' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'git hash-object "$installer"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'bash "$installer" --local "$binary"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'sha256sum -c' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
+
 pass=0
 fail=0
 
