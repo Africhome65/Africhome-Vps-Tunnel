@@ -57,7 +57,11 @@ shared443_apply_transaction() {
   xray run -test -config "$candidate_dir/xray-config.json" || { echo "Xray rejected the candidate config." >&2; return 1; }
   haproxy -c -f "$candidate_dir/haproxy-443.cfg" || { echo "HAProxy rejected the candidate config." >&2; return 1; }
 
-  install -d -o root -g root -m 0700 "$backup_root" || return 1
+  if (( strict_owner )); then
+    install -d -o root -g root -m 0700 "$backup_root" || return 1
+  else
+    install -d -m 0700 "$backup_root" || return 1
+  fi
   [[ -d "$backup_root" && ! -L "$backup_root" ]] || { echo "Backup root is unsafe." >&2; return 1; }
   backup_dir="$(mktemp -d "$backup_root/africhome-vmess-shared443.XXXXXX")" || return 1
   chmod 0700 "$backup_dir"
@@ -68,7 +72,11 @@ shared443_apply_transaction() {
   chmod 0600 "$backup_dir/service-state.txt"
 
   xray_tmp="$(mktemp "$(dirname -- "$xray_config")/.africhome-xray-shared443.XXXXXX")" || return 1
-  install -o root -g "$xray_group" -m 0640 "$candidate_dir/xray-config.json" "$xray_tmp" || { rm -f -- "$xray_tmp"; return 1; }
+  if (( strict_owner )); then
+    install -o root -g "$xray_group" -m 0640 "$candidate_dir/xray-config.json" "$xray_tmp" || { rm -f -- "$xray_tmp"; return 1; }
+  else
+    install -m 0640 "$candidate_dir/xray-config.json" "$xray_tmp" || { rm -f -- "$xray_tmp"; return 1; }
+  fi
   mv -f -- "$xray_tmp" "$xray_config" || { rm -f -- "$xray_tmp"; return 1; }
   xray_tmp=""
   xray_changed=1
@@ -90,7 +98,11 @@ shared443_apply_transaction() {
   if (( rollback_ok )); then
     haproxy_tmp="$(mktemp "$(dirname -- "$haproxy_config")/.africhome-haproxy-shared443.XXXXXX")" || rollback_ok=0
     if (( rollback_ok )); then
-      install -o root -g root -m 0644 "$candidate_dir/haproxy-443.cfg" "$haproxy_tmp" || rollback_ok=0
+      if (( strict_owner )); then
+        install -o root -g root -m 0644 "$candidate_dir/haproxy-443.cfg" "$haproxy_tmp" || rollback_ok=0
+      else
+        install -m 0644 "$candidate_dir/haproxy-443.cfg" "$haproxy_tmp" || rollback_ok=0
+      fi
     fi
     if (( rollback_ok )); then
       mv -f -- "$haproxy_tmp" "$haproxy_config" || rollback_ok=0
