@@ -21,6 +21,9 @@ ok() { printf '[ OK ] %s\n' "$*"; }
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -r "$SCRIPT_DIR/scripts/license.sh" ]] || fail "Licence verifier is missing. Run the main Africhome installer checkout."
 bash "$SCRIPT_DIR/scripts/license.sh" verify
+[[ -r "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh" ]] || fail "DNSTT transaction helper is missing."
+# shellcheck source=scripts/lib/dnstt-transaction.sh
+. "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh"
 [[ "$(uname -s)" == "Linux" ]] || fail "Linux is required."
 [[ "$(uname -m)" == "x86_64" ]] || fail "This bootstrap currently supports x86_64/amd64 only."
 
@@ -50,39 +53,19 @@ elif command -v go >/dev/null 2>&1 && go_is_new_enough "$(command -v go)"; then
 else
   info "Installing verified Go ${GO_VERSION} toolchain..."
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  stage=""
+  trap 'rm -rf -- "$tmpdir" "${stage:-}"' EXIT
   archive="$tmpdir/go.linux-amd64.tar.gz"
   curl -fL --retry 3 "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "$archive"
   printf '%s  %s\n' "$GO_SHA256" "$archive" | sha256sum -c - || fail "Go archive checksum mismatch."
-  stage="$tmpdir/go"
-  install -d -m 0755 "$stage"
+  # Stage under /usr/local so the final directory rename stays on one filesystem.
+  stage="$(mktemp -d /usr/local/.africhome-go-stage.XXXXXX)"
   tar -C "$stage" --strip-components=1 -xzf "$archive"
   [[ -x "$stage/bin/go" ]] || fail "Go extraction did not produce a working toolchain."
-  # Keep the old toolchain until the staged toolchain is in place and usable.
-  go_backup=""
-  if [[ -e /usr/local/go || -L /usr/local/go ]]; then
-    [[ -d /usr/local/go && ! -L /usr/local/go ]] || fail "/usr/local/go must be a real directory."
-    go_backup="/usr/local/go.africhome-backup.$(date +%s%N)"
-    [[ ! -e "$go_backup" && ! -L "$go_backup" ]] || fail "Go backup path already exists."
-    mv -- /usr/local/go "$go_backup" || fail "Could not stage the existing Go toolchain for rollback."
-  fi
-  if ! mv -- "$stage" /usr/local/go; then
-    if [[ -n "$go_backup" && -d "$go_backup" ]]; then
-      mv -- "$go_backup" /usr/local/go || fail "CRITICAL: Go install failed and the previous toolchain could not be restored from $go_backup."
-    fi
-    fail "Could not install the staged Go toolchain; previous toolchain restored."
-  fi
-  if ! /usr/local/go/bin/go version >/dev/null 2>&1; then
-    rm -rf -- /usr/local/go
-    if [[ -n "$go_backup" && -d "$go_backup" ]]; then
-      mv -- "$go_backup" /usr/local/go || fail "CRITICAL: Go validation failed and rollback could not restore $go_backup."
-    fi
-    fail "Staged Go toolchain failed its version check; previous toolchain restored."
-  fi
+  dnstt_install_go_toolchain "$stage" /usr/local/go || fail "Could not install the verified Go toolchain transactionally."
   GO_BIN="/usr/local/go/bin/go"
-  [[ -z "$go_backup" ]] || rm -rf -- "$go_backup"
   trap - EXIT
-  rm -rf -- "$tmpdir"
+  rm -rf -- "$tmpdir" "$stage"
 fi
 
 info "Using $("$GO_BIN" version)"
@@ -116,19 +99,7 @@ fi
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required."
 install -d -m 0755 /usr/local/bin
 build_tmp="$(mktemp -d)"
-server_new=""
-client_new=""
-bin_backup=""
-preserve_bin_backup=0
-cleanup_build() {
-  [[ -z "$server_new" ]] || rm -f -- "$server_new"
-  [[ -z "$client_new" ]] || rm -f -- "$client_new"
-  if (( ! preserve_bin_backup )) && [[ -n "$bin_backup" ]]; then
-    rm -rf -- "$bin_backup"
-  fi
-  rm -rf -- "$build_tmp"
-}
-trap cleanup_build EXIT
+trap 'rm -rf -- "$build_tmp"' EXIT
 (
   cd "$DNSTT_SRC/dnstt-server"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-server" .
@@ -137,57 +108,7 @@ trap cleanup_build EXIT
   cd "$DNSTT_SRC/dnstt-client"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-client" .
 )
-# Keep backups on the same filesystem as the installed binaries for safe restore.
-bin_backup="$(mktemp -d /usr/local/bin/.africhome-dnstt-backup.XXXXXX)"
-server_existed=0
-client_existed=0
-if [[ -e /usr/local/bin/dnstt-server || -L /usr/local/bin/dnstt-server ]]; then
-  [[ -f /usr/local/bin/dnstt-server && ! -L /usr/local/bin/dnstt-server ]] || fail "Existing dnstt-server is not a regular non-symlink file."
-  cp -a -- /usr/local/bin/dnstt-server "$bin_backup/dnstt-server"
-  server_existed=1
-fi
-if [[ -e /usr/local/bin/dnstt-client || -L /usr/local/bin/dnstt-client ]]; then
-  [[ -f /usr/local/bin/dnstt-client && ! -L /usr/local/bin/dnstt-client ]] || fail "Existing dnstt-client is not a regular non-symlink file."
-  cp -a -- /usr/local/bin/dnstt-client "$bin_backup/dnstt-client"
-  client_existed=1
-fi
-server_new="$(mktemp /usr/local/bin/.dnstt-server.new.XXXXXX)"
-client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"
-install -m 0755 "$build_tmp/dnstt-server" "$server_new"
-install -m 0755 "$build_tmp/dnstt-client" "$client_new"
-if ! mv -f -- "$server_new" /usr/local/bin/dnstt-server; then
-  fail "Could not install DNSTT server binary; existing binaries were not changed."
-fi
-if ! mv -f -- "$client_new" /usr/local/bin/dnstt-client; then
-  # Restore each file through a same-filesystem temporary path. If restoration
-  # itself fails, retain the protected backups for manual recovery.
-  rollback_ok=1
-  restore_binary() {
-    local backup_file="$1" destination="$2" existed="$3" restore_tmp
-    if (( existed )); then
-      restore_tmp="$(mktemp "${destination}.restore.XXXXXX")" || return 1
-      if ! cp -a -- "$backup_file" "$restore_tmp"; then
-        rm -f -- "$restore_tmp"
-        return 1
-      fi
-      if ! mv -f -- "$restore_tmp" "$destination"; then
-        rm -f -- "$restore_tmp"
-        return 1
-      fi
-    else
-      rm -f -- "$destination" || return 1
-    fi
-  }
-  restore_binary "$bin_backup/dnstt-server" /usr/local/bin/dnstt-server "$server_existed" || rollback_ok=0
-  restore_binary "$bin_backup/dnstt-client" /usr/local/bin/dnstt-client "$client_existed" || rollback_ok=0
-  if (( rollback_ok )); then
-    fail "Could not install DNSTT client binary; previous server/client pair restored."
-  fi
-  preserve_bin_backup=1
-  fail "CRITICAL: DNSTT binary install and rollback both failed. Protected backups retained at $bin_backup."
-fi
-rm -rf -- "$bin_backup"
-bin_backup=""
+dnstt_replace_binary_pair "$build_tmp/dnstt-server" "$build_tmp/dnstt-client" /usr/local/bin || fail "Could not install DNSTT server/client binaries transactionally."
 rm -rf -- "$build_tmp"
 trap - EXIT
 
