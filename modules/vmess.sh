@@ -122,6 +122,52 @@ vmess_remove() {
   ah_ok "VMess inbound removed. Firewall rule was left unchanged."
 }
 
+vmess_shared_443_candidate() {
+  ah_require_root || return 1
+  command -v python3 >/dev/null 2>&1 || { ah_err "Python 3 is required."; return 1; }
+  command -v xray >/dev/null 2>&1 || { ah_err "Install Xray first."; return 1; }
+  command -v openssl >/dev/null 2>&1 || { ah_err "OpenSSL is required to verify the TLS certificate/key."; return 1; }
+  [[ -s "$VMESS_CONFIG" && ! -L "$VMESS_CONFIG" ]] || { ah_err "Xray config must be a regular non-symlink file."; return 1; }
+  local script_dir domain cert key path vmess_port reality_port uuid output_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  [[ -r "$script_dir/scripts/license.sh" ]] || { ah_err "Licence verifier is missing."; return 1; }
+  bash "$script_dir/scripts/license.sh" verify || return 1
+  read -r -p "VMess SNI domain (must match TLS certificate): " domain
+  read -r -p "TLS certificate full path: " cert
+  read -r -p "TLS private key full path: " key
+  read -r -p "WebSocket path [/vmess]: " path
+  path="${path:-/vmess}"
+  read -r -p "VMess loopback backend port [8443]: " vmess_port
+  vmess_port="${vmess_port:-8443}"
+  read -r -p "VLESS REALITY loopback backend port [1443]: " reality_port
+  reality_port="${reality_port:-1443}"
+  [[ "$vmess_port" =~ ^[0-9]+$ && "$reality_port" =~ ^[0-9]+$ ]] || { ah_err "Backend ports must be numeric."; return 1; }
+  uuid="$(xray uuid)" || { ah_err "Could not generate VMess UUID."; return 1; }
+  output_dir="/root/africhome-vmess-shared443-candidate-$(date +%Y%m%d%H%M%S)"
+  python3 "$script_dir/scripts/render-vmess-shared-443.py" "$VMESS_CONFIG" \
+    --vmess-domain "$domain" --vmess-uuid "$uuid" --certificate "$cert" --private-key "$key" \
+    --ws-path "$path" --vmess-backend-port "$vmess_port" --reality-backend-port "$reality_port" \
+    --output-dir "$output_dir" || return 1
+  if ! xray run -test -config "$output_dir/xray-config.json"; then
+    ah_err "Xray rejected the candidate. Active config and services were not changed."
+    return 1
+  fi
+  if command -v haproxy >/dev/null 2>&1; then
+    if ! haproxy -c -f "$output_dir/haproxy-443.cfg"; then
+      ah_err "HAProxy rejected the candidate. Active config and services were not changed."
+      return 1
+    fi
+  else
+    ah_warn "HAProxy is not installed; the candidate was rendered but not syntax-checked by HAProxy."
+  fi
+  ah_ok "Shared TCP 443 candidate generated and validated without live changes."
+  echo "Candidate directory: $output_dir"
+  echo "VMess client details: $output_dir/client-details.txt"
+  echo "Xray candidate: $output_dir/xray-config.json"
+  echo "HAProxy candidate: $output_dir/haproxy-443.cfg"
+  ah_warn "This is a review-only candidate. External VLESS REALITY and VMess client tests are still required before applying it."
+}
+
 vmess_menu() {
   while true; do
     echo
@@ -130,6 +176,7 @@ vmess_menu() {
     echo "2) Show client import URI"
     echo "3) Xray service status and logs"
     echo "4) Remove VMess inbound"
+    echo "5) Generate shared TCP 443 candidate (no live changes)"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -137,6 +184,7 @@ vmess_menu() {
       2) vmess_show_client; ah_pause ;;
       3) vmess_status; ah_pause ;;
       4) vmess_remove; ah_pause ;;
+      5) vmess_shared_443_candidate; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac
