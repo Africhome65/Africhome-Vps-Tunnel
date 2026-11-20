@@ -45,11 +45,30 @@ def read_regular_file(path: str, label: str) -> bytes:
         return stream.read()
 
 
+def read_tls_file(path: str, label: str) -> bytes:
+    try:
+        resolved = Path(path).resolve(strict=True)
+    except OSError as exc:
+        raise CandidateError(f"{label} path cannot be resolved") from exc
+    if not resolved.is_file():
+        raise CandidateError(f"{label} must resolve to a regular file")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(str(resolved), flags)
+    except OSError as exc:
+        raise CandidateError(f"{label} cannot be opened safely") from exc
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+            raise CandidateError(f"{label} must resolve to a non-empty regular file")
+        return stream.read()
+
+
 def validate_tls_pair(certificate: str, private_key: str, domain: str) -> None:
     if not Path(certificate).is_absolute() or not Path(private_key).is_absolute():
         raise CandidateError("TLS certificate and key paths must be absolute")
-    read_regular_file(certificate, "TLS certificate")
-    read_regular_file(private_key, "TLS private key")
+    read_tls_file(certificate, "TLS certificate")
+    read_tls_file(private_key, "TLS private key")
     try:
         subprocess.run(
             ["openssl", "x509", "-in", certificate, "-noout", "-checkhost", domain],
