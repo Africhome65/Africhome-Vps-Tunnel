@@ -113,7 +113,19 @@ fi
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required."
 install -d -m 0755 /usr/local/bin
 build_tmp="$(mktemp -d)"
-trap 'rm -rf "$build_tmp"' EXIT
+server_new=""
+client_new=""
+bin_backup=""
+preserve_bin_backup=0
+cleanup_build() {
+  [[ -z "$server_new" ]] || rm -f -- "$server_new"
+  [[ -z "$client_new" ]] || rm -f -- "$client_new"
+  if (( ! preserve_bin_backup )) && [[ -n "$bin_backup" ]]; then
+    rm -rf -- "$bin_backup"
+  fi
+  rm -rf -- "$build_tmp"
+}
+trap cleanup_build EXIT
 (
   cd "$DNSTT_SRC/dnstt-server"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-server" .
@@ -122,9 +134,8 @@ trap 'rm -rf "$build_tmp"' EXIT
   cd "$DNSTT_SRC/dnstt-client"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-client" .
 )
-# Stage both candidates and preserve the current pair before replacing either one.
-bin_backup="$build_tmp/previous-bin"
-install -d -m 0700 "$bin_backup"
+# Keep backups on the same filesystem as the installed binaries for safe restore.
+bin_backup="$(mktemp -d /usr/local/bin/.africhome-dnstt-backup.XXXXXX)"
 server_existed=0
 client_existed=0
 if [[ -e /usr/local/bin/dnstt-server || -L /usr/local/bin/dnstt-server ]]; then
@@ -142,24 +153,38 @@ client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"
 install -m 0755 "$build_tmp/dnstt-server" "$server_new"
 install -m 0755 "$build_tmp/dnstt-client" "$client_new"
 if ! mv -f -- "$server_new" /usr/local/bin/dnstt-server; then
-  rm -f -- "$server_new" "$client_new"
   fail "Could not install DNSTT server binary; existing binaries were not changed."
 fi
 if ! mv -f -- "$client_new" /usr/local/bin/dnstt-client; then
-  # Restore the server/client pair to its exact pre-install state.
-  if (( server_existed )); then
-    cp -a -- "$bin_backup/dnstt-server" /usr/local/bin/dnstt-server
-  else
-    rm -f -- /usr/local/bin/dnstt-server
+  # Restore each file through a same-filesystem temporary path. If restoration
+  # itself fails, retain the protected backups for manual recovery.
+  rollback_ok=1
+  restore_binary() {
+    local backup_file="$1" destination="$2" existed="$3" restore_tmp
+    if (( existed )); then
+      restore_tmp="$(mktemp "${destination}.restore.XXXXXX")" || return 1
+      if ! cp -a -- "$backup_file" "$restore_tmp"; then
+        rm -f -- "$restore_tmp"
+        return 1
+      fi
+      if ! mv -f -- "$restore_tmp" "$destination"; then
+        rm -f -- "$restore_tmp"
+        return 1
+      fi
+    else
+      rm -f -- "$destination" || return 1
+    fi
+  }
+  restore_binary "$bin_backup/dnstt-server" /usr/local/bin/dnstt-server "$server_existed" || rollback_ok=0
+  restore_binary "$bin_backup/dnstt-client" /usr/local/bin/dnstt-client "$client_existed" || rollback_ok=0
+  if (( rollback_ok )); then
+    fail "Could not install DNSTT client binary; previous server/client pair restored."
   fi
-  if (( client_existed )); then
-    cp -a -- "$bin_backup/dnstt-client" /usr/local/bin/dnstt-client
-  else
-    rm -f -- /usr/local/bin/dnstt-client
-  fi
-  rm -f -- "$server_new" "$client_new"
-  fail "Could not install DNSTT client binary; previous server/client pair restored."
+  preserve_bin_backup=1
+  fail "CRITICAL: DNSTT binary install and rollback both failed. Protected backups retained at $bin_backup."
 fi
+rm -rf -- "$bin_backup"
+bin_backup=""
 rm -rf -- "$build_tmp"
 trap - EXIT
 
