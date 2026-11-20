@@ -95,7 +95,8 @@ fi
 if [[ -d "$DNSTT_SRC/.git" ]]; then
   existing_commit="$(git -C "$DNSTT_SRC" rev-parse HEAD)"
   [[ "$existing_commit" == "$DNSTT_COMMIT" ]] || fail "Existing DNSTT source checkout is not the pinned $DNSTT_TAG commit. Back it up and move it aside before retrying; it will not be overwritten."
-  info "Using verified pinned DNSTT source commit $DNSTT_COMMIT."
+  [[ -z "$(git -C "$DNSTT_SRC" status --porcelain --untracked-files=all)" ]] || fail "Existing DNSTT source checkout has local or untracked changes; refusing to build modified source."
+  info "Using verified clean DNSTT source commit $DNSTT_COMMIT."
 else
   # Fetch the exact upstream release commit, not the moving master branch.
   src_stage="$(mktemp -d /opt/.dnstt-src.XXXXXX)"
