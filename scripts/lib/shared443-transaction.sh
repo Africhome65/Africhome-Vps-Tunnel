@@ -15,11 +15,11 @@ shared443_restore_file() {
 }
 
 shared443_apply_transaction() {
-  local candidate_dir="$1" xray_config="$2" haproxy_config="$3"
-  local backup_root="$4" xray_service="$5" haproxy_service="$6" strict_owner="${7:-1}"
-  local backup_dir="" xray_tmp="" haproxy_tmp="" xray_group="" haproxy_enabled_state=""
+  local candidate_dir="$1" xray_config="$2" haproxy_config="$3" vmess_state="$4"
+  local backup_root="$5" xray_service="$6" haproxy_service="$7" strict_owner="${8:-1}"
+  local backup_dir="" xray_tmp="" haproxy_tmp="" state_tmp="" xray_group="" haproxy_enabled_state=""
   local xray_was_active=0 haproxy_was_active=0 haproxy_was_enabled=0
-  local xray_changed=0 haproxy_changed=0 rollback_ok=1
+  local xray_changed=0 haproxy_changed=0 vmess_state_existed=0 vmess_state_changed=0 rollback_ok=1
   local file listeners
 
   [[ -d "$candidate_dir" && ! -L "$candidate_dir" ]] || { echo "Candidate directory must be a real directory." >&2; return 1; }
@@ -27,7 +27,7 @@ shared443_apply_transaction() {
   if (( strict_owner )) && [[ "$(stat -c '%u' "$candidate_dir")" != "0" ]]; then
     echo "Candidate directory must be root-owned." >&2; return 1
   fi
-  for file in xray-config.json haproxy-443.cfg tls-routes.json; do
+  for file in xray-config.json haproxy-443.cfg tls-routes.json vmess-state.env; do
     [[ -f "$candidate_dir/$file" && ! -L "$candidate_dir/$file" ]] || { echo "Candidate file is missing or unsafe: $file" >&2; return 1; }
     [[ "$(stat -c '%a' "$candidate_dir/$file")" == "600" ]] || { echo "Candidate file must have mode 0600: $file" >&2; return 1; }
     if (( strict_owner )) && [[ "$(stat -c '%u' "$candidate_dir/$file")" != "0" ]]; then
@@ -37,6 +37,11 @@ shared443_apply_transaction() {
   for file in "$xray_config" "$haproxy_config"; do
     [[ -f "$file" && ! -L "$file" ]] || { echo "Active configuration is missing or unsafe: $file" >&2; return 1; }
   done
+  [[ -d "$(dirname -- "$vmess_state")" && ! -L "$(dirname -- "$vmess_state")" ]] || { echo "VMess state directory is missing or unsafe." >&2; return 1; }
+  if [[ -e "$vmess_state" || -L "$vmess_state" ]]; then
+    [[ -f "$vmess_state" && ! -L "$vmess_state" ]] || { echo "Existing VMess state is not a regular non-symlink file." >&2; return 1; }
+    vmess_state_existed=1
+  fi
   command -v xray >/dev/null 2>&1 || { echo "Xray binary is required." >&2; return 1; }
   command -v haproxy >/dev/null 2>&1 || { echo "HAProxy binary is required." >&2; return 1; }
   command -v ss >/dev/null 2>&1 || { echo "ss is required for TCP/443 listener checks." >&2; return 1; }
@@ -67,8 +72,11 @@ shared443_apply_transaction() {
   chmod 0700 "$backup_dir"
   cp -a -- "$xray_config" "$backup_dir/xray-config.json" || { echo "Could not back up active Xray config." >&2; return 1; }
   cp -a -- "$haproxy_config" "$backup_dir/haproxy.cfg" || { echo "Could not back up active HAProxy config." >&2; return 1; }
-  printf 'xray_service=%s\nxray_was_active=%s\nhaproxy_service=%s\nhaproxy_was_active=%s\nhaproxy_enabled_state=%s\n' \
-    "$xray_service" "$xray_was_active" "$haproxy_service" "$haproxy_was_active" "$haproxy_enabled_state" > "$backup_dir/service-state.txt"
+  if (( vmess_state_existed )); then
+    cp -a -- "$vmess_state" "$backup_dir/vmess-state.env" || { echo "Could not back up existing VMess state." >&2; return 1; }
+  fi
+  printf 'xray_service=%s\nxray_was_active=%s\nhaproxy_service=%s\nhaproxy_was_active=%s\nhaproxy_enabled_state=%s\nvmess_state_existed=%s\n' \
+    "$xray_service" "$xray_was_active" "$haproxy_service" "$haproxy_was_active" "$haproxy_enabled_state" "$vmess_state_existed" > "$backup_dir/service-state.txt"
   chmod 0600 "$backup_dir/service-state.txt"
 
   xray_tmp="$(mktemp "$(dirname -- "$xray_config")/.africhome-xray-shared443.XXXXXX")" || return 1
@@ -130,7 +138,25 @@ shared443_apply_transaction() {
   fi
 
   if (( rollback_ok )); then
-    rm -f -- "${xray_tmp:-}" "${haproxy_tmp:-}"
+    state_tmp="$(mktemp "$(dirname -- "$vmess_state")/.africhome-vmess-state.XXXXXX")" || rollback_ok=0
+    if (( rollback_ok )); then
+      if (( strict_owner )); then
+        install -o root -g root -m 0600 "$candidate_dir/vmess-state.env" "$state_tmp" || rollback_ok=0
+      else
+        install -m 0600 "$candidate_dir/vmess-state.env" "$state_tmp" || rollback_ok=0
+      fi
+    fi
+    if (( rollback_ok )); then
+      mv -f -- "$state_tmp" "$vmess_state" || rollback_ok=0
+      if (( rollback_ok )); then
+        state_tmp=""
+        vmess_state_changed=1
+      fi
+    fi
+  fi
+
+  if (( rollback_ok )); then
+    rm -f -- "${xray_tmp:-}" "${haproxy_tmp:-}" "${state_tmp:-}"
     echo "Shared TCP/443 configuration applied."
     echo "Protected pre-change backup: $backup_dir"
     return 0
@@ -142,6 +168,13 @@ shared443_apply_transaction() {
   fi
   if (( xray_changed )); then
     shared443_restore_file "$backup_dir/xray-config.json" "$xray_config" || rollback_ok=0
+  fi
+  if (( vmess_state_changed )); then
+    if (( vmess_state_existed )); then
+      shared443_restore_file "$backup_dir/vmess-state.env" "$vmess_state" || rollback_ok=0
+    else
+      rm -f -- "$vmess_state" || rollback_ok=0
+    fi
   fi
   systemctl daemon-reload || rollback_ok=0
   if (( xray_was_active )); then
@@ -159,7 +192,7 @@ shared443_apply_transaction() {
   else
     systemctl disable "$haproxy_service" >/dev/null 2>&1 || rollback_ok=0
   fi
-  rm -f -- "${xray_tmp:-}" "${haproxy_tmp:-}"
+  rm -f -- "${xray_tmp:-}" "${haproxy_tmp:-}" "${state_tmp:-}"
   if (( rollback_ok )); then
     echo "Rollback completed. Protected backup retained at $backup_dir." >&2
   else
