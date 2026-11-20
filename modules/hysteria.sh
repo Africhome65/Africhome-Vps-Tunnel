@@ -5,6 +5,9 @@ HY2_CONFIG="/etc/hysteria/config.yaml"
 HY2_STATE="/etc/africhome-hysteria.env"
 HY2_CERT_DIR="/etc/hysteria/certs"
 HY2_HOOK="/etc/letsencrypt/renewal-hooks/deploy/africhome-hysteria.sh"
+HY2_VERSION="v2.14.0"
+HY2_INSTALLER_COMMIT="c2b181e0b0e72b077e4b0b7297735af14d1f9929"
+HY2_INSTALLER_BLOB_SHA="0120aa8e9fab0974be2e4f2340b6efb15f88e361"
 
 hy2_valid_domain() {
   local domain="$1" label
@@ -147,10 +150,143 @@ HOOK
 hy2_install() {
   ah_require_root || return 1
   command -v curl >/dev/null 2>&1 || ah_apt_install curl ca-certificates || return 1
-  ah_info "Installing/updating Hysteria 2 with the official installer..."
-  bash <(curl -fsSL https://get.hy2.sh/) || { ah_err "Official Hysteria installer failed."; return 1; }
-  command -v hysteria >/dev/null 2>&1 || { ah_err "Hysteria binary was not found."; return 1; }
-  ah_ok "Hysteria 2 installed."
+  command -v git >/dev/null 2>&1 || ah_apt_install git || return 1
+  command -v sha256sum >/dev/null 2>&1 || { ah_err "sha256sum is required."; return 1; }
+
+  local arch asset_sha installer_url binary_url tmpdir backup_dir installer binary
+  local old_binary=0 old_unit=0 old_template=0 rollback_ok=1 installed_sha installed_version existing_user
+  case "$(uname -m)" in
+    x86_64|amd64)
+      arch="amd64"
+      asset_sha="fc25edff9948708cb00a4ff01f3bccde677660aca050133bb1ad46c6860362d2"
+      ;;
+    aarch64|arm64)
+      arch="arm64"
+      asset_sha="e7c52241299fe85aba11e9d36e85d8d88ddbb5799ac0e33d272219d20e313bab"
+      ;;
+    armv7l|armv7)
+      arch="arm"
+      asset_sha="50a7a9ac1ab0660ebfae0651f03faa234c7d99d0701806e10a7f5060857647ab"
+      ;;
+    i386|i686)
+      arch="386"
+      asset_sha="a30c618690b4aecf521c10ea2ec199aa13cff54696d3cecd5fa4502abdb2985a"
+      ;;
+    *)
+      ah_err "Unsupported Hysteria architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+
+  if [[ -s /etc/systemd/system/hysteria-server.service ]]; then
+    existing_user="$(sed -n 's/^User=//p' /etc/systemd/system/hysteria-server.service | tail -n1)"
+    if [[ -n "$existing_user" && "$existing_user" != "hysteria" ]]; then
+      ah_err "Existing Hysteria service runs as '$existing_user'. Africhome currently requires the official hysteria service user; refusing to change it automatically."
+      return 1
+    fi
+  fi
+
+  tmpdir="$(mktemp -d)" || { ah_err "Could not create Hysteria install workspace."; return 1; }
+  install -d -m 0700 /var/backups || { rm -rf -- "$tmpdir"; return 1; }
+  backup_dir="$(mktemp -d /var/backups/africhome-hysteria-install.XXXXXX)" || { rm -rf -- "$tmpdir"; return 1; }
+  chmod 0700 "$backup_dir"
+  installer="$tmpdir/install_server.sh"
+  binary="$tmpdir/hysteria-linux-$arch"
+  installer_url="https://raw.githubusercontent.com/HyNetworks/hysteria/$HY2_INSTALLER_COMMIT/scripts/install_server.sh"
+  binary_url="https://github.com/HyNetworks/hysteria/releases/download/app/$HY2_VERSION/hysteria-linux-$arch"
+
+  if [[ -e /usr/local/bin/hysteria || -L /usr/local/bin/hysteria ]]; then
+    [[ -f /usr/local/bin/hysteria && ! -L /usr/local/bin/hysteria ]] || { ah_err "Existing Hysteria executable is not a regular file."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    cp -a -- /usr/local/bin/hysteria "$backup_dir/hysteria" || { ah_err "Could not back up existing Hysteria executable."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    old_binary=1
+  fi
+  if [[ -e /etc/systemd/system/hysteria-server.service || -L /etc/systemd/system/hysteria-server.service ]]; then
+    [[ -f /etc/systemd/system/hysteria-server.service && ! -L /etc/systemd/system/hysteria-server.service ]] || { ah_err "Existing Hysteria service unit is unsafe."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    cp -a -- /etc/systemd/system/hysteria-server.service "$backup_dir/hysteria-server.service" || { ah_err "Could not back up Hysteria service unit."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    old_unit=1
+  fi
+  if [[ -e /etc/systemd/system/hysteria-server@.service || -L /etc/systemd/system/hysteria-server@.service ]]; then
+    [[ -f /etc/systemd/system/hysteria-server@.service && ! -L /etc/systemd/system/hysteria-server@.service ]] || { ah_err "Existing Hysteria template unit is unsafe."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    cp -a -- /etc/systemd/system/hysteria-server@.service "$backup_dir/hysteria-server@.service" || { ah_err "Could not back up Hysteria template unit."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
+    old_template=1
+  fi
+
+  if ! curl -fL --retry 3 "$installer_url" -o "$installer"; then
+    ah_err "Could not download the pinned Hysteria installer."
+    rm -rf -- "$tmpdir" "$backup_dir"
+    return 1
+  fi
+  installer_sha="$(git hash-object "$installer")"
+  if [[ "$installer_sha" != "$HY2_INSTALLER_BLOB_SHA" ]]; then
+    ah_err "Pinned Hysteria installer integrity check failed."
+    rm -rf -- "$tmpdir" "$backup_dir"
+    return 1
+  fi
+  if ! curl -fL --retry 3 "$binary_url" -o "$binary"; then
+    ah_err "Could not download Hysteria $HY2_VERSION for linux/$arch."
+    rm -rf -- "$tmpdir" "$backup_dir"
+    return 1
+  fi
+  if ! printf '%s  %s\n' "$asset_sha" "$binary" | sha256sum -c -; then
+    ah_err "Hysteria binary checksum mismatch; refusing to install."
+    rm -rf -- "$tmpdir" "$backup_dir"
+    return 1
+  fi
+  chmod 0755 "$binary"
+
+  hy2_rollback_install() {
+    local restore_tmp
+    if (( old_binary )); then
+      restore_tmp="$(mktemp /usr/local/bin/.hysteria.restore.XXXXXX)" || rollback_ok=0
+      if (( rollback_ok )); then
+        cp -a -- "$backup_dir/hysteria" "$restore_tmp" || rollback_ok=0
+        (( rollback_ok )) && mv -f -- "$restore_tmp" /usr/local/bin/hysteria || rollback_ok=0
+      fi
+      [[ -z "${restore_tmp:-}" ]] || rm -f -- "$restore_tmp"
+    else
+      rm -f -- /usr/local/bin/hysteria || rollback_ok=0
+    fi
+    if (( old_unit )); then
+      cp -a -- "$backup_dir/hysteria-server.service" /etc/systemd/system/hysteria-server.service || rollback_ok=0
+    else
+      rm -f -- /etc/systemd/system/hysteria-server.service || rollback_ok=0
+    fi
+    if (( old_template )); then
+      cp -a -- "$backup_dir/hysteria-server@.service" /etc/systemd/system/hysteria-server@.service || rollback_ok=0
+    else
+      rm -f -- /etc/systemd/system/hysteria-server@.service || rollback_ok=0
+    fi
+    systemctl daemon-reload || rollback_ok=0
+    systemctl restart hysteria-server.service >/dev/null 2>&1 || true
+    rm -rf -- "$tmpdir"
+    if (( rollback_ok )); then
+      rm -rf -- "$backup_dir"
+      ah_err "Hysteria installation failed; previous executable and service units were restored."
+    else
+      ah_err "CRITICAL: Hysteria installation and rollback failed. Protected backups retained at $backup_dir."
+    fi
+    return 1
+  }
+
+  ah_info "Installing pinned Hysteria $HY2_VERSION using its verified official installer..."
+  if ! bash "$installer" --local "$binary"; then
+    hy2_rollback_install
+    return 1
+  fi
+  [[ -f /usr/local/bin/hysteria && ! -L /usr/local/bin/hysteria ]] || {
+    hy2_rollback_install
+    return 1
+  }
+  installed_sha="$(sha256sum /usr/local/bin/hysteria | awk '{print $1}')"
+  installed_version="$(/usr/local/bin/hysteria version 2>&1 || true)"
+  if [[ "$installed_sha" != "$asset_sha" || "$installed_version" != *"$HY2_VERSION"* ]]; then
+    ah_err "Installed Hysteria binary did not match the pinned release."
+    hy2_rollback_install
+    return 1
+  fi
+
+  rm -rf -- "$tmpdir" "$backup_dir"
+  ah_ok "Verified Hysteria $HY2_VERSION installed for linux/$arch."
 }
 
 hy2_setup() {
@@ -212,7 +348,7 @@ hy2_setup() {
 
   config_tmp="$(mktemp)"
   hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
-  install -o root -g root -m 600 "$config_tmp" "$HY2_CONFIG"
+  install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"
   rm -f "$config_tmp"
   if ! systemctl daemon-reload || ! systemctl enable hysteria-server.service || ! systemctl restart hysteria-server.service; then
     ah_err "Hysteria failed to start. Restoring the previous configuration when available."
