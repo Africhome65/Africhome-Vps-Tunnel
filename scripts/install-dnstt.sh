@@ -6,6 +6,7 @@ set -Eeuo pipefail
 
 DNSTT_REPO="https://www.bamsoftware.com/git/dnstt.git"
 DNSTT_TAG="v1.20260501.0"
+DNSTT_TAG_OBJECT="8fb3b30e6dbdc9006780327c6687623534d134f5"
 DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"
 DNSTT_SRC="/opt/dnstt-src"
 KEY_DIR="/etc/africhome-dnstt"
@@ -101,6 +102,8 @@ else
   git -C "$src_stage" remote add origin "$DNSTT_REPO"
   git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"
   git -C "$src_stage" checkout --detach "$DNSTT_TAG"
+  fetched_tag_object="$(git -C "$src_stage" rev-parse "$DNSTT_TAG^{tag}")"
+  [[ "$fetched_tag_object" == "$DNSTT_TAG_OBJECT" ]] || fail "Fetched DNSTT tag object does not match the pinned signed release tag."
   fetched_commit="$(git -C "$src_stage" rev-parse HEAD)"
   [[ "$fetched_commit" == "$DNSTT_COMMIT" ]] || fail "Fetched DNSTT source does not match the pinned release commit."
   mv -- "$src_stage" "$DNSTT_SRC"
