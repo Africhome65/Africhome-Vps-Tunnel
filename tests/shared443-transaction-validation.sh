@@ -76,10 +76,12 @@ make_case() {
   printf '{"inbounds":[]}\n' > "$candidate/xray-config.json"
   printf 'global\ndefaults\nfrontend fe_shared_443\n' > "$candidate/haproxy-443.cfg"
   printf '{"routes":[]}\n' > "$candidate/tls-routes.json"
+  printf 'VMESS_DOMAIN=vmess.example.com\nVMESS_PORT=443\nVMESS_SHARED443=1\n' > "$candidate/vmess-state.env"
   chmod 0600 "$candidate/"*
   printf 'old-xray-%s\n' "$name" > "$active/xray.json"
   printf 'old-haproxy-%s\n' "$name" > "$active/haproxy.cfg"
-  printf '%s\n' "$candidate" "$active/xray.json" "$active/haproxy.cfg" "$backup"
+  printf 'old-state-%s\n' "$name" > "$active/vmess-state.env"
+  printf '%s\n' "$candidate" "$active/xray.json" "$active/haproxy.cfg" "$active/vmess-state.env" "$backup"
 }
 
 # Successful apply: Xray releases TCP/443, then HAProxy binds it; old configs are backed up.
@@ -87,12 +89,14 @@ mapfile -t success_paths < <(make_case success)
 candidate="${success_paths[0]}"
 xray_config="${success_paths[1]}"
 haproxy_config="${success_paths[2]}"
-backup_root="${success_paths[3]}"
+state_file="${success_paths[3]}"
+backup_root="${success_paths[4]}"
 xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=0; fail_ss=0; ss_mode=normal
-if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0 &&
+if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$state_file" "$backup_root" xray.service haproxy.service 0 &&
    grep -q '"inbounds"' "$xray_config" &&
    grep -q 'frontend fe_shared_443' "$haproxy_config" &&
+   grep -q 'VMESS_SHARED443=1' "$state_file" &&
    (( xray_active && haproxy_active )) &&
    [[ "$mock_haproxy_enabled_state" == "enabled" ]] &&
    compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null; then
@@ -108,14 +112,16 @@ mapfile -t rollback_paths < <(make_case rollback)
 candidate="${rollback_paths[0]}"
 xray_config="${rollback_paths[1]}"
 haproxy_config="${rollback_paths[2]}"
-backup_root="${rollback_paths[3]}"
+state_file="${rollback_paths[3]}"
+backup_root="${rollback_paths[4]}"
 xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=1; fail_ss=0; ss_mode=normal
-if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0; then
+if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$state_file" "$backup_root" xray.service haproxy.service 0; then
   echo "FAIL: injected HAProxy restart failure unexpectedly succeeded" >&2
   ((fail+=1))
 elif [[ "$(cat "$xray_config")" == "old-xray-rollback" ]] &&
      [[ "$(cat "$haproxy_config")" == "old-haproxy-rollback" ]] &&
+     [[ "$(cat "$state_file")" == "old-state-rollback" ]] &&
      (( xray_active )) && (( ! haproxy_active )) &&
      [[ "$mock_haproxy_enabled_state" == "disabled" ]] &&
      compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null; then
@@ -131,14 +137,16 @@ mapfile -t busy_paths < <(make_case busy)
 candidate="${busy_paths[0]}"
 xray_config="${busy_paths[1]}"
 haproxy_config="${busy_paths[2]}"
-backup_root="${busy_paths[3]}"
+state_file="${busy_paths[3]}"
+backup_root="${busy_paths[4]}"
 xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=0; fail_ss=0; ss_mode=busy
-if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0; then
+if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$state_file" "$backup_root" xray.service haproxy.service 0; then
   echo "FAIL: occupied TCP/443 was accepted" >&2
   ((fail+=1))
 elif [[ "$(cat "$xray_config")" == "old-xray-busy" ]] &&
      [[ "$(cat "$haproxy_config")" == "old-haproxy-busy" ]] &&
+     [[ "$(cat "$state_file")" == "old-state-busy" ]] &&
      (( xray_active )) && (( ! haproxy_active )); then
   echo "PASS: occupied TCP/443 aborts and restores the original Xray config"
   ((pass+=1))
@@ -152,7 +160,8 @@ mapfile -t preserve_paths < <(make_case preserve)
 candidate="${preserve_paths[0]}"
 xray_config="${preserve_paths[1]}"
 haproxy_config="${preserve_paths[2]}"
-backup_root="${preserve_paths[3]}"
+state_file="${preserve_paths[3]}"
+backup_root="${preserve_paths[4]}"
 xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=1; fail_ss=0; ss_mode=normal
 mv() {
@@ -161,7 +170,7 @@ mv() {
   fi
   command mv "$@"
 }
-if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0; then
+if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$state_file" "$backup_root" xray.service haproxy.service 0; then
   echo "FAIL: forced shared-443 rollback failure unexpectedly succeeded" >&2
   ((fail+=1))
 elif compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null &&
