@@ -157,6 +157,36 @@ else
   ((fail+=1))
 fi
 
+# A failed VMess state-file replacement must roll back Xray and HAProxy as one transaction.
+mapfile -t statefail_paths < <(make_case statefail)
+candidate="${statefail_paths[0]}"
+xray_config="${statefail_paths[1]}"
+haproxy_config="${statefail_paths[2]}"
+state_file="${statefail_paths[3]}"
+backup_root="${statefail_paths[4]}"
+xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
+fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=0; fail_ss=0; ss_mode=normal
+mv() {
+  if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${3:-}" == "$(dirname -- "$state_file")"/.africhome-vmess-state.* && "${4:-}" == "$state_file" ]]; then
+    return 1
+  fi
+  command mv "$@"
+}
+if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$state_file" "$backup_root" xray.service haproxy.service 0; then
+  echo "FAIL: injected VMess state replacement failure unexpectedly succeeded" >&2
+  ((fail+=1))
+elif [[ "$(cat "$xray_config")" == "old-xray-statefail" ]] &&
+     [[ "$(cat "$haproxy_config")" == "old-haproxy-statefail" ]] &&
+     [[ "$(cat "$state_file")" == "old-state-statefail" ]] &&
+     (( xray_active )) && (( ! haproxy_active )); then
+  echo "PASS: failed VMess state replacement restores both services and prior state"
+  ((pass+=1))
+else
+  echo "FAIL: VMess state replacement failure did not roll back all components" >&2
+  ((fail+=1))
+fi
+unset -f mv
+
 # A forced rollback rename failure must leave the protected backup available.
 mapfile -t preserve_paths < <(make_case preserve)
 candidate="${preserve_paths[0]}"
