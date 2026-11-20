@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import shlex
 import stat
 import subprocess
 import sys
@@ -230,10 +231,26 @@ def write_candidate_dir(output_dir: Path, config: dict[str, Any], manifest: dict
         raise CandidateError("Candidate output parent must be an existing real directory")
     output_dir.mkdir(mode=0o700)
     try:
+        vmess_inbound = config["inbounds"][-1]
+        vmess_client = vmess_inbound["settings"]["clients"][0]
+        vmess_stream = vmess_inbound["streamSettings"]
+        state_values = {
+            "VMESS_DOMAIN": manifest["routes"][-1]["sni"],
+            "VMESS_PORT": "443",
+            "VMESS_UUID": vmess_client["id"],
+            "VMESS_PATH": vmess_stream["wsSettings"]["path"],
+            "VMESS_CERT": vmess_stream["tlsSettings"]["certificates"][0]["certificateFile"],
+            "VMESS_KEY": vmess_stream["tlsSettings"]["certificates"][0]["keyFile"],
+            "VMESS_SHARED443": "1",
+            "VMESS_BACKEND_PORT": str(vmess_inbound["port"]),
+            "VMESS_REALITY_BACKEND_PORT": str(manifest["routes"][0]["backend_port"]),
+        }
+        state_text = "".join(f"{key}={shlex.quote(value)}\\n" for key, value in state_values.items())
         files = {
             "xray-config.json": json.dumps(config, indent=2) + "\n",
             "tls-routes.json": json.dumps(manifest, indent=2) + "\n",
             "haproxy-443.cfg": haproxy,
+            "vmess-state.env": state_text,
             "client-details.txt": (
                 f"VMess domain: {manifest['routes'][-1]['sni']}\n"
                 "Public port: 443/TCP\n"
