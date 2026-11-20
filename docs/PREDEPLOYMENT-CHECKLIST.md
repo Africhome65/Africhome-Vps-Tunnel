@@ -24,7 +24,7 @@ This checklist is a release gate. A passing shell-syntax workflow is not proof t
 
 ## Automated checks
 
-Latest full GitHub Actions run for PR #7: `44707458544` — passed on commit `d257f7cfd0697529ace1c56b99d74485dd07e7a2`. It includes DNSTT and Hysteria rollback fault-injection tests plus nine VMess shared-443 candidate tests, including Let's Encrypt symlink and Xray service-file-access checks. This is CI evidence only; it does not replace VPS/client integration testing.
+Latest full GitHub Actions run for PR #7: `44708208460` — passed on commit `63a30484cd08e65d103076618b5e4b43d1fa9cf9`. It includes DNSTT and Hysteria rollback tests, nine VMess candidate tests, and shared-443 apply/rollback fault injection. This is CI evidence only; it does not replace VPS/client integration testing.
 
 - [x] All shell scripts pass `bash -n`.
 - [x] ShellCheck passes with no errors.
