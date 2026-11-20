@@ -5,6 +5,8 @@
 set -Eeuo pipefail
 
 DNSTT_REPO="https://www.bamsoftware.com/git/dnstt.git"
+DNSTT_TAG="v1.20260501.0"
+DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"
 DNSTT_SRC="/opt/dnstt-src"
 KEY_DIR="/etc/africhome-dnstt"
 GO_VERSION="1.27.4"
@@ -87,10 +89,22 @@ info "Using $("$GO_BIN" version)"
 if [[ -e "$DNSTT_SRC" && ! -d "$DNSTT_SRC/.git" ]]; then
   fail "$DNSTT_SRC exists but is not a Git checkout; move it aside and retry."
 fi
-if [[ ! -d "$DNSTT_SRC/.git" ]]; then
-  git clone "$DNSTT_REPO" "$DNSTT_SRC"
+if [[ -d "$DNSTT_SRC/.git" ]]; then
+  existing_commit="$(git -C "$DNSTT_SRC" rev-parse HEAD)"
+  [[ "$existing_commit" == "$DNSTT_COMMIT" ]] || fail "Existing DNSTT source checkout is not the pinned $DNSTT_TAG commit. Back it up and move it aside before retrying; it will not be overwritten."
+  info "Using verified pinned DNSTT source commit $DNSTT_COMMIT."
 else
-  info "Using existing DNSTT source checkout at $DNSTT_SRC (not updating it automatically)."
+  # Fetch the exact upstream release commit, not the moving master branch.
+  src_stage="$(mktemp -d /opt/.dnstt-src.XXXXXX)"
+  trap 'rm -rf -- "$src_stage"' EXIT
+  git -C "$src_stage" init -q
+  git -C "$src_stage" remote add origin "$DNSTT_REPO"
+  git -C "$src_stage" fetch --depth=1 origin "$DNSTT_COMMIT"
+  git -C "$src_stage" checkout --detach FETCH_HEAD
+  fetched_commit="$(git -C "$src_stage" rev-parse HEAD)"
+  [[ "$fetched_commit" == "$DNSTT_COMMIT" ]] || fail "Fetched DNSTT source does not match the pinned release commit."
+  mv -- "$src_stage" "$DNSTT_SRC"
+  trap - EXIT
 fi
 
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required."
