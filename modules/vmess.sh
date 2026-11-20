@@ -128,13 +128,20 @@ vmess_shared_443_candidate() {
   command -v xray >/dev/null 2>&1 || { ah_err "Install Xray first."; return 1; }
   command -v openssl >/dev/null 2>&1 || { ah_err "OpenSSL is required to verify the TLS certificate/key."; return 1; }
   [[ -s "$VMESS_CONFIG" && ! -L "$VMESS_CONFIG" ]] || { ah_err "Xray config must be a regular non-symlink file."; return 1; }
-  local script_dir domain cert key path vmess_port reality_port uuid output_dir
+  local script_dir domain cert key path vmess_port reality_port uuid output_dir service_user service_group
   script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
   [[ -r "$script_dir/scripts/license.sh" ]] || { ah_err "Licence verifier is missing."; return 1; }
   bash "$script_dir/scripts/license.sh" verify || return 1
   read -r -p "VMess SNI domain (must match TLS certificate): " domain
   read -r -p "TLS certificate full path: " cert
   read -r -p "TLS private key full path: " key
+  service_user="$(systemctl show -p User --value xray.service 2>/dev/null)" || { ah_err "Cannot inspect Xray service identity."; return 1; }
+  service_group="$(systemctl show -p Group --value xray.service 2>/dev/null)" || { ah_err "Cannot inspect Xray service group."; return 1; }
+  service_user="${service_user:-root}"
+  service_group="${service_group:-$(id -gn "$service_user" 2>/dev/null || echo root)}"
+  command -v runuser >/dev/null 2>&1 || { ah_err "runuser is required to verify Xray certificate access."; return 1; }
+  runuser -u "$service_user" -g "$service_group" -- test -r "$cert" || { ah_err "Xray service user $service_user:$service_group cannot read the TLS certificate."; return 1; }
+  runuser -u "$service_user" -g "$service_group" -- test -r "$key" || { ah_err "Xray service user $service_user:$service_group cannot read the TLS private key."; return 1; }
   read -r -p "WebSocket path [/vmess]: " path
   path="${path:-/vmess}"
   read -r -p "VMess loopback backend port [8443]: " vmess_port
