@@ -363,7 +363,7 @@ hy2_setup() {
   local domain email port_spec first_port last_port ufw_port_spec username password replace
   local backup_dir tmp_cert="" tmp_key="" hook_tmp="" config_tmp="" state_tmp=""
   local old_config=0 old_cert=0 old_key=0 old_hook=0 old_state=0
-  local was_enabled=0 was_active=0 files_touched=0 rollback_ok=1
+  local was_enabled=0 was_active=0 files_touched=0 rollback_ok=1 cert_pub key_pub old_umask
   read -r -p "Your domain (DNS A/AAAA must point to this VPS): " domain
   domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   hy2_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
@@ -409,12 +409,12 @@ hy2_setup() {
   getent passwd hysteria >/dev/null 2>&1 || { ah_err "Hysteria service user missing. Re-run the verified installer."; return 1; }
   getent group hysteria >/dev/null 2>&1 || { ah_err "Hysteria service group missing. Re-run the verified installer."; return 1; }
   [[ ! -L "$HY2_CERT_DIR" ]] || { ah_err "Hysteria certificate directory must not be a symlink."; return 1; }
+  [[ ! -L "$(dirname -- "$HY2_HOOK")" ]] || { ah_err "Hysteria renewal-hook directory must not be a symlink."; return 1; }
+  [[ ! -L "$(dirname -- "$HY2_CONFIG")" ]] || { ah_err "Hysteria config directory must not be a symlink."; return 1; }
+  [[ ! -L /var/backups ]] || { ah_err "/var/backups must not be a symlink."; return 1; }
 
   install -d -o hysteria -g hysteria -m 750 "$HY2_CERT_DIR"
-  install -d -m 755 "$(dirname -- "$HY2_HOOK")"
-  install -d -m 755 "$(dirname -- "$HY2_CONFIG")"
-  install -d -m 700 "$(dirname -- "$HY2_STATE")"
-  install -d -m 700 /var/backups || return 1
+  mkdir -p -- "$(dirname -- "$HY2_HOOK")" "$(dirname -- "$HY2_CONFIG")" /var/backups || return 1
   backup_dir="$(mktemp -d /var/backups/africhome-hysteria-setup.XXXXXX)" || return 1
   chmod 0700 "$backup_dir"
 
@@ -506,8 +506,10 @@ hy2_setup() {
   hy2_write_renewal_hook "$hook_tmp" "$domain" || { ah_err "Could not prepare Hysteria renewal hook."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
   hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
   chown root:hysteria "$config_tmp" && chmod 0640 "$config_tmp" || { ah_err "Could not secure Hysteria config."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  old_umask="$(umask)"
   umask 077
   printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$state_tmp"
+  umask "$old_umask"
   chown root:root "$state_tmp" && chmod 0600 "$state_tmp" || { ah_err "Could not secure Hysteria state file."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
 
   files_touched=1
