@@ -220,11 +220,6 @@ hy2_install() {
     getent group hysteria >/dev/null 2>&1 || { ah_err "Existing Hysteria config is present but the hysteria group is missing; refusing to change its permissions."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
     cp -a -- "$HY2_CONFIG" "$backup_dir/config.yaml" || { ah_err "Could not back up existing Hysteria config."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
     old_config=1
-    chown root:hysteria "$HY2_CONFIG" && chmod 0640 "$HY2_CONFIG" || {
-      cp -a -- "$backup_dir/config.yaml" "$HY2_CONFIG" || ah_err "CRITICAL: failed to restore Hysteria config permissions."
-      rm -rf -- "$tmpdir" "$backup_dir"
-      return 1
-    }
   fi
 
   if ! curl -fL --retry 3 "$installer_url" -o "$installer"; then
@@ -249,6 +244,14 @@ hy2_install() {
     return 1
   fi
   chmod 0755 "$binary"
+
+  if (( old_config )); then
+    chown root:hysteria "$HY2_CONFIG" && chmod 0640 "$HY2_CONFIG" || {
+      cp -a -- "$backup_dir/config.yaml" "$HY2_CONFIG" || ah_err "CRITICAL: failed to restore Hysteria config permissions."
+      rm -rf -- "$tmpdir" "$backup_dir"
+      return 1
+    }
+  fi
 
   hy2_rollback_install() {
     local restore_tmp
