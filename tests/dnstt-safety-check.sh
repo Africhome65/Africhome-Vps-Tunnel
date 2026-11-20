@@ -74,12 +74,14 @@ fi
 # and for both DNSTT binaries. These assertions prevent accidental regression
 # to one-way mv/install operations.
 INSTALLER="$ROOT_DIR/scripts/install-dnstt.sh"
-grep -Fq 'go_backup="/usr/local/go.africhome-backup.$"' "$INSTALLER"
+grep -Fq 'go_backup="/usr/local/go.africhome-backup.$(date +%s%N)"' "$INSTALLER"
 grep -Fq 'previous toolchain could not be restored' "$INSTALLER"
 grep -Fq 'Staged Go toolchain failed its version check; previous toolchain restored.' "$INSTALLER"
 grep -Fq 'server_existed=0' "$INSTALLER"
 grep -Fq 'client_existed=0' "$INSTALLER"
 grep -Fq 'previous server/client pair restored.' "$INSTALLER"
+grep -Fq 'server_new="$(mktemp /usr/local/bin/.dnstt-server.new.XXXXXX)"' "$INSTALLER"
+grep -Fq 'client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"' "$INSTALLER"
 grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$INSTALLER"
 grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$INSTALLER"
 
