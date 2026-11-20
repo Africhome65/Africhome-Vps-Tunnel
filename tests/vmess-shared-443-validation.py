@@ -150,6 +150,13 @@ class VmessShared443Tests(unittest.TestCase):
         with self.assertRaises(MODULE.CandidateError):
             self.render(certificate=str(broken))
 
+    def test_vmess_menu_wires_candidate_and_checks_xray_file_access(self):
+        module_text = (ROOT / "modules" / "vmess.sh").read_text()
+        self.assertIn('5) Generate shared TCP 443 candidate (no live changes)', module_text)
+        self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$cert"', module_text)
+        self.assertIn('runuser -u "$service_user" -g "$service_group" -- test -r "$key"', module_text)
+        self.assertIn('render-vmess-shared-443.py', module_text)
+
     def test_candidate_directory_is_private_and_review_only(self):
         candidate, manifest, haproxy = self.render()
         output = self.root / "candidate"
