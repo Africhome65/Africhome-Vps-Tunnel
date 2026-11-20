@@ -59,7 +59,7 @@ else
   go_backup=""
   if [[ -e /usr/local/go || -L /usr/local/go ]]; then
     [[ -d /usr/local/go && ! -L /usr/local/go ]] || fail "/usr/local/go must be a real directory."
-    go_backup="/usr/local/go.africhome-backup.$"
+    go_backup="/usr/local/go.africhome-backup.$(date +%s%N)"
     [[ ! -e "$go_backup" && ! -L "$go_backup" ]] || fail "Go backup path already exists."
     mv -- /usr/local/go "$go_backup" || fail "Could not stage the existing Go toolchain for rollback."
   fi
@@ -120,13 +120,15 @@ if [[ -e /usr/local/bin/dnstt-client || -L /usr/local/bin/dnstt-client ]]; then
   cp -a -- /usr/local/bin/dnstt-client "$bin_backup/dnstt-client"
   client_existed=1
 fi
-install -m 0755 "$build_tmp/dnstt-server" /usr/local/bin/.dnstt-server.new.$
-install -m 0755 "$build_tmp/dnstt-client" /usr/local/bin/.dnstt-client.new.$
-if ! mv -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/dnstt-server; then
-  rm -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/.dnstt-client.new.$
+server_new="$(mktemp /usr/local/bin/.dnstt-server.new.XXXXXX)"
+client_new="$(mktemp /usr/local/bin/.dnstt-client.new.XXXXXX)"
+install -m 0755 "$build_tmp/dnstt-server" "$server_new"
+install -m 0755 "$build_tmp/dnstt-client" "$client_new"
+if ! mv -f -- "$server_new" /usr/local/bin/dnstt-server; then
+  rm -f -- "$server_new" "$client_new"
   fail "Could not install DNSTT server binary; existing binaries were not changed."
 fi
-if ! mv -f -- /usr/local/bin/.dnstt-client.new.$ /usr/local/bin/dnstt-client; then
+if ! mv -f -- "$client_new" /usr/local/bin/dnstt-client; then
   # Restore the server/client pair to its exact pre-install state.
   if (( server_existed )); then
     cp -a -- "$bin_backup/dnstt-server" /usr/local/bin/dnstt-server
@@ -138,7 +140,7 @@ if ! mv -f -- /usr/local/bin/.dnstt-client.new.$ /usr/local/bin/dnstt-client; th
   else
     rm -f -- /usr/local/bin/dnstt-client
   fi
-  rm -f -- /usr/local/bin/.dnstt-server.new.$ /usr/local/bin/.dnstt-client.new.$
+  rm -f -- "$server_new" "$client_new"
   fail "Could not install DNSTT client binary; previous server/client pair restored."
 fi
 rm -rf -- "$build_tmp"
