@@ -62,6 +62,8 @@ grep -q 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/instal
 
 # The bootstrap must fetch the fixed upstream release commit, never moving master.
 grep -Fq 'DNSTT_TAG="v1.20260501.0"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'DNSTT_TAG_OBJECT="8fb3b30e6dbdc9006780327c6687623534d134f5"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ "$fetched_tag_object" == "$DNSTT_TAG_OBJECT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -Fq 'DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -Fq 'git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -Fq '[[ "$fetched_commit" == "$DNSTT_COMMIT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
