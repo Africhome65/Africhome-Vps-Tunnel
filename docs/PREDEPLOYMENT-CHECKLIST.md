@@ -14,12 +14,13 @@ This checklist is a release gate. A passing shell-syntax workflow is not proof t
 ## Current code-review blockers
 
 - [ ] Pin the DNSTT source to an immutable, verified upstream release or commit. The current bootstrap clones the moving upstream branch.
-- [ ] Make Go toolchain replacement transactional: restore the previous `/usr/local/go` if the staged toolchain cannot be installed.
-- [ ] Make the server/client binary pair replacement transactional: if either binary installation fails, restore both previous binaries.
+- [x] Make Go toolchain replacement transactional: restore the previous `/usr/local/go` if the staged toolchain cannot be installed.
+- [x] Make the server/client binary pair replacement transactional: if either binary installation fails, restore both previous binaries.
 - [ ] Add fault-injection tests for each rollback path above.
 - [ ] Verify licence issuance and verification using valid, expired legacy, malformed, wrong-VPS, altered-payload, altered-signature, and mismatched-key cases.
 - [ ] Review the installer ordering so invalid licences cannot trigger package or service changes.
-- [ ] Review the Hysteria 2 branch against the central port-routing model before integration.
+- [x] Review the integrated Hysteria 2 module against central routing; keep its UDP service separate from TCP SNI routing. Certificate renewal now validates matching cert/key files and has a rollback path.
+- [ ] Complete fault-injection tests for DNSTT toolchain/binary rollback and Hysteria certificate-pair rollback.
 
 ## Automated checks
 
@@ -69,7 +70,7 @@ DNSTT port roles must remain distinct: server-side DNS transport is UDP (normall
 
 - [ ] Review the separate Hysteria 2 feature branch and its installer/service lifecycle.
 - [ ] Verify official binary/source provenance and checksums.
-- [ ] Test domain validation, certificate issuance, renewal deploy hook, and certificate permissions.
+- [ ] Test domain validation, certificate issuance, renewal deploy hook, and certificate permissions, including forced failure between certificate and key replacement.
 - [ ] Test UDP port and port-hopping ranges against actual listeners and provider firewall rules.
 - [ ] Confirm existing Xray, DNSTT, SSH, and unrelated services remain untouched.
 - [ ] Integrate only after central-router conflict checks and rollback behavior pass.
