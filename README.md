@@ -13,7 +13,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
 - Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
-- Hysteria 2 server management with a user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
+- Hysteria 2 server management pinned to official `v2.14.0` installer/binary artifacts with architecture-specific SHA-256 verification, user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
@@ -51,7 +51,7 @@ See [deployment readiness](docs/DEPLOYMENT-READINESS.md) for the current impleme
 Review scripts before running:
 
 ```bash
-git clone https://github.com/Africhome65/Africhome-Vps-Tunnel.git
+git clone --branch feature/central-dnstt-integration https://github.com/Africhome65/Africhome-Vps-Tunnel.git
 cd Africhome-Vps-Tunnel
 sudo bash install.sh
 sudo africhome
@@ -62,6 +62,7 @@ sudo africhome
 - Menu options 26-28 build the official DNSTT binaries, preserve or create the protected server keypair, save the operator's own tunnel domain and authoritative nameserver, and prepare the systemd unit.
 - Menu option 28 deliberately does not enable or start the service, stop another DNS tunnel, edit registrar records, or change firewall rules. Public UDP activation is a separate migration that requires checking current listeners and provider firewall settings.
 - The DNSTT UDP listener accepts a selected port from 1 through 65535. The default is UDP 53; the chosen port must be free and reachable through the provider firewall.
+- The bootstrap fetches the signed upstream DNSTT release tag `v1.20260501.0` and verifies its pinned tag-object and commit hashes before building; existing source checkouts at a different commit are not silently changed.
 - Menu option 29 manages separate non-root SSH customer accounts, validity, timed trial accounts, and client configuration export. DNSTT transports TCP over DNS; SSH authenticates each customer.
 - Client configuration exports contain the DNSTT public key and resolver command, but never the SSH password or server private key. The password for a generated account is shown once; custom passwords are entered with hidden input and confirmation.
 - Client resolver guidance supports UDP, DNS-over-TLS, and DNS-over-HTTPS. The recursive resolver is not the authoritative nameserver used for DNS delegation.
@@ -77,13 +78,16 @@ sudo africhome
 
 ## VMess WebSocket + TLS notes
 
-- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first.
+- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first. Direct mode defaults to TCP 8443. VMess TCP 443 sharing with VLESS REALITY is not implemented/verified; do not assume the central route planner alone makes it work.
 - Supply a domain and matching certificate/key files already installed on the VPS. The module does not issue certificates or configure DNS.
 - The module validates the resulting config before restarting Xray and restores the backup if validation or restart fails.
 - Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
 - Client import URIs contain account credentials; keep them private.
 
 ## Security and limitations
+
+- Hysteria config files are root-owned and group-readable only by the `hysteria` service account (mode 0640); private keys are restricted to that account. Setup and certificate renewal include rollback safeguards, but forced-failure and disposable-VPS testing remain release gates.
+- The public default `main` branch is not yet the consolidated release candidate. Until the development PRs are reviewed and merged, use the explicit development branch shown above for testing only.
 
 Review scripts before running them. Keep VPS console access available when changing firewall/network settings. Torrent-port filtering is only a basic port rule and can be bypassed; it is not application-level torrent detection. These modules have not been tested on every VPS provider or network configuration. Do not treat publication or JSON validation as proof of live service operation.
 
