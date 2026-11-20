@@ -133,6 +133,23 @@ class VmessShared443Tests(unittest.TestCase):
         with self.assertRaises(MODULE.CandidateError):
             self.render(private_key=str(other_key))
 
+    def test_accepts_valid_letsencrypt_style_symlinks_without_resolving_config_paths(self):
+        live = self.root / "live"
+        live.mkdir()
+        cert_link = live / "fullchain.pem"
+        key_link = live / "privkey.pem"
+        cert_link.symlink_to(self.cert)
+        key_link.symlink_to(self.key)
+        candidate, _, _ = self.render(certificate=str(cert_link), private_key=str(key_link))
+        vmess = next(x for x in candidate["inbounds"] if x.get("tag") == MODULE.TAG)
+        cert_entry = vmess["streamSettings"]["tlsSettings"]["certificates"][0]
+        self.assertEqual(cert_entry["certificateFile"], str(cert_link))
+        self.assertEqual(cert_entry["keyFile"], str(key_link))
+        broken = live / "broken.pem"
+        broken.symlink_to(live / "missing.pem")
+        with self.assertRaises(MODULE.CandidateError):
+            self.render(certificate=str(broken))
+
     def test_candidate_directory_is_private_and_review_only(self):
         candidate, manifest, haproxy = self.render()
         output = self.root / "candidate"
