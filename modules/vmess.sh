@@ -102,6 +102,13 @@ vmess_status() {
 vmess_remove() {
   ah_require_root || return 1
   [[ -s "$VMESS_CONFIG" && -r "$VMESS_STATE" ]] || { ah_warn "Africhome VMess state was not found."; return 1; }
+  [[ -f "$VMESS_STATE" && ! -L "$VMESS_STATE" && "$(stat -c '%u:%a' "$VMESS_STATE" 2>/dev/null || true)" == "0:600" ]] || { ah_err "VMess state file is unsafe; refusing to source it."; return 1; }
+  # shellcheck source=/etc/africhome-vmess.env
+  . "$VMESS_STATE"
+  if [[ "${VMESS_SHARED443:-0}" == "1" ]]; then
+    ah_err "This VMess inbound is part of the shared TCP/443 route. Generic removal is disabled to protect the VLESS REALITY route; restore the saved shared-443 backup to deactivate it."
+    return 1
+  fi
   read -r -p "Remove Africhome VMess inbound? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   command -v jq >/dev/null 2>&1 || { ah_err "jq is required to safely edit Xray config."; return 1; }
