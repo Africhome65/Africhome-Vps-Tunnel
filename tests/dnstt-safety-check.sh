@@ -67,6 +67,8 @@ grep -Fq '[[ "$fetched_tag_object" == "$DNSTT_TAG_OBJECT" ]]' "$ROOT_DIR/scripts
 grep -Fq 'DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -Fq 'git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -Fq '[[ "$fetched_commit" == "$DNSTT_COMMIT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ ! -L "$DNSTT_SRC" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ ! -L "$DNSTT_SRC/.git" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
 if grep -Fq 'git clone "$DNSTT_REPO"' "$ROOT_DIR/scripts/install-dnstt.sh"; then
   echo "DNSTT bootstrap must not clone the moving upstream branch." >&2
   exit 1
