@@ -59,6 +59,17 @@ fi
 grep -q 'root-owned regular file with mode 0600' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
 grep -q 'must be a real directory, not a symlink' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -q 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh"
+
+# The bootstrap must fetch the fixed upstream release commit, never moving master.
+grep -Fq 'DNSTT_TAG="v1.20260501.0"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'git fetch --depth=1 origin "$DNSTT_COMMIT"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ "$fetched_commit" == "$DNSTT_COMMIT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+if grep -Fq 'git clone "$DNSTT_REPO"' "$ROOT_DIR/scripts/install-dnstt.sh"; then
+  echo "DNSTT bootstrap must not clone the moving upstream branch." >&2
+  exit 1
+fi
+
 license_line="$(grep -n 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
 apt_line="$(grep -n '^apt-get update' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
 [[ -n "$license_line" && -n "$apt_line" && "$license_line" -lt "$apt_line" ]] || { echo "DNSTT installer must verify licence before apt changes." >&2; exit 1; }
