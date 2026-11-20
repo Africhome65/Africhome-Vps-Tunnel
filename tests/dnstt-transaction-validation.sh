@@ -79,6 +79,20 @@ else
   ((fail+=1))
 fi
 
+# A successful binary pair replacement must publish both candidates together.
+success_bindir="$TMP/bin-success"
+mkdir -p "$success_bindir"
+dnstt_replace_binary_pair "$TMP/server-new" "$TMP/client-new" "$success_bindir"
+if [[ "$(cat "$success_bindir/dnstt-server")" == "new-server" &&
+      "$(cat "$success_bindir/dnstt-client")" == "new-client" ]] &&
+   ! compgen -G "$success_bindir/.africhome-dnstt-backup.*" >/dev/null; then
+  echo "PASS: successful DNSTT binary pair replacement installed both candidates"
+  ((pass+=1))
+else
+  echo "FAIL: successful DNSTT binary pair replacement was incomplete" >&2
+  ((fail+=1))
+fi
+
 # A failure on the second binary move must restore the previous server/client pair.
 bindir="$TMP/bin-pair"
 mkdir -p "$bindir"
