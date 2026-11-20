@@ -335,13 +335,35 @@ hy2_install() {
   ah_ok "Verified Hysteria $HY2_VERSION installed for linux/$arch."
 }
 
+hy2_restore_path() {
+  local backup_path="$1" destination="$2" existed="$3" restore_tmp
+  if (( existed )); then
+    restore_tmp="$(mktemp "$(dirname -- "$destination")/.africhome-restore.XXXXXX")" || return 1
+    if ! cp -a -- "$backup_path" "$restore_tmp"; then
+      rm -f -- "$restore_tmp"
+      return 1
+    fi
+    if ! mv -f -- "$restore_tmp" "$destination"; then
+      rm -f -- "$restore_tmp"
+      return 1
+    fi
+  else
+    rm -f -- "$destination" || return 1
+  fi
+}
+
 hy2_setup() {
   ah_require_root || return 1
   command -v hysteria >/dev/null 2>&1 || { ah_warn "Install Hysteria 2 first."; return 1; }
   command -v certbot >/dev/null 2>&1 || ah_apt_install certbot || return 1
   command -v ss >/dev/null 2>&1 || ah_apt_install iproute2 || return 1
   command -v openssl >/dev/null 2>&1 || ah_apt_install openssl || return 1
-  local domain email port_spec first_port last_port ufw_port_spec username password backup="" config_tmp hook_tmp replace
+  [[ -s /etc/systemd/system/hysteria-server.service ]] || { ah_err "Hysteria systemd service is missing. Re-run the verified installer."; return 1; }
+
+  local domain email port_spec first_port last_port ufw_port_spec username password replace
+  local backup_dir tmp_cert="" tmp_key="" hook_tmp="" config_tmp="" state_tmp=""
+  local old_config=0 old_cert=0 old_key=0 old_hook=0 old_state=0
+  local was_enabled=0 was_active=0 files_touched=0 rollback_ok=1
   read -r -p "Your domain (DNS A/AAAA must point to this VPS): " domain
   domain="$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')"
   hy2_valid_domain "$domain" || { ah_err "Invalid domain name."; return 1; }
@@ -365,10 +387,8 @@ hy2_setup() {
   [[ "$username" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || { ah_err "Invalid username."; return 1; }
   password="$(openssl rand -hex 24)" || { ah_err "Could not generate password."; return 1; }
 
-  if [[ -e "$HY2_CONFIG" ]]; then
-    backup="$HY2_CONFIG.africhome-backup-$(date +%Y%m%d%H%M%S)"
-    cp -a "$HY2_CONFIG" "$backup" || { ah_err "Could not back up existing Hysteria config."; return 1; }
-    ah_warn "Existing config backup: $backup"
+  if [[ -e "$HY2_CONFIG" || -L "$HY2_CONFIG" ]]; then
+    [[ -f "$HY2_CONFIG" && ! -L "$HY2_CONFIG" ]] || { ah_err "Existing Hysteria config is unsafe."; return 1; }
     read -r -p "Replace existing Hysteria config? [y/N]: " replace
     [[ "$replace" =~ ^[Yy]$ ]] || { ah_info "Existing config left unchanged."; return 1; }
   fi
@@ -379,38 +399,136 @@ hy2_setup() {
   fi
   ah_info "Requesting a certificate. DNS must point to this VPS and inbound TCP 80 must be reachable."
   certbot certonly --standalone --non-interactive --agree-tos --email "$email" -d "$domain" || {
-    ah_err "Certificate issuance failed. Check DNS and TCP 80 in UFW/provider firewall."; return 1;
+    ah_err "Certificate issuance failed. Check DNS and TCP 80 in UFW/provider firewall."
+    return 1
   }
   [[ -s "/etc/letsencrypt/live/$domain/fullchain.pem" && -s "/etc/letsencrypt/live/$domain/privkey.pem" ]] || {
-    ah_err "Certificate files were not created."; return 1;
+    ah_err "Certificate files were not created."
+    return 1
   }
-  getent passwd hysteria >/dev/null 2>&1 || { ah_err "Hysteria service user missing. Re-run the official installer."; return 1; }
-  getent group hysteria >/dev/null 2>&1 || { ah_err "Hysteria service group missing. Re-run the official installer."; return 1; }
+  getent passwd hysteria >/dev/null 2>&1 || { ah_err "Hysteria service user missing. Re-run the verified installer."; return 1; }
+  getent group hysteria >/dev/null 2>&1 || { ah_err "Hysteria service group missing. Re-run the verified installer."; return 1; }
+  [[ ! -L "$HY2_CERT_DIR" ]] || { ah_err "Hysteria certificate directory must not be a symlink."; return 1; }
+
   install -d -o hysteria -g hysteria -m 750 "$HY2_CERT_DIR"
-  install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/fullchain.pem" "$HY2_CERT_DIR/fullchain.pem"
-  install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/privkey.pem" "$HY2_CERT_DIR/privkey.pem"
+  install -d -m 755 "$(dirname -- "$HY2_HOOK")"
+  install -d -m 755 "$(dirname -- "$HY2_CONFIG")"
+  install -d -m 700 "$(dirname -- "$HY2_STATE")"
+  install -d -m 700 /var/backups || return 1
+  backup_dir="$(mktemp -d /var/backups/africhome-hysteria-setup.XXXXXX)" || return 1
+  chmod 0700 "$backup_dir"
 
-  install -d -m 755 /etc/letsencrypt/renewal-hooks/deploy
-  hy2_write_renewal_hook "$HY2_HOOK" "$domain"
+  if [[ -e "$HY2_CONFIG" || -L "$HY2_CONFIG" ]]; then
+    [[ -f "$HY2_CONFIG" && ! -L "$HY2_CONFIG" ]] || { ah_err "Existing Hysteria config is unsafe."; rm -rf -- "$backup_dir"; return 1; }
+    cp -a -- "$HY2_CONFIG" "$backup_dir/config.yaml" || { ah_err "Could not back up Hysteria config."; rm -rf -- "$backup_dir"; return 1; }
+    old_config=1
+  fi
+  if [[ -e "$HY2_CERT_DIR/fullchain.pem" || -L "$HY2_CERT_DIR/fullchain.pem" ||
+        -e "$HY2_CERT_DIR/privkey.pem" || -L "$HY2_CERT_DIR/privkey.pem" ]]; then
+    [[ -f "$HY2_CERT_DIR/fullchain.pem" && ! -L "$HY2_CERT_DIR/fullchain.pem" &&
+       -f "$HY2_CERT_DIR/privkey.pem" && ! -L "$HY2_CERT_DIR/privkey.pem" ]] || {
+      ah_err "Existing Hysteria certificate pair is incomplete or unsafe."
+      rm -rf -- "$backup_dir"
+      return 1
+    }
+    cp -a -- "$HY2_CERT_DIR/fullchain.pem" "$backup_dir/fullchain.pem" &&
+      cp -a -- "$HY2_CERT_DIR/privkey.pem" "$backup_dir/privkey.pem" || {
+        ah_err "Could not back up existing Hysteria certificate pair."
+        rm -rf -- "$backup_dir"
+        return 1
+      }
+    old_cert=1
+    old_key=1
+  fi
+  if [[ -e "$HY2_HOOK" || -L "$HY2_HOOK" ]]; then
+    [[ -f "$HY2_HOOK" && ! -L "$HY2_HOOK" ]] || { ah_err "Existing Hysteria renewal hook is unsafe."; rm -rf -- "$backup_dir"; return 1; }
+    cp -a -- "$HY2_HOOK" "$backup_dir/renewal-hook.sh" || { ah_err "Could not back up Hysteria renewal hook."; rm -rf -- "$backup_dir"; return 1; }
+    old_hook=1
+  fi
+  if [[ -e "$HY2_STATE" || -L "$HY2_STATE" ]]; then
+    [[ -f "$HY2_STATE" && ! -L "$HY2_STATE" ]] || { ah_err "Existing Hysteria state file is unsafe."; rm -rf -- "$backup_dir"; return 1; }
+    cp -a -- "$HY2_STATE" "$backup_dir/state.env" || { ah_err "Could not back up Hysteria state."; rm -rf -- "$backup_dir"; return 1; }
+    old_state=1
+  fi
+  if systemctl is-enabled --quiet hysteria-server.service; then was_enabled=1; fi
+  if systemctl is-active --quiet hysteria-server.service; then was_active=1; fi
 
-  config_tmp="$(mktemp)"
-  hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
-  install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"
-  rm -f "$config_tmp"
-  if ! systemctl daemon-reload || ! systemctl enable hysteria-server.service || ! systemctl restart hysteria-server.service; then
-    ah_err "Hysteria failed to start. Restoring the previous configuration when available."
-    if [[ -n "$backup" && -s "$backup" ]]; then
-      cp -a "$backup" "$HY2_CONFIG"
-      systemctl restart hysteria-server.service || true
+  hy2_setup_cleanup_staged() {
+    [[ -z "$tmp_cert" ]] || rm -f -- "$tmp_cert"
+    [[ -z "$tmp_key" ]] || rm -f -- "$tmp_key"
+    [[ -z "$hook_tmp" ]] || rm -f -- "$hook_tmp"
+    [[ -z "$config_tmp" ]] || rm -f -- "$config_tmp"
+    [[ -z "$state_tmp" ]] || rm -f -- "$state_tmp"
+  }
+  hy2_setup_rollback() {
+    systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+    if (( files_touched )); then
+      hy2_restore_path "$backup_dir/config.yaml" "$HY2_CONFIG" "$old_config" || rollback_ok=0
+      hy2_restore_path "$backup_dir/fullchain.pem" "$HY2_CERT_DIR/fullchain.pem" "$old_cert" || rollback_ok=0
+      hy2_restore_path "$backup_dir/privkey.pem" "$HY2_CERT_DIR/privkey.pem" "$old_key" || rollback_ok=0
+      hy2_restore_path "$backup_dir/renewal-hook.sh" "$HY2_HOOK" "$old_hook" || rollback_ok=0
+      hy2_restore_path "$backup_dir/state.env" "$HY2_STATE" "$old_state" || rollback_ok=0
+      systemctl daemon-reload || rollback_ok=0
+      if (( was_enabled )); then
+        systemctl enable hysteria-server.service || rollback_ok=0
+      else
+        systemctl disable hysteria-server.service >/dev/null 2>&1 || true
+      fi
+      if (( was_active )); then
+        systemctl restart hysteria-server.service || rollback_ok=0
+      else
+        systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+      fi
+    fi
+    hy2_setup_cleanup_staged
+    if (( rollback_ok )); then
+      rm -rf -- "$backup_dir"
+      ah_err "Hysteria setup failed; previous config, certificate pair, hook, state and service state were restored."
+    else
+      ah_err "CRITICAL: Hysteria setup and rollback failed. Protected backups retained at $backup_dir."
     fi
     return 1
+  }
+
+  tmp_cert="$(mktemp "$HY2_CERT_DIR/.fullchain.XXXXXX")" || { rm -rf -- "$backup_dir"; return 1; }
+  tmp_key="$(mktemp "$HY2_CERT_DIR/.privkey.XXXXXX")" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  hook_tmp="$(mktemp "$(dirname -- "$HY2_HOOK")/.africhome-hook.XXXXXX")" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  config_tmp="$(mktemp "$(dirname -- "$HY2_CONFIG")/.africhome-config.XXXXXX")" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  state_tmp="$(mktemp "$(dirname -- "$HY2_STATE")/.africhome-state.XXXXXX")" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+
+  install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/fullchain.pem" "$tmp_cert" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  install -o hysteria -g hysteria -m 640 "/etc/letsencrypt/live/$domain/privkey.pem" "$tmp_key" || { hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  openssl x509 -in "$tmp_cert" -noout && openssl pkey -in "$tmp_key" -noout || { ah_err "Issued Hysteria certificate/key validation failed."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  cert_pub="$(openssl x509 -in "$tmp_cert" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | awk '{print $1}')"
+  key_pub="$(openssl pkey -in "$tmp_key" -pubout -outform DER | sha256sum | awk '{print $1}')"
+  [[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || { ah_err "Issued Hysteria certificate and private key do not match."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+
+  hy2_write_renewal_hook "$hook_tmp" "$domain" || { ah_err "Could not prepare Hysteria renewal hook."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  hy2_write_config "$config_tmp" "$port_spec" "$HY2_CERT_DIR" "$username" "$password"
+  chown root:hysteria "$config_tmp" && chmod 0640 "$config_tmp" || { ah_err "Could not secure Hysteria config."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+  umask 077
+  printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$state_tmp"
+  chown root:root "$state_tmp" && chmod 0600 "$state_tmp" || { ah_err "Could not secure Hysteria state file."; hy2_setup_cleanup_staged; rm -rf -- "$backup_dir"; return 1; }
+
+  files_touched=1
+  if ! mv -f -- "$tmp_cert" "$HY2_CERT_DIR/fullchain.pem" ||
+     ! mv -f -- "$tmp_key" "$HY2_CERT_DIR/privkey.pem" ||
+     ! mv -f -- "$hook_tmp" "$HY2_HOOK" ||
+     ! mv -f -- "$config_tmp" "$HY2_CONFIG" ||
+     ! mv -f -- "$state_tmp" "$HY2_STATE" ||
+     ! systemctl daemon-reload ||
+     ! systemctl enable hysteria-server.service ||
+     ! systemctl restart hysteria-server.service; then
+    ah_err "Hysteria setup failed during apply; rolling back the complete file/service transaction."
+    hy2_setup_rollback
+    return 1
   fi
+
+  hy2_setup_cleanup_staged
+  rm -rf -- "$backup_dir"
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
     ufw allow "$ufw_port_spec/udp" || ah_warn "Could not add UDP $port_spec to UFW."
   fi
-  umask 077
-  printf 'HY2_DOMAIN=%q\nHY2_PORT_SPEC=%q\nHY2_USERNAME=%q\nHY2_PASSWORD=%q\n' "$domain" "$port_spec" "$username" "$password" > "$HY2_STATE"
-  chmod 600 "$HY2_STATE"
   ah_ok "Hysteria 2 configured and running."
   echo "Domain: $domain"
   echo "UDP port/range: $port_spec"
@@ -420,7 +538,6 @@ hy2_setup() {
   [[ "$port_spec" != *-* ]] || ah_info "Port hopping requires nftables/iptables and CAP_NET_ADMIN; the official systemd unit includes the required capabilities."
   ah_warn "Save the password securely. Never commit client credentials to Git."
 }
-
 hy2_show_client() {
   [[ -r "$HY2_STATE" ]] || { ah_warn "Configure Hysteria 2 first."; return 1; }
   # shellcheck disable=SC1090
