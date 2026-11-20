@@ -8,7 +8,7 @@ pass=0
 fail=0
 xray_active=1
 haproxy_active=0
-haproxy_enabled_state=disabled
+mock_haproxy_enabled_state=disabled
 fail_xray_validation=0
 fail_haproxy_validation=0
 fail_haproxy_restart=0
@@ -36,7 +36,7 @@ systemctl() {
       else return 1
       fi
       ;;
-    is-enabled) printf '%s\n' "$haproxy_enabled_state" ;;
+    is-enabled) printf '%s\n' "$mock_haproxy_enabled_state" ;;
     show) printf 'root\n' ;;
     restart)
       if [[ "$service" == "xray.service" ]]; then xray_active=1
@@ -45,8 +45,8 @@ systemctl() {
         haproxy_active=1
       fi
       ;;
-    enable) haproxy_enabled_state=enabled ;;
-    disable) haproxy_enabled_state=disabled ;;
+    enable) mock_haproxy_enabled_state=enabled ;;
+    disable) mock_haproxy_enabled_state=disabled ;;
     stop)
       if [[ "$service" == "xray.service" ]]; then xray_active=0
       elif [[ "$service" == "haproxy.service" ]]; then haproxy_active=0
@@ -88,13 +88,13 @@ candidate="${success_paths[0]}"
 xray_config="${success_paths[1]}"
 haproxy_config="${success_paths[2]}"
 backup_root="${success_paths[3]}"
-xray_active=1; haproxy_active=0; haproxy_enabled_state=disabled
+xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=0; fail_ss=0; ss_mode=normal
 if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0 &&
    grep -q '"inbounds"' "$xray_config" &&
    grep -q 'frontend fe_shared_443' "$haproxy_config" &&
    (( xray_active && haproxy_active )) &&
-   [[ "$haproxy_enabled_state" == "enabled" ]] &&
+   [[ "$mock_haproxy_enabled_state" == "enabled" ]] &&
    compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null; then
   echo "PASS: shared TCP/443 apply updates both configs and enables HAProxy with protected backups"
   ((pass+=1))
@@ -109,7 +109,7 @@ candidate="${rollback_paths[0]}"
 xray_config="${rollback_paths[1]}"
 haproxy_config="${rollback_paths[2]}"
 backup_root="${rollback_paths[3]}"
-xray_active=1; haproxy_active=0; haproxy_enabled_state=disabled
+xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=1; fail_ss=0; ss_mode=normal
 if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0; then
   echo "FAIL: injected HAProxy restart failure unexpectedly succeeded" >&2
@@ -117,7 +117,7 @@ if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$b
 elif [[ "$(cat "$xray_config")" == "old-xray-rollback" ]] &&
      [[ "$(cat "$haproxy_config")" == "old-haproxy-rollback" ]] &&
      (( xray_active )) && (( ! haproxy_active )) &&
-     [[ "$haproxy_enabled_state" == "disabled" ]] &&
+     [[ "$mock_haproxy_enabled_state" == "disabled" ]] &&
      compgen -G "$backup_root/africhome-vmess-shared443.*/xray-config.json" >/dev/null; then
   echo "PASS: failed HAProxy start restores both configs and previous service state"
   ((pass+=1))
@@ -132,7 +132,7 @@ candidate="${busy_paths[0]}"
 xray_config="${busy_paths[1]}"
 haproxy_config="${busy_paths[2]}"
 backup_root="${busy_paths[3]}"
-xray_active=1; haproxy_active=0; haproxy_enabled_state=disabled
+xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=0; fail_ss=0; ss_mode=busy
 if shared443_apply_transaction "$candidate" "$xray_config" "$haproxy_config" "$backup_root" xray.service haproxy.service 0; then
   echo "FAIL: occupied TCP/443 was accepted" >&2
@@ -153,7 +153,7 @@ candidate="${preserve_paths[0]}"
 xray_config="${preserve_paths[1]}"
 haproxy_config="${preserve_paths[2]}"
 backup_root="${preserve_paths[3]}"
-xray_active=1; haproxy_active=0; haproxy_enabled_state=disabled
+xray_active=1; haproxy_active=0; mock_haproxy_enabled_state=disabled
 fail_xray_validation=0; fail_haproxy_validation=0; fail_haproxy_restart=1; fail_ss=0; ss_mode=normal
 mv() {
   if [[ "${1:-}" == "-f" && "${2:-}" == "--" && "${3:-}" == "$(dirname -- "$xray_config")"/.africhome-restore.* && "${4:-}" == "$xray_config" ]]; then
