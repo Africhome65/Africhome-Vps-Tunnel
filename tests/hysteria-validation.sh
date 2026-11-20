@@ -116,8 +116,13 @@ hy2_write_renewal_hook "$hook_file" "vpn.example.com"
 bash -n "$hook_file" || { echo "FAIL: generated renewal hook syntax"; ((fail+=1)); }
 grep -Fxq 'DOMAIN="vpn.example.com"' "$hook_file" || { echo "FAIL: renewal hook domain"; ((fail+=1)); }
 grep -Fq 'install -o hysteria -g hysteria -m 640' "$hook_file" || { echo "FAIL: renewal hook certificate permissions"; ((fail+=1)); }
-grep -Fq 'mv -f "$tmp_cert" "$DEST/fullchain.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic certificate replacement"; ((fail+=1)); }
-grep -Fq 'mv -f "$tmp_key" "$DEST/privkey.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic key replacement"; ((fail+=1)); }
+grep -Fq 'mv -f -- "$tmp_cert" "$DEST/fullchain.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic certificate replacement"; ((fail+=1)); }
+grep -Fq 'mv -f -- "$tmp_key" "$DEST/privkey.pem"' "$hook_file" || { echo "FAIL: renewal hook atomic key replacement"; ((fail+=1)); }
+grep -Fq 'openssl x509 -in "$tmp_cert" -noout' "$hook_file" || { echo "FAIL: renewal hook certificate validation"; ((fail+=1)); }
+grep -Fq 'openssl pkey -in "$tmp_key" -noout' "$hook_file" || { echo "FAIL: renewal hook private-key validation"; ((fail+=1)); }
+grep -Fq 'cert_pub" == "$key_pub' "$hook_file" || { echo "FAIL: renewal hook certificate/key matching"; ((fail+=1)); }
+grep -Fq 'pair_touched=1' "$hook_file" || { echo "FAIL: renewal hook rollback activation"; ((fail+=1)); }
+grep -Fq 'trap rollback EXIT' "$hook_file" || { echo "FAIL: renewal hook rollback trap"; ((fail+=1)); }
 grep -Fq 'systemctl restart hysteria-server.service' "$hook_file" || { echo "FAIL: renewal hook service restart"; ((fail+=1)); }
 if [[ -x "$hook_file" ]]; then
   echo "PASS: renewal hook is executable"
