@@ -13,7 +13,7 @@ This checklist is a release gate. A passing shell-syntax workflow is not proof t
 
 ## Current code-review blockers
 
-- [ ] Pin the DNSTT source to an immutable, verified upstream release or commit. The current bootstrap clones the moving upstream branch.
+- [x] Pin the DNSTT source to the signed upstream release tag object `8fb3b30e6dbdc9006780327c6687623534d134f5` and commit `0c5c52a57d899c05428c116898941761a2ed83c2` (`v1.20260501.0`); the installer fetches the tag and verifies both hashes.
 - [x] Make Go toolchain replacement transactional: restore the previous `/usr/local/go` if the staged toolchain cannot be installed.
 - [x] Make the server/client binary pair replacement transactional: if either binary installation fails, restore both previous binaries.
 - [ ] Add fault-injection tests for each rollback path above.
