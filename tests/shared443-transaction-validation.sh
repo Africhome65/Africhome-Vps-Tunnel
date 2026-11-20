@@ -58,8 +58,10 @@ systemctl() {
 }
 ss() {
   (( fail_ss )) && return 1
-  if [[ "$ss_mode" == "busy" || "$haproxy_active" == "1" ]]; then
-    printf 'LISTEN 0 128 *:443 *:*\n'
+  if [[ "$ss_mode" == "busy" ]]; then
+    printf 'LISTEN 0 128 *:443 *:* users:(("nginx",pid=321,fd=3))\n'
+  elif [[ "$haproxy_active" == "1" ]]; then
+    printf 'LISTEN 0 128 *:443 *:* users:(("haproxy",pid=123,fd=3))\n'
   fi
   return 0
 }
