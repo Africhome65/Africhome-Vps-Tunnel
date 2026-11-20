@@ -94,12 +94,48 @@ SRC="/etc/letsencrypt/live/$DOMAIN"
 install -d -o hysteria -g hysteria -m 750 "$DEST"
 tmp_cert="$(mktemp "$DEST/.fullchain.XXXXXX")"
 tmp_key="$(mktemp "$DEST/.privkey.XXXXXX")"
-trap 'rm -f "$tmp_cert" "$tmp_key"' EXIT
+backup_cert="$(mktemp "$DEST/.fullchain.backup.XXXXXX")"
+backup_key="$(mktemp "$DEST/.privkey.backup.XXXXXX")"
+had_cert=0
+had_key=0
+if [[ -e "$DEST/fullchain.pem" ]]; then
+  [[ -s "$DEST/fullchain.pem" && -f "$DEST/fullchain.pem" && ! -L "$DEST/fullchain.pem" ]] || exit 1
+  cp -a -- "$DEST/fullchain.pem" "$backup_cert"
+  had_cert=1
+fi
+if [[ -e "$DEST/privkey.pem" ]]; then
+  [[ -s "$DEST/privkey.pem" && -f "$DEST/privkey.pem" && ! -L "$DEST/privkey.pem" ]] || exit 1
+  cp -a -- "$DEST/privkey.pem" "$backup_key"
+  had_key=1
+fi
+[[ "$had_cert" == "$had_key" ]] || { echo "Existing Hysteria certificate pair is incomplete." >&2; exit 1; }
+rollback() {
+  rc=$?
+  if (( rc != 0 )); then
+    if (( had_cert )); then cp -a -- "$backup_cert" "$DEST/fullchain.pem" || echo "CRITICAL: certificate rollback failed." >&2
+    else rm -f -- "$DEST/fullchain.pem"
+    fi
+    if (( had_key )); then cp -a -- "$backup_key" "$DEST/privkey.pem" || echo "CRITICAL: key rollback failed." >&2
+    else rm -f -- "$DEST/privkey.pem"
+    fi
+    systemctl restart hysteria-server.service || true
+  fi
+  rm -f -- "$tmp_cert" "$tmp_key" "$backup_cert" "$backup_key"
+  exit "$rc"
+}
+trap rollback EXIT
 install -o hysteria -g hysteria -m 640 "$SRC/fullchain.pem" "$tmp_cert"
 install -o hysteria -g hysteria -m 640 "$SRC/privkey.pem" "$tmp_key"
-mv -f "$tmp_cert" "$DEST/fullchain.pem"
-mv -f "$tmp_key" "$DEST/privkey.pem"
+openssl x509 -in "$tmp_cert" -noout
+openssl pkey -in "$tmp_key" -noout
+cert_pub="$(openssl x509 -in "$tmp_cert" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | awk '{print $1}')"
+key_pub="$(openssl pkey -in "$tmp_key" -pubout -outform DER | sha256sum | awk '{print $1}')"
+[[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || { echo "Renewed Hysteria certificate and private key do not match." >&2; exit 1; }
+mv -f -- "$tmp_cert" "$DEST/fullchain.pem"
+mv -f -- "$tmp_key" "$DEST/privkey.pem"
 systemctl restart hysteria-server.service
+trap - EXIT
+rm -f -- "$backup_cert" "$backup_key"
 HOOK
   sed "s/@@DOMAIN@@/$domain/g" "$output" > "$output.tmp"
   mv -f "$output.tmp" "$output"
