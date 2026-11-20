@@ -294,6 +294,13 @@ hy2_install() {
     hy2_rollback_install
     return 1
   fi
+  if ! getent passwd hysteria >/dev/null 2>&1 || ! getent group hysteria >/dev/null 2>&1 ||
+     [[ ! -f "$HY2_CONFIG" || -L "$HY2_CONFIG" ]] ||
+     ! chown root:hysteria "$HY2_CONFIG" || ! chmod 0640 "$HY2_CONFIG"; then
+    ah_err "Hysteria service user, group, or protected config permissions are not ready."
+    hy2_rollback_install
+    return 1
+  fi
   [[ -f /usr/local/bin/hysteria && ! -L /usr/local/bin/hysteria ]] || {
     hy2_rollback_install
     return 1
