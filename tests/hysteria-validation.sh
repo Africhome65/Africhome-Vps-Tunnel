@@ -25,6 +25,16 @@ grep -Fq 'chown root:hysteria "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'chmod 0640 "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
 grep -Fq 'install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
 
+# First-time and replacement setup must back up and restore every active file.
+grep -Fq 'hy2_restore_path() {' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'backup_dir="$(mktemp -d /var/backups/africhome-hysteria-setup.XXXXXX)"' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'files_touched=1' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'hy2_setup_rollback() {' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'systemctl is-enabled --quiet hysteria-server.service' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'systemctl is-active --quiet hysteria-server.service' "$ROOT_DIR/modules/hysteria.sh"
+grep -Fq 'Protected backups retained at $backup_dir.' "$ROOT_DIR/modules/hysteria.sh"
+
+
 grep -Fq 'install -o root -g hysteria -m 640 "$config_tmp" "$HY2_CONFIG"' "$ROOT_DIR/modules/hysteria.sh"
 
 pass=0
