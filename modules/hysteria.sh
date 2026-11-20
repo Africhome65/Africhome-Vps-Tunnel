@@ -169,7 +169,7 @@ hy2_install() {
   command -v sha256sum >/dev/null 2>&1 || { ah_err "sha256sum is required."; return 1; }
 
   local arch asset_sha installer_url binary_url tmpdir backup_dir installer binary installer_sha
-  local old_binary=0 old_unit=0 old_template=0 old_config=0 rollback_ok=1 installed_sha installed_version existing_user
+  local old_binary=0 old_unit=0 old_template=0 old_config=0 old_service_active=0 rollback_ok=1 installed_sha installed_version existing_user
   case "$(uname -m)" in
     x86_64|amd64)
       arch="amd64"
@@ -230,6 +230,7 @@ hy2_install() {
     cp -a -- /etc/systemd/system/hysteria-server@.service "$backup_dir/hysteria-server@.service" || { ah_err "Could not back up Hysteria template unit."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
     old_template=1
   fi
+  if systemctl is-active --quiet hysteria-server.service 2>/dev/null; then old_service_active=1; fi
   if [[ -e "$HY2_CONFIG" || -L "$HY2_CONFIG" ]]; then
     [[ -f "$HY2_CONFIG" && ! -L "$HY2_CONFIG" ]] || { ah_err "Existing Hysteria config is unsafe."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
     getent group hysteria >/dev/null 2>&1 || { ah_err "Existing Hysteria config is present but the hysteria group is missing; refusing to change its permissions."; rm -rf -- "$tmpdir" "$backup_dir"; return 1; }
@@ -296,7 +297,11 @@ hy2_install() {
       rm -f -- "$HY2_CONFIG" || rollback_ok=0
     fi
     systemctl daemon-reload || rollback_ok=0
-    systemctl restart hysteria-server.service >/dev/null 2>&1 || true
+    if (( old_service_active )); then
+      systemctl restart hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
+    else
+      systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+    fi
     rm -rf -- "$tmpdir"
     if (( rollback_ok )); then
       rm -rf -- "$backup_dir"
@@ -461,7 +466,8 @@ hy2_setup() {
     [[ -z "$state_tmp" ]] || rm -f -- "$state_tmp"
   }
   hy2_setup_rollback() {
-    systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+    if ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
+       systemctl is-active --quiet hysteria-server.service; then rollback_ok=0; fi
     if (( files_touched )); then
       hy2_restore_path "$backup_dir/config.yaml" "$HY2_CONFIG" "$old_config" || rollback_ok=0
       hy2_restore_path "$backup_dir/fullchain.pem" "$HY2_CERT_DIR/fullchain.pem" "$old_cert" || rollback_ok=0
@@ -472,12 +478,13 @@ hy2_setup() {
       if (( was_enabled )); then
         systemctl enable hysteria-server.service || rollback_ok=0
       else
-        systemctl disable hysteria-server.service >/dev/null 2>&1 || true
+        systemctl disable hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
       fi
       if (( was_active )); then
         systemctl restart hysteria-server.service || rollback_ok=0
-      else
-        systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+      elif ! systemctl stop hysteria-server.service >/dev/null 2>&1 &&
+           systemctl is-active --quiet hysteria-server.service; then
+        rollback_ok=0
       fi
     fi
     hy2_setup_cleanup_staged
