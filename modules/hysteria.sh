@@ -270,38 +270,7 @@ hy2_install() {
   fi
 
   hy2_rollback_install() {
-    local restore_tmp
-    if (( old_binary )); then
-      restore_tmp="$(mktemp /usr/local/bin/.hysteria.restore.XXXXXX)" || rollback_ok=0
-      if (( rollback_ok )); then
-        cp -a -- "$backup_dir/hysteria" "$restore_tmp" || rollback_ok=0
-        (( rollback_ok )) && mv -f -- "$restore_tmp" /usr/local/bin/hysteria || rollback_ok=0
-      fi
-      [[ -z "${restore_tmp:-}" ]] || rm -f -- "$restore_tmp"
-    else
-      rm -f -- /usr/local/bin/hysteria || rollback_ok=0
-    fi
-    if (( old_unit )); then
-      cp -a -- "$backup_dir/hysteria-server.service" /etc/systemd/system/hysteria-server.service || rollback_ok=0
-    else
-      rm -f -- /etc/systemd/system/hysteria-server.service || rollback_ok=0
-    fi
-    if (( old_template )); then
-      cp -a -- "$backup_dir/hysteria-server@.service" /etc/systemd/system/hysteria-server@.service || rollback_ok=0
-    else
-      rm -f -- /etc/systemd/system/hysteria-server@.service || rollback_ok=0
-    fi
-    if (( old_config )); then
-      cp -a -- "$backup_dir/config.yaml" "$HY2_CONFIG" || rollback_ok=0
-    else
-      rm -f -- "$HY2_CONFIG" || rollback_ok=0
-    fi
-    systemctl daemon-reload || rollback_ok=0
-    if (( old_service_active )); then
-      systemctl restart hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
-    else
-      systemctl stop hysteria-server.service >/dev/null 2>&1 || true
-    fi
+    hy2_restore_install_transaction "$backup_dir" /usr/local/bin/hysteria /etc/systemd/system/hysteria-server.service /etc/systemd/system/hysteria-server@.service "$HY2_CONFIG" "$old_binary" "$old_unit" "$old_template" "$old_config" "$old_service_active" || rollback_ok=0
     rm -rf -- "$tmpdir"
     if (( rollback_ok )); then
       rm -rf -- "$backup_dir"
@@ -355,6 +324,23 @@ hy2_restore_path() {
   else
     rm -f -- "$destination" || return 1
   fi
+}
+
+hy2_restore_install_transaction() {
+  local backup_dir="$1" binary_path="$2" unit_path="$3" template_path="$4" config_path="$5"
+  local old_binary="$6" old_unit="$7" old_template="$8" old_config="$9" service_active="${10}"
+  local rollback_ok=1
+  hy2_restore_path "$backup_dir/hysteria" "$binary_path" "$old_binary" || rollback_ok=0
+  hy2_restore_path "$backup_dir/hysteria-server.service" "$unit_path" "$old_unit" || rollback_ok=0
+  hy2_restore_path "$backup_dir/hysteria-server@.service" "$template_path" "$old_template" || rollback_ok=0
+  hy2_restore_path "$backup_dir/config.yaml" "$config_path" "$old_config" || rollback_ok=0
+  systemctl daemon-reload || rollback_ok=0
+  if (( service_active )); then
+    systemctl restart hysteria-server.service >/dev/null 2>&1 || rollback_ok=0
+  else
+    systemctl stop hysteria-server.service >/dev/null 2>&1 || true
+  fi
+  (( rollback_ok ))
 }
 
 hy2_restore_setup_transaction() {
