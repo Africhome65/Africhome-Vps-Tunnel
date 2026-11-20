@@ -69,4 +69,18 @@ if grep -E -q '^[[:space:]]*systemctl[[:space:]]+(stop|disable|enable|start|rest
   exit 1
 fi
 
+
+# Installer replacement must have explicit rollback paths for the Go toolchain
+# and for both DNSTT binaries. These assertions prevent accidental regression
+# to one-way mv/install operations.
+INSTALLER="$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'go_backup="/usr/local/go.africhome-backup.$"' "$INSTALLER"
+grep -Fq 'previous toolchain could not be restored' "$INSTALLER"
+grep -Fq 'Staged Go toolchain failed its version check; previous toolchain restored.' "$INSTALLER"
+grep -Fq 'server_existed=0' "$INSTALLER"
+grep -Fq 'client_existed=0' "$INSTALLER"
+grep -Fq 'previous server/client pair restored.' "$INSTALLER"
+grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$INSTALLER"
+grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$INSTALLER"
+
 echo "DNSTT repository safety checks passed."
