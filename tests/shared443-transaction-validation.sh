@@ -57,7 +57,7 @@ systemctl() {
   esac
 }
 ss() {
-  [[ " $* " == *" -p "* ]] || { echo "ss process ownership flag (-p) is required" >&2; return 1; }
+  [[ " $* " == *"-ltnp"* ]] || { echo "ss process ownership flag (-p) is required" >&2; return 1; }
   (( fail_ss )) && return 1
   if [[ "$ss_mode" == "busy" ]]; then
     printf 'LISTEN 0 128 *:443 *:* users:(("nginx",pid=321,fd=3))\n'
