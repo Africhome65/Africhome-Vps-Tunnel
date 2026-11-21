@@ -25,8 +25,8 @@ ssh_users_create(){
   fi
   local password
   echo "Set a strong, unique password for $username."
-  echo "WARNING: Password characters will be visible while you type."
-  read -r -p "New password (visible): " password
+  read -r -s -p "New password (input hidden): " password
+  echo
   if [[ -z "$password" || "$password" == *:* ]]; then
     unset password
     userdel "$username" || true
