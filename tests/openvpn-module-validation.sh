@@ -96,22 +96,29 @@ stat(){
   if [[ -d "$path" ]]; then printf '%s\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
   else printf '%s\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
 }
+echo 'DEBUG: before baseline PKI check'
 ovpn_pki_paths_safe
+echo 'DEBUG: baseline PKI check passed'
 MOCK_OVPN_PKI_DIR_STAT=1001:700
 ! ovpn_pki_paths_safe
+echo 'DEBUG: non-root owner rejection passed'
 unset MOCK_OVPN_PKI_DIR_STAT
 MOCK_OVPN_PKI_DIR_STAT=0:777
 ! ovpn_pki_paths_safe
+echo 'DEBUG: writable directory rejection passed'
 unset MOCK_OVPN_PKI_DIR_STAT
 MOCK_OVPN_PKI_FILE_STAT=0:644
 ! ovpn_pki_paths_safe
+echo 'DEBUG: permissive key rejection passed'
 unset MOCK_OVPN_PKI_FILE_STAT
 mv "$TMP/easy-rsa/pki/private" "$TMP/private-real"
 ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ! ovpn_pki_paths_safe
+echo 'DEBUG: symlink rejection passed'
 rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
+echo 'DEBUG: final PKI check passed'
 unset -f stat
 
 # Incomplete server setup cleanup removes only the newly-created runtime
