@@ -19,7 +19,7 @@ esac
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y git ca-certificates curl jq openssl iproute2 procps util-linux
+apt-get install -y git ca-certificates curl jq openssl iproute2 procps util-linux dnsutils
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   git -C "$INSTALL_DIR" fetch --depth=1 origin main
   git -C "$INSTALL_DIR" reset --hard origin/main
