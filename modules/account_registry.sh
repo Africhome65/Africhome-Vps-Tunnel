@@ -104,7 +104,7 @@ ar_set_service_status() {
     "$AR_REGISTRY" >/dev/null || { echo "[FAIL] Service account not found." >&2; ar_unlock; return 1; }
   local tmp now
   now="$(date +%s)"
-  tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || return 1
+  tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || { ar_unlock; return 1; }
   jq --arg id "$account_id" --arg s "$service" --arg r "$service_ref" \
     --arg status "$status" --argjson now "$now" '
     .accounts |= map(if .id == $id then
