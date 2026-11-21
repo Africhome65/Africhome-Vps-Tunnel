@@ -66,7 +66,7 @@ cmp -s "$HY2_USERS_CONFIG" "$tmp_dir/unsupported.yaml"
 # native config, with compensating rollback paths for failures.
 remove_fn="$(sed -n '/^hy2u_remove() {/,/^}/p' "$ROOT/modules/hysteria_users.sh")"
 grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "revoked"' <<< "$remove_fn"
-grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "active"' <<< "$remove_fn"
+grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "$previous_status"' <<< "$remove_fn"
 grep -Fq 'dbbackup=' <<< "$remove_fn"
 grep -Fq 'systemctl restart hysteria-server.service' <<< "$remove_fn"
 
@@ -79,4 +79,22 @@ grep -Fq 'registry_done+=' <<< "$expire_fn"
 grep -Fq 'systemctl restart hysteria-server.service' <<< "$expire_fn"
 grep -Fq 'install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"' <<< "$expire_fn"
 
-echo "Hysteria userpass adapter validation passed."
+
+# Config and metadata paths must not follow attacker-controlled symlinks.
+regular_config="$tmp_dir/regular-config.yaml"
+regular_db="$tmp_dir/regular-users.json"
+printf 'auth: {type: userpass, userpass: {}}\\n' > "$regular_config"
+printf '[]\\n' > "$regular_db"
+ln -s "$regular_config" "$tmp_dir/config-link.yaml"
+HY2_USERS_CONFIG="$tmp_dir/config-link.yaml"
+HY2_USERS_DB="$regular_db"
+if hy2u_require; then
+  echo "Symlinked Hysteria config was accepted." >&2; exit 1
+fi
+HY2_USERS_CONFIG="$regular_config"
+ln -s "$regular_db" "$tmp_dir/users-link.json"
+HY2_USERS_DB="$tmp_dir/users-link.json"
+if hy2u_require; then
+  echo "Symlinked Hysteria metadata database was accepted." >&2; exit 1
+fi
+\necho "Hysteria userpass adapter validation passed."
