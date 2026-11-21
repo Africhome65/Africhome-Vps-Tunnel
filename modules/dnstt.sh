@@ -89,11 +89,11 @@ ah_dnstt_check_dns() {
     ah_warn "dig is unavailable; DNS delegation could not be checked."
     return 1
   fi
-  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" | sed 's/\\.$//' || true)"
+  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" | sed 's/\.$//' || true)"
   ns_addresses="$(dig +time=3 +tries=1 +short A "$ns" || true)"
-  if ! printf '%s\\n' "$ns_records" | grep -Fxq "$ns"; then
+  if ! printf '%s\n' "$ns_records" | grep -Fxq "$ns"; then
     ah_warn "The tunnel zone does not currently resolve to the nameserver $ns."
-    [[ -n "$ns_records" ]] && printf 'Observed NS records: %s\\n' "$ns_records"
+    [[ -n "$ns_records" ]] && printf 'Observed NS records: %s\n' "$ns_records"
     return 1
   fi
   if [[ -z "$ns_addresses" ]]; then
