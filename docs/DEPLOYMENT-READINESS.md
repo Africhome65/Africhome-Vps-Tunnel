@@ -37,4 +37,4 @@
 
 ## Validation interpretation
 
-The full GitHub Actions suite passed on commit 390f3e881e23b24a34b05b7ac7797fd35f148359 (run 44709017981). Checks include shell syntax, ShellCheck, licence tests, DNSTT/Hysteria rollback fault injection, VMess shared-443 candidate tests and shared-443 apply/rollback fault injection. The checklist-only follow-up commit triggers another full run. These automated checks do not replace disposable-VPS and external-client integration testing.
+The full GitHub Actions suite passed on commit 4252ed05e6c7a2237d4234f96b4ec5122bd99741 (run 44891943724). All 38 validation steps completed successfully, including Bash syntax, ShellCheck, licence verification/rejection, DNSTT and Hysteria rollback fault injection, OpenVPN and SSH TLS safeguards, REALITY/VMess shared-443 candidate validation, HAProxy render/apply rollback, and the shared-443 process-ownership regression test. These automated checks do not replace disposable-VPS and external-client interoperability testing.
