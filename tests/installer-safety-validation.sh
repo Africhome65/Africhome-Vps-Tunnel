@@ -29,7 +29,7 @@ fetch_reset="$(line_of 'git -C "$INSTALL_DIR" reset --hard')"
 grep -Fq '[[ -r "$SCRIPT_DIR/scripts/license.sh" ]]' "$FILE"
 grep -Fq '|| -L "$INSTALL_DIR/.git"' "$FILE"
 grep -Fq 'git -C "$INSTALL_DIR" status --porcelain --untracked-files=all' "$FILE"
-grep -Fq 'INSTALL_BRANCH="feature/central-dnstt-integration"' "$FILE"
+grep -Fq 'INSTALL_BRANCH="fix/dnstt-transactional-install"' "$FILE"
 for dnstt_script in install-dnstt.sh configure-dnstt-domain.sh install-dnstt-service.sh; do
   expected='"$INSTALL_DIR/scripts/'"$dnstt_script"'"'
   grep -Fq "$expected" "$FILE"
