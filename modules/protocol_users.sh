@@ -55,8 +55,10 @@ pu_add() {
   [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
   if (( days == 0 )); then
     expires_at=0
+    expires="Never"
   else
     expires_at=$(( $(date +%s) + days * 86400 ))
+    expires="$(date -d "@$expires_at" +%F)"
   fi
 
   backup="${PU_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
