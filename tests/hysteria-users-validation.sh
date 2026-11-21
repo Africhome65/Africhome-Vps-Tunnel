@@ -70,4 +70,13 @@ grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "active"' <
 grep -Fq 'dbbackup=' <<< "$remove_fn"
 grep -Fq 'systemctl restart hysteria-server.service' <<< "$remove_fn"
 
+
+expire_fn="$(sed -n '/^hy2u_expire() {/,/^}/p' "$ROOT/modules/hysteria_users.sh")"
+grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "expired"' <<< "$expire_fn"
+grep -Fq 'previous_status=' <<< "$expire_fn"
+grep -Fq 'rollback_status' <<< "$expire_fn"
+grep -Fq 'registry_done+=' <<< "$expire_fn"
+grep -Fq 'systemctl restart hysteria-server.service' <<< "$expire_fn"
+grep -Fq 'install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"' <<< "$expire_fn"
+
 echo "Hysteria userpass adapter validation passed."
