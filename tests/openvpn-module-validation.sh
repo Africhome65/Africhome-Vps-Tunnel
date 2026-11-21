@@ -114,7 +114,6 @@ mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
 unset -f stat
 # Incomplete server setup cleanup removes only the newly-created runtime
-set -x
 # directory and an empty log directory; it never follows/removes a symlink.
 ROLLBACK_RUNTIME="$TMP/rollback-runtime"
 ROLLBACK_LOG="$TMP/rollback-log"
@@ -142,7 +141,8 @@ grep -q '^proto tcp-server$' "$TMP/server-tcp.conf"
 ! grep -q '^explicit-exit-notify' "$TMP/server-tcp.conf"
 
 printf 'V\t20300101000000Z\t\t01\tunknown\t/CN=client-one\nR\t20300101000000Z\t20270101000000Z\t02\tunknown\t/CN=client-two\nV\t20300101000000Z\t\t03\tunknown\t/CN=server\n' > "$TMP/easy-rsa/pki/index.txt"
-OVPN_EASYRSA_DIR="$TMP/easy-rsa" ovpn_list_clients > "$TMP/clients.txt"
+OVPN_EASYRSA_DIR="$TMP/easy-rsa"
+ovpn_list_clients > "$TMP/clients.txt"
 grep -q 'VALID.*client-one' "$TMP/clients.txt"
 grep -q 'REVOKED.*client-two' "$TMP/clients.txt"
 ! grep -q 'server' "$TMP/clients.txt"
@@ -295,5 +295,4 @@ rm -rf "$SETUP_TMP"
 unset -f ah_require_root ah_ok ah_info ah_warn ovpn_require_tools ovpn_pki_paths_safe
 unset -f ovpn_port_available ip chown install systemctl journalctl
 
-set +x
 echo "OpenVPN module validation passed."
