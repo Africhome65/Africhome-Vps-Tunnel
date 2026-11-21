@@ -8,8 +8,7 @@ ssh_users_create(){
   if id "$username" >/dev/null 2>&1; then ah_err "That username already exists."; return; fi
   local days
   read -r -p "Account duration in days (0 = no expiry): " days
-  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return; }
-  if (( days > 36500 )); then ah_err "Maximum duration is 36500 days."; return; fi
+  [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return; }
   expiry=""
   if (( days > 0 )); then
     expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
@@ -84,13 +83,12 @@ ssh_users_unlock(){
 
 ssh_users_set_expiry(){
   ah_require_root || return
-  local username expiry
+  local username expiry days
   read -r -p "Existing username: " username
   id "$username" >/dev/null 2>&1 || { ah_err "User does not exist."; return; }
   [[ "$username" != root ]] || { ah_err "Refusing to change root expiry."; return; }
   read -r -p "Account duration in days from today (0 = no expiry): " days
-  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return; }
-  if (( days > 36500 )); then ah_err "Maximum duration is 36500 days."; return; fi
+  [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return; }
   if (( days == 0 )); then
     chage --expiredate "" "$username" && ah_ok "Expiry cleared for $username."
     return
