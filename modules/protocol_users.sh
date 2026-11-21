@@ -42,7 +42,8 @@ pu_add() {
 
   read -r -p "Account name (letters, numbers, dash, underscore): " username
   [[ "$username" =~ ^[A-Za-z0-9_-]{1,24}$ ]] || { ah_err "Invalid account name."; return 1; }
-  local email credential expires expires_at backup tmp
+  jq -e --arg n "$username" 'any(.[]; .name == $n)' "$PU_DB" >/dev/null && { ah_err "That account name is already used by a managed protocol account."; return 1; }
+  local email credential expires expires_at backup tmp days
   email="afh-${protocol}-${username}-$(date +%s)"
   if jq -e --arg e "$email" 'any(.[]; .email == $e)' "$PU_DB" >/dev/null; then
     ah_err "Account identifier already exists."; return 1
@@ -52,8 +53,8 @@ pu_add() {
     trojan) credential="$(openssl rand -hex 24)" || return 1 ;;
   esac
   read -r -p "Validity in days (0 = never expires): " days
-  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
-  if (( days == 0 )); then
+  [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return 1; }
+  if (( 10#$days == 0 )); then
     expires_at=0
     expires="Never"
   else
@@ -123,12 +124,12 @@ pu_renew() {
   pu_lock || return 1
   pu_list
   read -r -p "Account name to renew: " name
-  local record expires expires_at tmp
+  local record expires expires_at tmp days
   record="$(jq -c --arg n "$name" '[.[] | select(.name == $n)] | .[0] // empty' "$PU_DB")"
   [[ -n "$record" ]] || { ah_err "Account not found."; return 1; }
   read -r -p "Additional days to add (0 = never expires): " days
-  [[ "$days" =~ ^[0-9]+$ ]] || { ah_err "Enter a whole number of days."; return 1; }
-  if (( days == 0 )); then
+  [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return 1; }
+  if (( 10#$days == 0 )); then
     expires_at=0
   else
     local current_expiry
