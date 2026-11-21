@@ -22,9 +22,6 @@ hy2u_require() {
   [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
     echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
   }
-  [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
-    echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
-  }
   jq -e 'type == "array"' "$HY2_USERS_DB" >/dev/null 2>&1 || {
     echo "[FAIL] Hysteria account metadata is invalid; refusing to overwrite." >&2; return 1;
   }
@@ -184,7 +181,7 @@ hy2u_remove() {
   if ! install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"; then
     cp -a "$backup" "$HY2_USERS_CONFIG"
     systemctl restart hysteria-server.service || true
-    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    ar_set_service_status "$account_id" "hysteria" "$username" "$previous_status" || true
     rm -f "$tmp"
     ah_err "Local metadata update failed; config restored and registry rollback attempted."; return 1
   fi
