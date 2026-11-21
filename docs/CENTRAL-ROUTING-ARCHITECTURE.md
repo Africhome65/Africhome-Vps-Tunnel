@@ -23,7 +23,7 @@ A TCP passthrough frontend may be considered only after confirming that its Clie
 
 The existing Xray module creates VLESS REALITY directly in the Xray config. The VMess module supports a standalone TLS inbound and a separate shared-443 candidate workflow that renders a loopback VMess WS/TLS backend alongside a loopback REALITY backend. The guarded apply script can transactionally update Xray and HAProxy after explicit confirmation and preflight checks. This path still requires disposable-VPS rollback and external client testing. Trojan remains a standalone TLS-terminating inbound and is not a shared-router backend.
 
-Before implementing shared routing:
+Before extending shared routing to another protocol or transport:
 1. Introduce a tagged, loopback-bound backend profile for each supported Xray transport.
 2. Merge inbounds into the existing JSON config; never replace the full config as part of a mode add.
 3. Preserve every unknown inbound, outbound, routing rule, DNS setting, and API setting.
