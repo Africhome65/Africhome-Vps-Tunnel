@@ -132,7 +132,7 @@ shared443_apply_transaction() {
     fi
   fi
   if (( rollback_ok )); then
-    if ! listeners="$(ss -H -ltn 'sport = :443' 2>/dev/null)"; then
+    if ! listeners="$(ss -H -ltnp 'sport = :443' 2>/dev/null)"; then
       echo "Could not verify the HAProxy TCP/443 listener." >&2
       rollback_ok=0
     elif [[ -z "$listeners" || "$listeners" != *haproxy* ]]; then
