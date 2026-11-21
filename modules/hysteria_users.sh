@@ -15,8 +15,13 @@ hy2u_require() {
   python3 -c 'import yaml' >/dev/null 2>&1 || ah_apt_install python3-yaml || return 1
   command -v openssl >/dev/null 2>&1 || return 1
   command -v systemctl >/dev/null 2>&1 || return 1
-  [[ -s "$HY2_USERS_CONFIG" ]] || { echo "[FAIL] Hysteria config not found." >&2; return 1; }
+  [[ -f "$HY2_USERS_CONFIG" && ! -L "$HY2_USERS_CONFIG" && -s "$HY2_USERS_CONFIG" ]] || {
+    echo "[FAIL] Hysteria config must be a non-symlink regular file." >&2; return 1;
+  }
   [[ -e "$HY2_USERS_DB" ]] || { install -d -m 700 "$(dirname "$HY2_USERS_DB")"; printf '[]\n' > "$HY2_USERS_DB"; chmod 600 "$HY2_USERS_DB"; }
+  [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
+    echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
+  }
   jq -e 'type == "array"' "$HY2_USERS_DB" >/dev/null 2>&1 || {
     echo "[FAIL] Hysteria account metadata is invalid; refusing to overwrite." >&2; return 1;
   }
@@ -90,8 +95,8 @@ hy2u_add() {
   else expires_at=$(( $(date +%s) + days * 86400 )); expires="$(date -u -d "@$expires_at" '+%Y-%m-%d %H:%M UTC')"; fi
   password="$(openssl rand -hex 24)" || return 1
   account_id="$(openssl rand -hex 16)" || return 1
-  backup="${HY2_USERS_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
-  dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  backup="$(mktemp "${HY2_USERS_CONFIG}.africhome-backup.XXXXXX")"
+  dbbackup="$(mktemp "${HY2_USERS_DB}.africhome-backup.XXXXXX")"
   cp -a "$HY2_USERS_CONFIG" "$backup" || return 1
   cp -a "$HY2_USERS_DB" "$dbbackup" || return 1
   hy2u_yaml_change add "$username" "$password" || { ah_err "Could not safely update Hysteria userpass config."; return 1; }
@@ -100,12 +105,19 @@ hy2u_add() {
     systemctl restart hysteria-server.service || true
     ah_err "Hysteria restart failed; previous config restored."; return 1
   fi
-  dbtmp="$(mktemp)"
+  dbtmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || { cp -a "$backup" "$HY2_USERS_CONFIG"; systemctl restart hysteria-server.service || true; return 1; }
   if ! jq --arg id "$account_id" --arg n "$username" --argjson exp "$expires_at"     '. + [{account_id:$id,username:$n,expires_at:$exp,created_at:(now|floor)}]' "$HY2_USERS_DB" > "$dbtmp"; then
     rm -f "$dbtmp"; cp -a "$backup" "$HY2_USERS_CONFIG"; systemctl restart hysteria-server.service || true
     ah_err "Could not update Hysteria account metadata; config restored."; return 1
   fi
-  install -m 600 "$dbtmp" "$HY2_USERS_DB"; rm -f "$dbtmp"
+  if ! install -o root -g root -m 600 "$dbtmp" "$HY2_USERS_DB"; then
+    rm -f "$dbtmp"
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    ah_err "Could not commit Hysteria metadata; config restored."
+    return 1
+  fi
+  rm -f "$dbtmp"
   if ! ar_register_service "$account_id" "$username" "hysteria" "$username" "$expires_at"; then
     cp -a "$backup" "$HY2_USERS_CONFIG"
     systemctl restart hysteria-server.service || true
@@ -135,12 +147,15 @@ hy2u_remove() {
   ah_require_root || return 1
   hy2u_require || return 1
   hy2u_lock || return 1
-  local username record account_id backup tmp dbbackup
+  local username record account_id previous_status backup tmp dbbackup
   read -r -p "Hysteria username to revoke: " username
   record="$(jq -c --arg n "$username" '.[] | select(.username == $n)' "$HY2_USERS_DB")"
   [[ -n "$record" ]] || { ah_err "Managed Hysteria user not found."; return 1; }
   account_id="$(jq -r '.account_id' <<< "$record")"
-  backup="${HY2_USERS_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  ar_init || return 1
+  previous_status="$(jq -r --arg id "$account_id" --arg name "$username" '.accounts[] | select(.id == $id) | .services[] | select(.service == "hysteria" and .ref == $name) | .status' "$AR_REGISTRY")"
+  [[ -n "$previous_status" && "$previous_status" != "null" ]] || { ah_err "Matching Hysteria registry record not found."; return 1; }
+  backup="$(mktemp "${HY2_USERS_CONFIG}.africhome-backup.XXXXXX")"
   dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
   tmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || return 1
   cp -a "$HY2_USERS_CONFIG" "$backup" || { rm -f "$tmp"; return 1; }
@@ -153,7 +168,7 @@ hy2u_remove() {
     rm -f "$tmp"; ah_err "Registry update failed; Hysteria account was not changed."; return 1;
   }
   if ! hy2u_yaml_change remove "$username"; then
-    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    ar_set_service_status "$account_id" "hysteria" "$username" "$previous_status" || true
     rm -f "$tmp"; ah_err "Could not update Hysteria config; registry rollback attempted."; return 1
   fi
   if ! systemctl restart hysteria-server.service; then
