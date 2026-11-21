@@ -87,18 +87,31 @@ rm "$OVPN_CLIENT_DIR"
 OVPN_EASYRSA_DIR="$TMP/easy-rsa"
 OVPN_CONFIG_DIR="$TMP/server"
 OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
-mkdir -p "$OVPN_CONFIG_DIR" "$TMP/easy-rsa/pki"
-mkdir -p "$TMP/easy-rsa/pki/private" "$TMP/easy-rsa/pki/issued"
-touch "$TMP/easy-rsa/easyrsa"
-chmod 0700 "$TMP/easy-rsa"
+mkdir -p "$OVPN_CONFIG_DIR" "$TMP/easy-rsa/pki/private" "$TMP/easy-rsa/pki/issued"
+touch "$TMP/easy-rsa/easyrsa" "$TMP/easy-rsa/pki/private/ca.key"
+chmod 0700 "$TMP/easy-rsa" "$TMP/easy-rsa/pki" "$TMP/easy-rsa/pki/private"
+chmod 0600 "$TMP/easy-rsa/pki/private/ca.key"
+stat(){
+  local path="${@: -1}"
+  if [[ -d "$path" ]]; then printf '%s\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
+  else printf '%s\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
+}
 ovpn_pki_paths_safe
+MOCK_OVPN_PKI_DIR_STAT=1001:700
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_DIR_STAT
+MOCK_OVPN_PKI_DIR_STAT=0:777
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_DIR_STAT
+MOCK_OVPN_PKI_FILE_STAT=0:644
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_FILE_STAT
 mv "$TMP/easy-rsa/pki/private" "$TMP/private-real"
 ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ! ovpn_pki_paths_safe
 rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
-
 # Incomplete server setup cleanup removes only the newly-created runtime
 # directory and an empty log directory; it never follows/removes a symlink.
 ROLLBACK_RUNTIME="$TMP/rollback-runtime"
@@ -127,10 +140,12 @@ grep -q '^proto tcp-server$' "$TMP/server-tcp.conf"
 ! grep -q '^explicit-exit-notify' "$TMP/server-tcp.conf"
 
 printf 'V\t20300101000000Z\t\t01\tunknown\t/CN=client-one\nR\t20300101000000Z\t20270101000000Z\t02\tunknown\t/CN=client-two\nV\t20300101000000Z\t\t03\tunknown\t/CN=server\n' > "$TMP/easy-rsa/pki/index.txt"
-OVPN_EASYRSA_DIR="$TMP/easy-rsa" ovpn_list_clients > "$TMP/clients.txt"
+OVPN_EASYRSA_DIR="$TMP/easy-rsa"
+ovpn_list_clients > "$TMP/clients.txt"
 grep -q 'VALID.*client-one' "$TMP/clients.txt"
 grep -q 'REVOKED.*client-two' "$TMP/clients.txt"
 ! grep -q 'server' "$TMP/clients.txt"
+unset -f stat
 
 # Revocation failure handling must stop the service.
 OVPN_SERVICE="openvpn-server@africhome"
@@ -138,6 +153,18 @@ systemctl(){ touch "$TMP/systemctl.log"; printf '%s\n' "$*" >> "$TMP/systemctl.l
 ovpn_fail_closed "test CRL failure"
 grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
 unset -f systemctl
+
+# Easy-RSA calls must force a private umask even when the caller is permissive.
+OVPN_EASYRSA_DIR="$TMP/easyrsa-umask"
+mkdir -m 0700 "$OVPN_EASYRSA_DIR"
+cat > "$OVPN_EASYRSA_DIR/easyrsa" <<'MOCK'
+#!/usr/bin/env sh
+umask > "$OVPN_UMASK_CAPTURE"
+MOCK
+chmod 0700 "$OVPN_EASYRSA_DIR/easyrsa"
+export OVPN_UMASK_CAPTURE="$TMP/easyrsa-umask.txt"
+( umask 000; ovpn_easyrsa inspect )
+[[ "$(cat "$OVPN_UMASK_CAPTURE")" == 0077 ]]
 
 # PKI initialization is staged and published only after a complete CA build.
 OVPN_EASYRSA_DIR="$TMP/pki-success"

@@ -4,8 +4,10 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 for file in \
   "$ROOT_DIR/scripts/install-dnstt.sh" \
+  "$ROOT_DIR/scripts/lib/dnstt-transaction.sh" \
   "$ROOT_DIR/scripts/configure-dnstt-domain.sh" \
-  "$ROOT_DIR/scripts/install-dnstt-service.sh"; do
+  "$ROOT_DIR/scripts/install-dnstt-service.sh" \
+  "$ROOT_DIR/tests/dnstt-transaction-validation.sh"; do
   [[ -f "$file" ]] || { echo "Missing DNSTT script: $file" >&2; exit 1; }
   bash -n "$file"
 done
@@ -59,6 +61,22 @@ fi
 grep -q 'root-owned regular file with mode 0600' "$ROOT_DIR/scripts/configure-dnstt-domain.sh"
 grep -q 'must be a real directory, not a symlink' "$ROOT_DIR/scripts/install-dnstt.sh"
 grep -q 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh"
+
+# The bootstrap must fetch the fixed upstream release commit, never moving master.
+grep -Fq 'DNSTT_TAG="v1.20260501.0"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'DNSTT_TAG_OBJECT="8fb3b30e6dbdc9006780327c6687623534d134f5"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ "$fetched_tag_object" == "$DNSTT_TAG_OBJECT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ "$fetched_commit" == "$DNSTT_COMMIT" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ ! -L "$DNSTT_SRC" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq '[[ ! -L "$DNSTT_SRC/.git" ]]' "$ROOT_DIR/scripts/install-dnstt.sh"
+grep -Fq 'git -C "$DNSTT_SRC" status --porcelain --untracked-files=all' "$ROOT_DIR/scripts/install-dnstt.sh"
+if grep -Fq 'git clone "$DNSTT_REPO"' "$ROOT_DIR/scripts/install-dnstt.sh"; then
+  echo "DNSTT bootstrap must not clone the moving upstream branch." >&2
+  exit 1
+fi
+
 license_line="$(grep -n 'bash "$SCRIPT_DIR/scripts/license.sh" verify' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
 apt_line="$(grep -n '^apt-get update' "$ROOT_DIR/scripts/install-dnstt.sh" | cut -d: -f1)"
 [[ -n "$license_line" && -n "$apt_line" && "$license_line" -lt "$apt_line" ]] || { echo "DNSTT installer must verify licence before apt changes." >&2; exit 1; }
@@ -68,5 +86,19 @@ if grep -E -q '^[[:space:]]*systemctl[[:space:]]+(stop|disable|enable|start|rest
   echo "DNSTT preparation script must not change running services." >&2
   exit 1
 fi
+
+
+# Installer must source the reusable transaction helpers after the licence gate.
+INSTALLER="$ROOT_DIR/scripts/install-dnstt.sh"
+TRANSACTION_LIB="$ROOT_DIR/scripts/lib/dnstt-transaction.sh"
+grep -Fq '. "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh"' "$INSTALLER"
+grep -Fq 'dnstt_install_go_toolchain() {' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_replace_binary_pair() {' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_restore_file() {' "$TRANSACTION_LIB"
+grep -Fq 'go_is_new_enough "$target/bin/go"' "$TRANSACTION_LIB"
+grep -Fq 'Protected backups retained at $backup.' "$TRANSACTION_LIB"
+grep -Fq 'dnstt_replace_binary_pair "$build_tmp/dnstt-server" "$build_tmp/dnstt-client" /usr/local/bin' "$INSTALLER"
+grep -Fq 'Existing dnstt-server is not a regular non-symlink file.' "$TRANSACTION_LIB"
+grep -Fq 'Existing dnstt-client is not a regular non-symlink file.' "$TRANSACTION_LIB"
 
 echo "DNSTT repository safety checks passed."

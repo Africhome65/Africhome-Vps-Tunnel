@@ -11,7 +11,8 @@ vmess_add() {
   command -v xray >/dev/null 2>&1 || { ah_warn "Install Xray first."; return 1; }
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
   [[ -s "$VMESS_CONFIG" ]] || { ah_warn "Xray config not found. Configure Xray first."; return 1; }
-  [[ ! -e "$VMESS_STATE" ]] || { ah_warn "Africhome VMess is already configured. Remove it before replacing."; return 1; }
+  # Treat dangling symlinks as existing state too; never let a root run follow one when writing state.
+  [[ ! -e "$VMESS_STATE" && ! -L "$VMESS_STATE" ]] || { ah_warn "Africhome VMess state already exists or is an unsafe symlink. Review it before replacing."; return 1; }
 
   local domain port cert key path uuid backup tmp
   read -r -p "VMess TLS domain (must match certificate): " domain
@@ -79,8 +80,23 @@ vmess_add() {
   ah_warn "Client credentials are sensitive. Test TLS and connection from an external network."
 }
 
+vmess_require_safe_state() {
+  [[ -f "$VMESS_STATE" && ! -L "$VMESS_STATE" ]] || {
+    ah_err "VMess state must be a regular non-symlink file; refusing to source it."
+    return 1
+  }
+  [[ "$(stat -c '%u:%a' "$VMESS_STATE" 2>/dev/null || true)" == "0:600" ]] || {
+    ah_err "VMess state must be owned by root with mode 600; refusing to source it."
+    return 1
+  }
+  [[ -s "$VMESS_STATE" ]] || {
+    ah_err "VMess state file is empty; refusing to source it."
+    return 1
+  }
+}
+
 vmess_show_client() {
-  [[ -r "$VMESS_STATE" ]] || { ah_warn "Configure VMess first."; return 1; }
+  vmess_require_safe_state || return 1
   # shellcheck disable=SC1090
   . "$VMESS_STATE"
   local payload encoded
@@ -101,7 +117,14 @@ vmess_status() {
 
 vmess_remove() {
   ah_require_root || return 1
-  [[ -s "$VMESS_CONFIG" && -r "$VMESS_STATE" ]] || { ah_warn "Africhome VMess state was not found."; return 1; }
+  [[ -s "$VMESS_CONFIG" ]] || { ah_warn "Xray config was not found."; return 1; }
+  vmess_require_safe_state || return 1
+  # shellcheck source=/etc/africhome-vmess.env
+  . "$VMESS_STATE"
+  if [[ "${VMESS_SHARED443:-0}" == "1" ]]; then
+    ah_err "This VMess inbound is part of the shared TCP/443 route. Generic removal is disabled to protect the VLESS REALITY route; restore the saved shared-443 backup to deactivate it."
+    return 1
+  fi
   read -r -p "Remove Africhome VMess inbound? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || return 0
   command -v jq >/dev/null 2>&1 || { ah_err "jq is required to safely edit Xray config."; return 1; }
@@ -122,6 +145,68 @@ vmess_remove() {
   ah_ok "VMess inbound removed. Firewall rule was left unchanged."
 }
 
+vmess_shared_443_candidate() {
+  ah_require_root || return 1
+  command -v python3 >/dev/null 2>&1 || { ah_err "Python 3 is required."; return 1; }
+  command -v xray >/dev/null 2>&1 || { ah_err "Install Xray first."; return 1; }
+  command -v openssl >/dev/null 2>&1 || { ah_err "OpenSSL is required to verify the TLS certificate/key."; return 1; }
+  [[ -s "$VMESS_CONFIG" && ! -L "$VMESS_CONFIG" ]] || { ah_err "Xray config must be a regular non-symlink file."; return 1; }
+  local script_dir domain cert key path vmess_port reality_port uuid output_dir service_user service_group
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  [[ -r "$script_dir/scripts/license.sh" ]] || { ah_err "Licence verifier is missing."; return 1; }
+  bash "$script_dir/scripts/license.sh" verify || return 1
+  read -r -p "VMess SNI domain (must match TLS certificate): " domain
+  read -r -p "TLS certificate full path: " cert
+  read -r -p "TLS private key full path: " key
+  service_user="$(systemctl show -p User --value xray.service 2>/dev/null)" || { ah_err "Cannot inspect Xray service identity."; return 1; }
+  service_group="$(systemctl show -p Group --value xray.service 2>/dev/null)" || { ah_err "Cannot inspect Xray service group."; return 1; }
+  service_user="${service_user:-root}"
+  service_group="${service_group:-$(id -gn "$service_user" 2>/dev/null || echo root)}"
+  command -v runuser >/dev/null 2>&1 || { ah_err "runuser is required to verify Xray certificate access."; return 1; }
+  runuser -u "$service_user" -g "$service_group" -- test -r "$cert" || { ah_err "Xray service user $service_user:$service_group cannot read the TLS certificate."; return 1; }
+  runuser -u "$service_user" -g "$service_group" -- test -r "$key" || { ah_err "Xray service user $service_user:$service_group cannot read the TLS private key."; return 1; }
+  read -r -p "WebSocket path [/vmess]: " path
+  path="${path:-/vmess}"
+  read -r -p "VMess loopback backend port [8443]: " vmess_port
+  vmess_port="${vmess_port:-8443}"
+  read -r -p "VLESS REALITY loopback backend port [1443]: " reality_port
+  reality_port="${reality_port:-1443}"
+  [[ "$vmess_port" =~ ^[0-9]+$ && "$reality_port" =~ ^[0-9]+$ ]] || { ah_err "Backend ports must be numeric."; return 1; }
+  uuid="$(xray uuid)" || { ah_err "Could not generate VMess UUID."; return 1; }
+  output_dir="/root/africhome-vmess-shared443-candidate-$(date +%Y%m%d%H%M%S)"
+  python3 "$script_dir/scripts/render-vmess-shared-443.py" "$VMESS_CONFIG" \
+    --vmess-domain "$domain" --vmess-uuid "$uuid" --certificate "$cert" --private-key "$key" \
+    --ws-path "$path" --vmess-backend-port "$vmess_port" --reality-backend-port "$reality_port" \
+    --output-dir "$output_dir" || return 1
+  if ! xray run -test -config "$output_dir/xray-config.json"; then
+    ah_err "Xray rejected the candidate. Active config and services were not changed."
+    return 1
+  fi
+  if command -v haproxy >/dev/null 2>&1; then
+    if ! haproxy -c -f "$output_dir/haproxy-443.cfg"; then
+      ah_err "HAProxy rejected the candidate. Active config and services were not changed."
+      return 1
+    fi
+  else
+    ah_warn "HAProxy is not installed; the candidate was rendered but not syntax-checked by HAProxy."
+  fi
+  ah_ok "Shared TCP 443 candidate generated and validated without live changes."
+  echo "Candidate directory: $output_dir"
+  echo "VMess client details: $output_dir/client-details.txt"
+  echo "Xray candidate: $output_dir/xray-config.json"
+  echo "HAProxy candidate: $output_dir/haproxy-443.cfg"
+  ah_warn "This is a review-only candidate. External VLESS REALITY and VMess client tests are still required before applying it."
+}
+
+vmess_apply_shared_443_candidate() {
+  ah_require_root || return 1
+  local script_dir candidate_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  read -r -p "Full path to the reviewed shared-443 candidate directory: " candidate_dir
+  [[ -n "$candidate_dir" ]] || { ah_err "Candidate directory is required."; return 1; }
+  bash "$script_dir/scripts/apply-vmess-shared-443.sh" "$candidate_dir"
+}
+
 vmess_menu() {
   while true; do
     echo
@@ -130,6 +215,8 @@ vmess_menu() {
     echo "2) Show client import URI"
     echo "3) Xray service status and logs"
     echo "4) Remove VMess inbound"
+    echo "5) Generate shared TCP 443 candidate (no live changes)"
+    echo "6) Apply reviewed shared TCP 443 candidate (restarts Xray/HAProxy)"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -137,6 +224,8 @@ vmess_menu() {
       2) vmess_show_client; ah_pause ;;
       3) vmess_status; ah_pause ;;
       4) vmess_remove; ah_pause ;;
+      5) vmess_shared_443_candidate; ah_pause ;;
+      6) vmess_apply_shared_443_candidate; ah_pause ;;
       0) return ;;
       *) ah_warn "Invalid choice." ;;
     esac

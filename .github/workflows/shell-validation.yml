@@ -34,6 +34,8 @@ jobs:
           done < <(find . -type f -name '*.sh' -print0)
       - name: Test installer safety and licence ordering
         run: bash tests/installer-safety-validation.sh
+      - name: Test Ed25519 licence verification and rejection matrix
+        run: bash tests/license-validation.sh
       - name: Test Hysteria input validation
         run: bash tests/hysteria-validation.sh
       - name: Test security module safeguards
@@ -56,6 +58,8 @@ jobs:
         run: bash tests/dnstt-inventory-validation.sh
       - name: Test DNSTT bootstrap and service safety
         run: bash tests/dnstt-safety-check.sh
+      - name: Fault-inject DNSTT Go and binary pair rollback
+        run: bash tests/dnstt-transaction-validation.sh
       - name: Test DNSTT customer account and resolver safety
         run: bash tests/dnstt-accounts-safety-check.sh
       - name: Test protocol account config permissions
@@ -66,6 +70,12 @@ jobs:
         run: python3 tests/xray-reality-sni-validation.py
       - name: Test candidate-only REALITY loopback backend renderer
         run: python3 tests/reality-backend-render-validation.py
+      - name: Test VMess state-path symlink safety
+        run: bash tests/vmess-state-safety-validation.sh
+      - name: Test VMess and VLESS REALITY shared TCP 443 candidate
+        run: python3 tests/vmess-shared-443-validation.py
+      - name: Fault-inject shared TCP 443 apply and rollback
+        run: bash tests/shared443-transaction-validation.sh
       - name: Test central account registry
         run: bash tests/account-registry-validation.sh
       - name: Test Hysteria userpass account adapter

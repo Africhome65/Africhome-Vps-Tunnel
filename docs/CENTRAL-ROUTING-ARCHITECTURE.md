@@ -2,7 +2,7 @@
 
 ## Status
 
-This document is the implementation contract for the central-port-routing work. It is not evidence that the router or every listed protocol mode is operational. Current menu entries are a requested-mode catalogue; the router module is validation/planning code only.
+This document is the implementation contract for central port routing. The central-router menu module remains a validation/planning layer. Separate scripts now provide HAProxy renderers, read-only preflight, and guarded apply transactions. A VMess + VLESS REALITY shared-TCP-443 candidate and guarded apply path exist, but external client interoperability has not been proven; do not treat this as production-ready or as support for every catalogue mode.
 
 ## Required architecture
 
@@ -17,13 +17,13 @@ This document is the implementation contract for the central-port-routing work. 
 
 VLESS REALITY is not an ordinary TLS-terminated inbound. Do not place it behind a TLS-terminating proxy and do not rewrite it as a normal TLS backend. Preserve the existing Xray inbound and its credentials during all unrelated changes.
 
-A TCP passthrough frontend may be considered only after confirming that its ClientHello/SNI inspection is compatible with the actual REALITY handshake and that the REALITY route is selected deterministically. If this cannot be demonstrated, keep REALITY on its existing dedicated public socket or a separate IP. No automatic migration is permitted.
+A TCP passthrough frontend may be considered only after confirming that its ClientHello/SNI inspection is compatible with the actual REALITY handshake and that the REALITY route is selected deterministically. The current candidate/apply code renders a passthrough route and validates local Xray/HAProxy configuration, but this does not prove REALITY interoperability. External VLESS REALITY connection/reconnect tests through the shared listener remain a release blocker. If compatibility cannot be demonstrated, keep REALITY on its existing dedicated public socket or a separate IP. No automatic migration is permitted.
 
 ## Xray backend integration
 
-The existing Xray module creates VLESS REALITY directly in the Xray config. Existing VMess and Trojan modules add their own TLS-terminating Xray inbounds and currently request independent public ports. They are not yet shared-router backends.
+The existing Xray module creates VLESS REALITY directly in the Xray config. The VMess module supports a standalone TLS inbound and a separate shared-443 candidate workflow that renders a loopback VMess WS/TLS backend alongside a loopback REALITY backend. The guarded apply script can transactionally update Xray and HAProxy after explicit confirmation and preflight checks. This path still requires disposable-VPS rollback and external client testing. Trojan remains a standalone TLS-terminating inbound and is not a shared-router backend.
 
-Before implementing shared routing:
+Before extending shared routing to another protocol or transport:
 1. Introduce a tagged, loopback-bound backend profile for each supported Xray transport.
 2. Merge inbounds into the existing JSON config; never replace the full config as part of a mode add.
 3. Preserve every unknown inbound, outbound, routing rule, DNS setting, and API setting.
@@ -55,7 +55,7 @@ Do not advertise SSH Direct SSL, Payload Direct, Payload Proxy, or Payload + Pro
 
 ## OpenVPN and UDP
 
-OpenVPN is not currently present as an Africhome module. Its TCP TLS/SNI and WebSocket modes require a separately designed wrapper/bridge and compatible client. Native OpenVPN TCP/UDP listeners remain dedicated sockets unless a tested frontend explicitly supports that transport.
+The OpenVPN module provides native TCP/UDP server management, Easy-RSA CA and client-certificate lifecycle, profile export, revocation, status, and read-only inventory. It does not implement TLS/SNI or WebSocket wrapper modes, payload/proxy modes, automatic firewall/NAT setup, or central-router integration. Those modes require a separately designed wrapper/bridge and compatible client. Native OpenVPN TCP/UDP listeners remain dedicated sockets unless a tested frontend explicitly supports that transport.
 
 UDP Direct, Hysteria 2, and DNSTT require exact port allocation and conflict detection. Preserve the current Hysteria 2 and DNSTT deployment. DNSTT remains included; WireGuard, ZIVPN, Iodine, and SlowDNS remain excluded.
 

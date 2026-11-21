@@ -13,7 +13,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
 - Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
-- Hysteria 2 server management with a user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
+- Hysteria 2 server management pinned to official `v2.14.0` installer/binary artifacts with architecture-specific SHA-256 verification, user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
+- Hysteria 2 userpass customer accounts with generated passwords, duplicate-name checks, manual revocation, batch expiry, daily timer, and central-registry status; server-side passwords remain in the protected Hysteria YAML config
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
@@ -24,9 +25,10 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 
 ## Central routing status
 
-- Central TCP/UDP route validation and planning primitives are available; they do not configure listeners, proxies, firewall rules, or services.
-- The requested shared-port modes remain planned until their protocol handlers and client interoperability are implemented and verified.
-- VLESS REALITY is preserve-only for the shared-router work and must not be treated as ordinary TLS.
+- Central TCP 443 SNI, TCP 80 HTTP Host/path, and combined HAProxy renderers are available.
+- VMess + VLESS REALITY shared TCP 443 has a review-only candidate generator and an explicit transactional apply command. It changes Xray/HAProxy only after root/licence checks and typed APPLY confirmation; it does not change DNS or firewall rules.
+- Shared TCP 443 client interoperability remains unverified on a disposable VPS. Other shared-port modes remain planned until their handlers and client interoperability are implemented and tested.
+- VLESS REALITY is passed through by SNI and must not be treated as ordinary TLS termination.
 - SSH account management creates Linux users; the separate stunnel backend provides an SSH-over-TLS loopback service, but public SNI routing and payload/proxy gateway modes are still pending.
 - Native OpenVPN direct UDP/TCP server and certificate-based client management are implemented. OpenVPN WebSocket, payload-proxy, TLS/SNI wrapper modes, automatic firewall/NAT setup, and shared-port router integration are not implemented. The module deliberately does not change UFW/nftables or enable IP forwarding.
 - See [the central routing architecture contract](docs/CENTRAL-ROUTING-ARCHITECTURE.md) for required backend, safety, and compatibility rules.
@@ -48,20 +50,25 @@ See [deployment readiness](docs/DEPLOYMENT-READINESS.md) for the current impleme
 
 ## Installation
 
-Review scripts before running:
+**Release candidate — not ready for VPS deployment.**
+
+The public default `main` branch is not yet the consolidated release candidate. Development work is under draft PRs #4, #5 and #7. Do not run `install.sh` or deploy this branch until those changes are reviewed, consolidated into `main`, and all release gates are passed.
+
+For source review only:
 
 ```bash
-git clone https://github.com/Africhome65/Africhome-Vps-Tunnel.git
+git clone --branch fix/dnstt-transactional-install https://github.com/Africhome65/Africhome-Vps-Tunnel.git
 cd Africhome-Vps-Tunnel
-sudo bash install.sh
-sudo africhome
 ```
+
+The deployment command will be restored here when the public `main` branch is ready.
 
 ## DNSTT setup and customer accounts
 
 - Menu options 26-28 build the official DNSTT binaries, preserve or create the protected server keypair, save the operator's own tunnel domain and authoritative nameserver, and prepare the systemd unit.
 - Menu option 28 deliberately does not enable or start the service, stop another DNS tunnel, edit registrar records, or change firewall rules. Public UDP activation is a separate migration that requires checking current listeners and provider firewall settings.
 - The DNSTT UDP listener accepts a selected port from 1 through 65535. The default is UDP 53; the chosen port must be free and reachable through the provider firewall.
+- The bootstrap fetches the signed upstream DNSTT release tag `v1.20260501.0` and verifies its pinned tag-object and commit hashes before building; existing source checkouts at a different commit are not silently changed.
 - Menu option 29 manages separate non-root SSH customer accounts, validity, timed trial accounts, and client configuration export. DNSTT transports TCP over DNS; SSH authenticates each customer.
 - Client configuration exports contain the DNSTT public key and resolver command, but never the SSH password or server private key. The password for a generated account is shown once; custom passwords are entered with hidden input and confirmation.
 - Client resolver guidance supports UDP, DNS-over-TLS, and DNS-over-HTTPS. The recursive resolver is not the authoritative nameserver used for DNS delegation.
@@ -77,13 +84,27 @@ sudo africhome
 
 ## VMess WebSocket + TLS notes
 
-- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first.
+- VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first. Direct mode defaults to TCP 8443. Menu option 5 can render a review-only shared TCP 443 candidate: it moves the VLESS REALITY and VMess Xray inbounds to distinct loopback ports and generates HAProxy TLS SNI passthrough routes. This does not apply the candidate or change live services; external VLESS REALITY and VMess client interoperability on the shared listener remains unverified.
 - Supply a domain and matching certificate/key files already installed on the VPS. The module does not issue certificates or configure DNS.
 - The module validates the resulting config before restarting Xray and restores the backup if validation or restart fails.
 - Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
 - Client import URIs contain account credentials; keep them private.
 
+## Shared TCP 443 candidate
+
+- The VMess menu's shared-443 candidate generator reads the existing Xray config and requires exactly one VLESS REALITY inbound with valid `serverNames`.
+- It generates a new Xray candidate with VLESS REALITY on loopback TCP 1443 and VMess WebSocket + TLS on loopback TCP 8443, plus a TLS SNI passthrough HAProxy candidate on public TCP 443.
+- The VMess SNI domain must be covered by the supplied certificate and must differ from all VLESS REALITY `serverNames`. The generator checks certificate hostname coverage and certificate/private-key matching, safely supports normal Let's Encrypt live symlinks, and the menu checks that the Xray service account can read both files.
+- Candidate files are written under a root-only directory and include a TLS route manifest, VMess client details, and a protected VMess state file. After apply, the existing VMess status/client-detail functions use the saved UUID/domain/port/path; generic VMess removal is blocked while shared mode is active to protect VLESS REALITY.
+- The apply command prints the protected backup directory. To deactivate shared mode, restore the saved Xray/HAProxy configs and prior VMess state from that backup; do not use the ordinary VMess remove option.
+- VMess menu option 6 can apply a reviewed candidate after the operator types `APPLY`. It backs up the active Xray and complete HAProxy configs, validates both candidates, moves Xray to loopback first, confirms TCP 443 is free, then starts HAProxy and confirms HAProxy owns TCP 443. It attempts to restore both configs and prior service states if any step fails.
+- Applying the candidate replaces the complete `/etc/haproxy/haproxy.cfg`; review and back up any non-Africhome HAProxy configuration first. The apply script does not change DNS, UFW or provider firewall rules. Keep the backup directory it prints.
+- Review the generated Xray and HAProxy candidates before deployment. HAProxy must be able to inspect the ClientHello SNI for the selected VLESS REALITY clients; confirm this with real clients before production use.
+
 ## Security and limitations
+
+- Hysteria config files are root-owned and group-readable only by the `hysteria` service account (mode 0640); private keys are restricted to that account. Setup and certificate renewal include rollback safeguards, but forced-failure and disposable-VPS testing remain release gates.
+- The public default `main` branch is not yet the consolidated release candidate. Until the development PRs are reviewed and merged, use the explicit development branch shown above for testing only.
 
 Review scripts before running them. Keep VPS console access available when changing firewall/network settings. Torrent-port filtering is only a basic port rule and can be bypassed; it is not application-level torrent detection. These modules have not been tested on every VPS provider or network configuration. Do not treat publication or JSON validation as proof of live service operation.
 

@@ -13,24 +13,27 @@ This checklist is a release gate. A passing shell-syntax workflow is not proof t
 
 ## Current code-review blockers
 
-- [ ] Pin the DNSTT source to an immutable, verified upstream release or commit. The current bootstrap clones the moving upstream branch.
-- [ ] Make Go toolchain replacement transactional: restore the previous `/usr/local/go` if the staged toolchain cannot be installed.
-- [ ] Make the server/client binary pair replacement transactional: if either binary installation fails, restore both previous binaries.
-- [ ] Add fault-injection tests for each rollback path above.
-- [ ] Verify licence issuance and verification using valid, expired legacy, malformed, wrong-VPS, altered-payload, altered-signature, and mismatched-key cases.
-- [ ] Review the installer ordering so invalid licences cannot trigger package or service changes.
-- [ ] Review the Hysteria 2 branch against the central port-routing model before integration.
+- [x] Pin the DNSTT source to the signed upstream release tag object `8fb3b30e6dbdc9006780327c6687623534d134f5` and commit `0c5c52a57d899c05428c116898941761a2ed83c2` (`v1.20260501.0`); the installer fetches the tag and verifies both hashes.
+- [x] Make Go toolchain replacement transactional: restore the previous `/usr/local/go` if the staged toolchain cannot be installed.
+- [x] Make the server/client binary pair replacement transactional: if either binary installation fails, restore both previous binaries.
+- [x] Add fault-injection tests for Go toolchain replacement and DNSTT server/client binary-pair rollback; the current CI suite runs these tests.
+- [x] Verify licence issuance and verification using valid, expired legacy, malformed, wrong-VPS, altered-payload, altered-signature, and mismatched-key cases (GitHub Actions licence matrix passed).
+- [x] Review the installer ordering so invalid licences cannot trigger package or service changes (regression test passed).
+- [x] Review the integrated Hysteria 2 module against central routing; keep its UDP service separate from TCP SNI routing. Certificate renewal now validates matching cert/key files and has a rollback path.
+- [x] Complete fault-injection tests for DNSTT toolchain/binary rollback and Hysteria certificate-pair rollback; the current CI suite runs these tests.
 
 ## Automated checks
 
-- [ ] All shell scripts pass `bash -n`.
-- [ ] ShellCheck passes with no unexplained warnings.
-- [ ] All repository safety/regression scripts pass.
-- [ ] Menu smoke test exits cleanly and every menu option resolves to an existing handler.
-- [ ] Route planner rejects invalid ports, hostnames, transports, backends, and duplicate socket claims.
-- [ ] Candidate router renderers do not write active service configuration or restart services.
-- [ ] Licence tests pass without committing any private signing material.
-- [ ] DNSTT account tests cover create, list, renew, never-expire, disable, re-enable, reset, delete, and trial timer cleanup.
+Latest full GitHub Actions run for PR #7: `44896628663` — passed on commit `dfbe2fa667149964ad358540d20c9c96ca7e0999` (21 November 2026). It includes DNSTT toolchain/binary rollback tests, Hysteria validation and certificate-pair rollback checks, VMess shared-443 candidate validation, and shared-443 apply/rollback fault injection including VMess state persistence. This is CI evidence only; it does not replace disposable-VPS/client integration testing.
+
+- [x] All shell scripts pass `bash -n`.
+- [x] ShellCheck passes with no errors.
+- [x] All repository safety/regression scripts pass on the current PR head.
+- [x] Menu smoke test exits cleanly and every menu option resolves to an existing handler.
+- [x] Route planner rejects invalid ports, hostnames, transports, backends, and duplicate socket claims.
+- [x] Candidate router renderers do not write active service configuration or restart services.
+- [x] Licence tests pass without committing any private signing material.
+- [x] DNSTT account tests cover create, list, renew, never-expire, disable, re-enable, reset, delete, and trial timer cleanup.
 
 ## DNSTT disposable-server validation
 
@@ -69,7 +72,7 @@ DNSTT port roles must remain distinct: server-side DNS transport is UDP (normall
 
 - [ ] Review the separate Hysteria 2 feature branch and its installer/service lifecycle.
 - [ ] Verify official binary/source provenance and checksums.
-- [ ] Test domain validation, certificate issuance, renewal deploy hook, and certificate permissions.
+- [ ] Test domain validation, certificate issuance, renewal deploy hook, and certificate permissions, including forced failure between certificate and key replacement.
 - [ ] Test UDP port and port-hopping ranges against actual listeners and provider firewall rules.
 - [ ] Confirm existing Xray, DNSTT, SSH, and unrelated services remain untouched.
 - [ ] Integrate only after central-router conflict checks and rollback behavior pass.

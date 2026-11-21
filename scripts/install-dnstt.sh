@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Build the official DNSTT server/client and create a local keypair.
-# This bootstrap deliberately does NOT stop iodine, bind UDP/53, change DNS,
+# This bootstrap deliberately does NOT stop services, bind UDP/53, change DNS,
 # change firewall rules, or install/start a DNSTT systemd service.
 set -Eeuo pipefail
 
 DNSTT_REPO="https://www.bamsoftware.com/git/dnstt.git"
+DNSTT_TAG="v1.20260501.0"
+DNSTT_TAG_OBJECT="8fb3b30e6dbdc9006780327c6687623534d134f5"
+DNSTT_COMMIT="0c5c52a57d899c05428c116898941761a2ed83c2"
 DNSTT_SRC="/opt/dnstt-src"
 KEY_DIR="/etc/africhome-dnstt"
 GO_VERSION="1.27.4"
@@ -18,6 +21,9 @@ ok() { printf '[ OK ] %s\n' "$*"; }
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -r "$SCRIPT_DIR/scripts/license.sh" ]] || fail "Licence verifier is missing. Run the main Africhome installer checkout."
 bash "$SCRIPT_DIR/scripts/license.sh" verify
+[[ -r "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh" ]] || fail "DNSTT transaction helper is missing."
+# shellcheck source=scripts/lib/dnstt-transaction.sh
+. "$SCRIPT_DIR/scripts/lib/dnstt-transaction.sh"
 [[ "$(uname -s)" == "Linux" ]] || fail "Linux is required."
 [[ "$(uname -m)" == "x86_64" ]] || fail "This bootstrap currently supports x86_64/amd64 only."
 
@@ -47,38 +53,53 @@ elif command -v go >/dev/null 2>&1 && go_is_new_enough "$(command -v go)"; then
 else
   info "Installing verified Go ${GO_VERSION} toolchain..."
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
+  stage=""
+  trap 'rm -rf -- "$tmpdir" "${stage:-}"' EXIT
   archive="$tmpdir/go.linux-amd64.tar.gz"
   curl -fL --retry 3 "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "$archive"
   printf '%s  %s\n' "$GO_SHA256" "$archive" | sha256sum -c - || fail "Go archive checksum mismatch."
-  stage="$tmpdir/go"
-  install -d -m 0755 "$stage"
+  # Stage under /usr/local so the final directory rename stays on one filesystem.
+  stage="$(mktemp -d /usr/local/.africhome-go-stage.XXXXXX)"
   tar -C "$stage" --strip-components=1 -xzf "$archive"
   [[ -x "$stage/bin/go" ]] || fail "Go extraction did not produce a working toolchain."
-  if [[ -d /usr/local/go ]]; then
-    mv /usr/local/go "/usr/local/go.backup.$(date +%Y%m%d%H%M%S)"
-  fi
-  mv "$stage" /usr/local/go
+  dnstt_install_go_toolchain "$stage" /usr/local/go || fail "Could not install the verified Go toolchain transactionally."
   GO_BIN="/usr/local/go/bin/go"
   trap - EXIT
-  rm -rf "$tmpdir"
+  rm -rf -- "$tmpdir" "$stage"
 fi
 
 info "Using $("$GO_BIN" version)"
 
+[[ ! -L "$DNSTT_SRC" ]] || fail "$DNSTT_SRC must not be a symlink."
+[[ ! -L "$DNSTT_SRC/.git" ]] || fail "$DNSTT_SRC/.git must not be a symlink."
 if [[ -e "$DNSTT_SRC" && ! -d "$DNSTT_SRC/.git" ]]; then
   fail "$DNSTT_SRC exists but is not a Git checkout; move it aside and retry."
 fi
-if [[ ! -d "$DNSTT_SRC/.git" ]]; then
-  git clone "$DNSTT_REPO" "$DNSTT_SRC"
+if [[ -d "$DNSTT_SRC/.git" ]]; then
+  existing_commit="$(git -C "$DNSTT_SRC" rev-parse HEAD)"
+  [[ "$existing_commit" == "$DNSTT_COMMIT" ]] || fail "Existing DNSTT source checkout is not the pinned $DNSTT_TAG commit. Back it up and move it aside before retrying; it will not be overwritten."
+  [[ -z "$(git -C "$DNSTT_SRC" status --porcelain --untracked-files=all)" ]] || fail "Existing DNSTT source checkout has local or untracked changes; refusing to build modified source."
+  info "Using verified clean DNSTT source commit $DNSTT_COMMIT."
 else
-  info "Using existing DNSTT source checkout at $DNSTT_SRC (not updating it automatically)."
+  # Fetch the exact upstream release commit, not the moving master branch.
+  src_stage="$(mktemp -d /opt/.dnstt-src.XXXXXX)"
+  trap 'rm -rf -- "$src_stage"' EXIT
+  git -C "$src_stage" init -q
+  git -C "$src_stage" remote add origin "$DNSTT_REPO"
+  git -C "$src_stage" fetch --depth=1 origin "refs/tags/$DNSTT_TAG:refs/tags/$DNSTT_TAG"
+  git -C "$src_stage" checkout --detach "$DNSTT_TAG"
+  fetched_tag_object="$(git -C "$src_stage" rev-parse "$DNSTT_TAG^{tag}")"
+  [[ "$fetched_tag_object" == "$DNSTT_TAG_OBJECT" ]] || fail "Fetched DNSTT tag object does not match the pinned signed release tag."
+  fetched_commit="$(git -C "$src_stage" rev-parse HEAD)"
+  [[ "$fetched_commit" == "$DNSTT_COMMIT" ]] || fail "Fetched DNSTT source does not match the pinned release commit."
+  mv -- "$src_stage" "$DNSTT_SRC"
+  trap - EXIT
 fi
 
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required."
 install -d -m 0755 /usr/local/bin
 build_tmp="$(mktemp -d)"
-trap 'rm -rf "$build_tmp"' EXIT
+trap 'rm -rf -- "$build_tmp"' EXIT
 (
   cd "$DNSTT_SRC/dnstt-server"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-server" .
@@ -87,11 +108,8 @@ trap 'rm -rf "$build_tmp"' EXIT
   cd "$DNSTT_SRC/dnstt-client"
   GOTOOLCHAIN=local "$GO_BIN" build -trimpath -o "$build_tmp/dnstt-client" .
 )
-install -m 0755 "$build_tmp/dnstt-server" /usr/local/bin/dnstt-server.new
-install -m 0755 "$build_tmp/dnstt-client" /usr/local/bin/dnstt-client.new
-mv -f /usr/local/bin/dnstt-server.new /usr/local/bin/dnstt-server
-mv -f /usr/local/bin/dnstt-client.new /usr/local/bin/dnstt-client
-rm -rf "$build_tmp"
+dnstt_replace_binary_pair "$build_tmp/dnstt-server" "$build_tmp/dnstt-client" /usr/local/bin || fail "Could not install DNSTT server/client binaries transactionally."
+rm -rf -- "$build_tmp"
 trap - EXIT
 
 install -d -o root -g root -m 0700 "$KEY_DIR"
@@ -120,5 +138,5 @@ printf 'Source commit: %s\n' "$(git -C "$DNSTT_SRC" rev-parse --short HEAD)"
 printf 'Public key: '
 cat "$KEY_DIR/server.pub"
 echo
-info "No DNS, firewall, UDP/53, iodine, or systemd service settings were changed."
-info "Next: configure and externally test DNSTT before any SlowDNS migration."
+info "No DNS, firewall, UDP/53, or systemd service settings were changed."
+info "Next: configure and externally test DNSTT before enabling its service."
