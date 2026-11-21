@@ -22,6 +22,9 @@ hy2u_require() {
   [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
     echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
   }
+  [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
+    echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
+  }
   jq -e 'type == "array"' "$HY2_USERS_DB" >/dev/null 2>&1 || {
     echo "[FAIL] Hysteria account metadata is invalid; refusing to overwrite." >&2; return 1;
   }
@@ -156,7 +159,7 @@ hy2u_remove() {
   previous_status="$(jq -r --arg id "$account_id" --arg name "$username" '.accounts[] | select(.id == $id) | .services[] | select(.service == "hysteria" and .ref == $name) | .status' "$AR_REGISTRY")"
   [[ -n "$previous_status" && "$previous_status" != "null" ]] || { ah_err "Matching Hysteria registry record not found."; return 1; }
   backup="$(mktemp "${HY2_USERS_CONFIG}.africhome-backup.XXXXXX")"
-  dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  dbbackup="$(mktemp "${HY2_USERS_DB}.africhome-backup.XXXXXX")"
   tmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || return 1
   cp -a "$HY2_USERS_CONFIG" "$backup" || { rm -f "$tmp"; return 1; }
   cp -a "$HY2_USERS_DB" "$dbbackup" || { rm -f "$tmp"; return 1; }
@@ -174,7 +177,7 @@ hy2u_remove() {
   if ! systemctl restart hysteria-server.service; then
     cp -a "$backup" "$HY2_USERS_CONFIG"
     systemctl restart hysteria-server.service || true
-    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    ar_set_service_status "$account_id" "hysteria" "$username" "$previous_status" || true
     rm -f "$tmp"
     ah_err "Hysteria restart failed; config restored and registry rollback attempted."; return 1
   fi
