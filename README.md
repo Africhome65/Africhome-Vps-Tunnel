@@ -8,7 +8,6 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Fail2ban installation and status
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
-- SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
@@ -40,15 +39,11 @@ sudo bash install.sh
 sudo africhome
 ```
 
-## SlowDNS SSH notes
+## DNSTT DNS tunnel
 
-- SlowDNS uses iodine DNS tunnelling; it is not a V2Ray transport.
-- The menu accepts a tunnel domain and nameserver hostname, then displays the required A, registrar glue, NS-delegation, and UDP 53 firewall records. These records must be created at the domain registrar/DNS provider; the script cannot register glue records automatically.
-- The server uses iodine's default 1130-byte tunnel MTU explicitly. Client instructions retain lazy mode (`-L 1`) and the maximum upstream hostname length (`-M 255`); fragment sizing remains automatically negotiated rather than forcing a potentially incompatible value.
-- Create Trial (default one day) and Normal (administrator-selected days) SSH accounts. Each account gets a separate generated SSH password and Linux account-expiry date. Linux enforces expiry; admins can list, renew, lock, unlock, or delete managed accounts.
-- The iodine tunnel password is shared by all tunnel clients; it is not a per-customer credential. Customer-specific access control and expiry are enforced by their separate SSH accounts.
-- After the DNS tunnel is established, SSH is reached at `10.77.0.1`.
-- DNS tunnels have inherently limited throughput and can be blocked or rate-limited. Lazy mode and fragment negotiation help, but actual speed depends on the DNS resolver/relay, network path, and client. Use strong credentials and SSH keys where practical.
+- DNSTT is the selected DNS tunnel and replaces the former iodine/SlowDNS implementation.
+- The intended server listener is public UDP 53, forwarding tunnel traffic to the local SSH service on TCP 22. Port 22 is the SSH upstream, not the DNSTT DNS listener.
+- DNSTT server installation, key generation, DNS delegation checks, systemd lifecycle, client configuration, and end-to-end tests are not implemented yet. Do not deploy or advertise DNSTT as operational until these are completed and tested.
 
 ## Xray VLESS REALITY notes
 
