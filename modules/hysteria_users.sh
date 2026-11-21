@@ -10,6 +10,7 @@ HY2_USERS_BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$HY2_USERS_BASE_DIR/modules/account_registry.sh"
 
 hy2u_require() {
+  local db_tmp
   command -v python3 >/dev/null 2>&1 || { echo "[FAIL] python3 is required." >&2; return 1; }
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
   python3 -c 'import yaml' >/dev/null 2>&1 || ah_apt_install python3-yaml || return 1
@@ -18,7 +19,20 @@ hy2u_require() {
   [[ -f "$HY2_USERS_CONFIG" && ! -L "$HY2_USERS_CONFIG" && -s "$HY2_USERS_CONFIG" ]] || {
     echo "[FAIL] Hysteria config must be a non-symlink regular file." >&2; return 1;
   }
-  [[ -e "$HY2_USERS_DB" ]] || { install -d -m 700 "$(dirname "$HY2_USERS_DB")"; printf '[]\n' > "$HY2_USERS_DB"; chmod 600 "$HY2_USERS_DB"; }
+  [[ ! -L "$HY2_USERS_DB" ]] || {
+    echo "[FAIL] Hysteria account database path is a symlink." >&2; return 1;
+  }
+  if [[ ! -e "$HY2_USERS_DB" ]]; then
+    install -d -m 700 "$(dirname "$HY2_USERS_DB")" || return 1
+    db_tmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || return 1
+    printf '[]\n' > "$db_tmp"
+    chmod 600 "$db_tmp"
+    if ! mv -n -- "$db_tmp" "$HY2_USERS_DB" || [[ -e "$db_tmp" ]]; then
+      rm -f "$db_tmp"
+      echo "[FAIL] Could not safely initialize Hysteria account metadata." >&2
+      return 1
+    fi
+  fi
   [[ -f "$HY2_USERS_DB" && ! -L "$HY2_USERS_DB" ]] || {
     echo "[FAIL] Hysteria account database must be a regular non-symlink file." >&2; return 1;
   }
