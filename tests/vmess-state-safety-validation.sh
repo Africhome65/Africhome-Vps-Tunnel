@@ -17,7 +17,7 @@ grep -Fq 'vmess_require_safe_state || return 1' "$VMESS" || {
   echo "VMess state must be validated before client display and removal." >&2
   exit 1
 }
-grep -Fq 'stat -c \'%u:%a\' "$VMESS_STATE"' "$VMESS" || {
+grep -Fq "stat -c '%u:%a' \"\$VMESS_STATE\"" "$VMESS" || {
   echo "VMess state must be root-owned and mode 600 before sourcing." >&2
   exit 1
 }
