@@ -13,6 +13,19 @@ This document separates protocol support in the server from actual Android-app i
 | OpenVPN native | OpenVPN UDP or TCP with per-client certificates and revocation. | Import the generated `.ovpn` profile into an OpenVPN-compatible Android client; verify certificate validation and revoked-client rejection. |
 | SSH over TLS | Stunnel TLS frontend is currently a loopback backend only; no public SNI route or universal Android wrapper is implied. | A client-side TLS wrapper compatible with the chosen SSH app must be specified and tested before this mode is advertised. |
 
+## Recommended primary Android client
+
+**Primary target: NPV Tunnel (NapsternetV), Android.** Its current Google Play listing explicitly names VLESS, VMess, Hysteria2, SSH and DNSTT, plus custom Xray JSON configuration. That gives the project the broadest single-app overlap across its current proxy/tunnel protocols. This is a recommendation for the first interoperability test target, not a claim that Africhome profiles have already passed.
+
+- Official Google Play listing: https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv
+- Test in this order: DNSTT; VLESS REALITY; VMess WebSocket/TLS; Hysteria2; then any SSH mode actually exposed by the script.
+- Confirm the app version and the precise import schema before implementing NPV-specific QR, link or `.npv4` exports. Do not guess a proprietary format.
+- Exclude WireGuard from all Africhome-generated profiles and menus even though the app supports it.
+
+**Separate OpenVPN client:** use OpenVPN Connect for the native OpenVPN profile. NPV Tunnel is not the acceptance target for OpenVPN. If a future SSH-over-TLS or SSH payload mode needs a specific client wrapper, select that client only after its exact protocol contract is implemented and tested.
+
+**Fallback for Xray/Hysteria2-only testing:** NekoBox for Android is a good secondary client for VLESS/REALITY, VMess and Hysteria2, but it is not the primary DNSTT acceptance target. Use the project's upstream GitHub releases/documentation and verify the distribution source carefully; do not install unofficial repackaged builds.
+
 ## Candidate apps discussed during planning
 
 NapsternetV / NPV Tunnel, HTTP Injector, HTTP Custom and TLS Tunnel have been mentioned as possible Android clients. No app/version has yet been certified against the current Africhome server configuration.
