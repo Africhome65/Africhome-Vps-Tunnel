@@ -97,6 +97,14 @@ HY2_USERS_DB="$tmp_dir/users-link.json"
 if hy2u_require; then
   echo "Symlinked Hysteria metadata database was accepted." >&2; exit 1
 fi
+ln -s "$tmp_dir/should-not-be-created.json" "$tmp_dir/dangling-users.json"
+HY2_USERS_DB="$tmp_dir/dangling-users.json"
+if hy2u_require; then
+  echo "Dangling symlinked Hysteria metadata path was accepted." >&2; exit 1
+fi
+[[ ! -e "$tmp_dir/should-not-be-created.json" ]] || {
+  echo "Hysteria metadata initialization followed a dangling symlink." >&2; exit 1;
+}
 
 # Exercise revocation commit and restart-failure compensation against a
 # temporary registry/config/database; never touch system services.
