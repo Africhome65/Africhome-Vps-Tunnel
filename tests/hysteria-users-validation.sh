@@ -97,4 +97,72 @@ HY2_USERS_DB="$tmp_dir/users-link.json"
 if hy2u_require; then
   echo "Symlinked Hysteria metadata database was accepted." >&2; exit 1
 fi
-echo "Hysteria userpass adapter validation passed."
+
+# Exercise revocation commit and restart-failure compensation against a
+# temporary registry/config/database; never touch system services.
+ah_require_root() { return 0; }
+systemctl() { return 0; }
+HY2_USERS_CONFIG="$tmp_dir/remove-ok.yaml"
+HY2_USERS_DB="$tmp_dir/remove-ok.json"
+HY2_USERS_LOCK="$tmp_dir/remove-ok.lock"
+AR_BASE_DIR="$tmp_dir/remove-ok-registry"
+AR_REGISTRY="$AR_BASE_DIR/registry.json"
+AR_LOCK="$tmp_dir/remove-ok-registry.lock"
+cat > "$HY2_USERS_CONFIG" <<'YAML'
+auth:
+  type: userpass
+  userpass:
+    alice: alice-password
+YAML
+printf '[{"account_id":"acctremove01","username":"alice","expires_at":0,"created_at":1}]\\n' > "$HY2_USERS_DB"
+chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
+ar_register_service acctremove01 alice hysteria alice 0
+ar_set_service_status acctremove01 hysteria alice suspended
+printf 'alice\\n' | hy2u_remove
+jq -e 'length == 0' "$HY2_USERS_DB" >/dev/null
+python3 - "$HY2_USERS_CONFIG" <<'PY'
+import sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
+assert "alice" not in d["auth"]["userpass"]
+PY
+jq -e '.accounts[] | select(.id == "acctremove01") | .services[] | select(.ref == "alice") | .status == "revoked"' "$AR_REGISTRY" >/dev/null
+
+# A failed first restart must restore config, local metadata, and the exact
+# prior registry status (suspended), not blindly mark the account active.
+HY2_USERS_CONFIG="$tmp_dir/remove-fail.yaml"
+HY2_USERS_DB="$tmp_dir/remove-fail.json"
+HY2_USERS_LOCK="$tmp_dir/remove-fail.lock"
+AR_BASE_DIR="$tmp_dir/remove-fail-registry"
+AR_REGISTRY="$AR_BASE_DIR/registry.json"
+AR_LOCK="$tmp_dir/remove-fail-registry.lock"
+cat > "$HY2_USERS_CONFIG" <<'YAML'
+auth:
+  type: userpass
+  userpass:
+    bob: bob-password
+YAML
+printf '[{"account_id":"acctremove02","username":"bob","expires_at":0,"created_at":1}]\\n' > "$HY2_USERS_DB"
+chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
+ar_register_service acctremove02 bob hysteria bob 0
+ar_set_service_status acctremove02 hysteria bob suspended
+SYSTEMCTL_CALLS=0
+systemctl() {
+  if [[ "$*" == "restart hysteria-server.service" ]]; then
+    SYSTEMCTL_CALLS=$((SYSTEMCTL_CALLS + 1))
+    (( SYSTEMCTL_CALLS > 1 ))
+  else
+    return 0
+  fi
+}
+if printf 'bob\\n' | hy2u_remove; then
+  echo "Hysteria revocation unexpectedly succeeded after a failed restart." >&2; exit 1
+fi
+jq -e 'length == 1 and .[0].username == "bob"' "$HY2_USERS_DB" >/dev/null
+python3 - "$HY2_USERS_CONFIG" <<'PY'
+import sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
+assert d["auth"]["userpass"]["bob"] == "bob-password"
+PY
+jq -e '.accounts[] | select(.id == "acctremove02") | .services[] | select(.ref == "bob") | .status == "suspended"' "$AR_REGISTRY" >/dev/null
+unset -f systemctl ah_require_root
+\necho "Hysteria userpass adapter validation passed."
