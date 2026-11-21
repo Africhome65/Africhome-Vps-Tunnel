@@ -80,8 +80,23 @@ vmess_add() {
   ah_warn "Client credentials are sensitive. Test TLS and connection from an external network."
 }
 
+vmess_require_safe_state() {
+  [[ -f "$VMESS_STATE" && ! -L "$VMESS_STATE" ]] || {
+    ah_err "VMess state must be a regular non-symlink file; refusing to source it."
+    return 1
+  }
+  [[ "$(stat -c '%u:%a' "$VMESS_STATE" 2>/dev/null || true)" == "0:600" ]] || {
+    ah_err "VMess state must be owned by root with mode 600; refusing to source it."
+    return 1
+  }
+  [[ -s "$VMESS_STATE" ]] || {
+    ah_err "VMess state file is empty; refusing to source it."
+    return 1
+  }
+}
+
 vmess_show_client() {
-  [[ -r "$VMESS_STATE" ]] || { ah_warn "Configure VMess first."; return 1; }
+  vmess_require_safe_state || return 1
   # shellcheck disable=SC1090
   . "$VMESS_STATE"
   local payload encoded
@@ -102,8 +117,8 @@ vmess_status() {
 
 vmess_remove() {
   ah_require_root || return 1
-  [[ -s "$VMESS_CONFIG" && -r "$VMESS_STATE" ]] || { ah_warn "Africhome VMess state was not found."; return 1; }
-  [[ -f "$VMESS_STATE" && ! -L "$VMESS_STATE" && "$(stat -c '%u:%a' "$VMESS_STATE" 2>/dev/null || true)" == "0:600" ]] || { ah_err "VMess state file is unsafe; refusing to source it."; return 1; }
+  [[ -s "$VMESS_CONFIG" ]] || { ah_warn "Xray config was not found."; return 1; }
+  vmess_require_safe_state || return 1
   # shellcheck source=/etc/africhome-vmess.env
   . "$VMESS_STATE"
   if [[ "${VMESS_SHARED443:-0}" == "1" ]]; then
