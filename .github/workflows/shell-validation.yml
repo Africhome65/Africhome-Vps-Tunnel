@@ -70,6 +70,8 @@ jobs:
         run: python3 tests/xray-reality-sni-validation.py
       - name: Test candidate-only REALITY loopback backend renderer
         run: python3 tests/reality-backend-render-validation.py
+      - name: Test VMess state-path symlink safety
+        run: bash tests/vmess-state-safety-validation.sh
       - name: Test VMess and VLESS REALITY shared TCP 443 candidate
         run: python3 tests/vmess-shared-443-validation.py
       - name: Fault-inject shared TCP 443 apply and rollback
