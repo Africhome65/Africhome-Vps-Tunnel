@@ -202,7 +202,8 @@ sd_accounts_create() {
     2) read -r -p "Normal account duration in days: " days ;;
     *) ah_err "Choose 1 or 2."; return 1 ;;
   esac
-  [[ "$days" =~ ^[0-9]+$ ]] && (( days >= 1 && days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
+  [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days >= 1 && 10#$days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
+  days=$((10#$days))
   expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry."; return 1; }
 
   getent group "$SD_GROUP" >/dev/null || groupadd --system "$SD_GROUP"
@@ -389,7 +390,8 @@ sd_accounts_change() {
   case "$action" in
     1)
       read -r -p "Additional days to add (1-36500): " days
-      [[ "$days" =~ ^[0-9]+$ ]] && (( days >= 1 && days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
+      [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days >= 1 && 10#$days <= 36500 )) || { ah_err "Enter 1-36500 days."; return 1; }
+      days=$((10#$days))
       local current_expiry base_date
       current_expiry="$(chage -l "$username" 2>/dev/null | awk -F': ' '/Account expires/{print $2}')"
       if [[ "$current_expiry" == "never" || "$current_expiry" == "Never" ]]; then
