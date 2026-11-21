@@ -83,8 +83,8 @@ grep -Fq 'install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"' <<< "$expire_fn
 # Config and metadata paths must not follow attacker-controlled symlinks.
 regular_config="$tmp_dir/regular-config.yaml"
 regular_db="$tmp_dir/regular-users.json"
-printf 'auth: {type: userpass, userpass: {}}\\n' > "$regular_config"
-printf '[]\\n' > "$regular_db"
+printf 'auth: {type: userpass, userpass: {}}\n' > "$regular_config"
+printf '[]\n' > "$regular_db"
 ln -s "$regular_config" "$tmp_dir/config-link.yaml"
 HY2_USERS_CONFIG="$tmp_dir/config-link.yaml"
 HY2_USERS_DB="$regular_db"
@@ -97,4 +97,4 @@ HY2_USERS_DB="$tmp_dir/users-link.json"
 if hy2u_require; then
   echo "Symlinked Hysteria metadata database was accepted." >&2; exit 1
 fi
-\necho "Hysteria userpass adapter validation passed."
+echo "Hysteria userpass adapter validation passed."
