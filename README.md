@@ -14,6 +14,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
 - Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
 - Hysteria 2 server management pinned to official `v2.14.0` installer/binary artifacts with architecture-specific SHA-256 verification, user-defined domain, UDP port or port-hopping range, Let's Encrypt TLS, and client URI
+- Hysteria 2 userpass customer accounts with generated passwords, duplicate-name checks, manual revocation, batch expiry, daily timer, and central-registry status; server-side passwords remain in the protected Hysteria YAML config
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 - Read-only TCP/UDP listener, firewall, and relevant service inventory for future port-routing planning
 - Read-only Xray inbound inventory showing tags, protocol, bind address, port, network, and security mode without printing client credentials or private-key paths
