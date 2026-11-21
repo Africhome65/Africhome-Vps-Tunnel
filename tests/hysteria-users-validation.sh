@@ -174,7 +174,7 @@ PY
 jq -e '.accounts[] | select(.id == "acctremove02") | .services[] | select(.ref == "bob") | .status == "suspended"' "$AR_REGISTRY" >/dev/null
 
 # A two-account expiry batch must acquire/release the registry lock for each
-# status transition, preserve prior states on failure, and commit once.
+# status transition and commit the complete batch once.
 HY2_USERS_CONFIG="$tmp_dir/expire.yaml"
 HY2_USERS_DB="$tmp_dir/expire.json"
 HY2_USERS_LOCK="$tmp_dir/expire.lock"
@@ -203,5 +203,5 @@ with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
 assert d["auth"]["userpass"] == {}
 PY
 jq -e '[.accounts[].services[].status] == ["expired","expired"]' "$AR_REGISTRY" >/dev/null
-\nunset -f systemctl ah_require_root install
+unset -f systemctl ah_require_root install
 echo "Hysteria userpass adapter validation passed."
