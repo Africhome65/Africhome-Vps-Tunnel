@@ -96,32 +96,23 @@ stat(){
   if [[ -d "$path" ]]; then printf '%s\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
   else printf '%s\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
 }
-echo 'DEBUG: before baseline PKI check'
 ovpn_pki_paths_safe
-echo 'DEBUG: baseline PKI check passed'
 MOCK_OVPN_PKI_DIR_STAT=1001:700
 ! ovpn_pki_paths_safe
-echo 'DEBUG: non-root owner rejection passed'
 unset MOCK_OVPN_PKI_DIR_STAT
 MOCK_OVPN_PKI_DIR_STAT=0:777
 ! ovpn_pki_paths_safe
-echo 'DEBUG: writable directory rejection passed'
 unset MOCK_OVPN_PKI_DIR_STAT
 MOCK_OVPN_PKI_FILE_STAT=0:644
 ! ovpn_pki_paths_safe
-echo 'DEBUG: permissive key rejection passed'
 unset MOCK_OVPN_PKI_FILE_STAT
 mv "$TMP/easy-rsa/pki/private" "$TMP/private-real"
 ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ! ovpn_pki_paths_safe
-echo 'DEBUG: symlink rejection passed'
 rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
-echo 'DEBUG: final PKI check passed'
 unset -f stat
-set -x
-
 # Incomplete server setup cleanup removes only the newly-created runtime
 # directory and an empty log directory; it never follows/removes a symlink.
 ROLLBACK_RUNTIME="$TMP/rollback-runtime"
@@ -154,6 +145,7 @@ OVPN_EASYRSA_DIR="$TMP/easy-rsa" ovpn_list_clients > "$TMP/clients.txt"
 grep -q 'VALID.*client-one' "$TMP/clients.txt"
 grep -q 'REVOKED.*client-two' "$TMP/clients.txt"
 ! grep -q 'server' "$TMP/clients.txt"
+unset -f stat
 
 # Revocation failure handling must stop the service.
 OVPN_SERVICE="openvpn-server@africhome"
@@ -302,5 +294,4 @@ rm -rf "$SETUP_TMP"
 unset -f ah_require_root ah_ok ah_info ah_warn ovpn_require_tools ovpn_pki_paths_safe
 unset -f ovpn_port_available ip chown install systemctl journalctl
 
-set +x
 echo "OpenVPN module validation passed."
