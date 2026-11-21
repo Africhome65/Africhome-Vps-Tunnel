@@ -10,7 +10,10 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
 - SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
-- VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
+- VMess over WebSocket + TLS inbound management, client import URI, status, and removal
+- Trojan over TLS inbound management, generated password, client URI, status, and removal
+- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
+- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
 ## Planned / not yet implemented
 
@@ -23,7 +26,8 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
 - For SlowDNS: delegated DNS subdomain and UDP 53
 - For VLESS REALITY: chosen TCP port (default 2053)
-- For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key\n- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
+- For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key
+- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
 
 ## Installation
 
