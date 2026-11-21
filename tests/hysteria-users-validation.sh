@@ -102,6 +102,14 @@ fi
 # temporary registry/config/database; never touch system services.
 ah_require_root() { return 0; }
 systemctl() { return 0; }
+# CI is non-root; preserve install behavior while neutralizing root ownership
+# flags that the real root-only command enforces on a VPS.
+install() {
+  if [[ "${1:-}" == "-o" && "${2:-}" == "root" && "${3:-}" == "-g" && "${4:-}" == "root" ]]; then
+    shift 4
+  fi
+  command install "$@"
+}
 HY2_USERS_CONFIG="$tmp_dir/remove-ok.yaml"
 HY2_USERS_DB="$tmp_dir/remove-ok.json"
 HY2_USERS_LOCK="$tmp_dir/remove-ok.lock"
@@ -164,5 +172,36 @@ with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
 assert d["auth"]["userpass"]["bob"] == "bob-password"
 PY
 jq -e '.accounts[] | select(.id == "acctremove02") | .services[] | select(.ref == "bob") | .status == "suspended"' "$AR_REGISTRY" >/dev/null
-unset -f systemctl ah_require_root
+
+# A two-account expiry batch must acquire/release the registry lock for each
+# status transition, preserve prior states on failure, and commit once.
+HY2_USERS_CONFIG="$tmp_dir/expire.yaml"
+HY2_USERS_DB="$tmp_dir/expire.json"
+HY2_USERS_LOCK="$tmp_dir/expire.lock"
+AR_BASE_DIR="$tmp_dir/expire-registry"
+AR_REGISTRY="$AR_BASE_DIR/registry.json"
+AR_LOCK="$tmp_dir/expire-registry.lock"
+cat > "$HY2_USERS_CONFIG" <<'YAML'
+auth:
+  type: userpass
+  userpass:
+    carol: carol-password
+    dave: dave-password
+YAML
+printf '[{"account_id":"acctexpire01","username":"carol","expires_at":1,"created_at":1},{"account_id":"acctexpire02","username":"dave","expires_at":1,"created_at":1}]\n' > "$HY2_USERS_DB"
+chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
+ar_register_service acctexpire01 carol hysteria carol 1
+ar_register_service acctexpire02 dave hysteria dave 1
+ar_set_service_status acctexpire01 hysteria carol suspended
+ar_set_service_status acctexpire02 hysteria dave suspended
+systemctl() { return 0; }
+hy2u_expire
+jq -e 'length == 0' "$HY2_USERS_DB" >/dev/null
+python3 - "$HY2_USERS_CONFIG" <<'PY'
+import sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
+assert d["auth"]["userpass"] == {}
+PY
+jq -e '[.accounts[].services[].status] == ["expired","expired"]' "$AR_REGISTRY" >/dev/null
+\nunset -f systemctl ah_require_root install
 echo "Hysteria userpass adapter validation passed."
