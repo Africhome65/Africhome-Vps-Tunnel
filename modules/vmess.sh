@@ -11,7 +11,8 @@ vmess_add() {
   command -v xray >/dev/null 2>&1 || { ah_warn "Install Xray first."; return 1; }
   command -v jq >/dev/null 2>&1 || ah_apt_install jq || return 1
   [[ -s "$VMESS_CONFIG" ]] || { ah_warn "Xray config not found. Configure Xray first."; return 1; }
-  [[ ! -e "$VMESS_STATE" ]] || { ah_warn "Africhome VMess is already configured. Remove it before replacing."; return 1; }
+  # Treat dangling symlinks as existing state too; never let a root run follow one when writing state.
+  [[ ! -e "$VMESS_STATE" && ! -L "$VMESS_STATE" ]] || { ah_warn "Africhome VMess state already exists or is an unsafe symlink. Review it before replacing."; return 1; }
 
   local domain port cert key path uuid backup tmp
   read -r -p "VMess TLS domain (must match certificate): " domain
