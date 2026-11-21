@@ -135,23 +135,43 @@ hy2u_remove() {
   ah_require_root || return 1
   hy2u_require || return 1
   hy2u_lock || return 1
-  local username record account_id backup tmp
+  local username record account_id backup tmp dbbackup
   read -r -p "Hysteria username to revoke: " username
   record="$(jq -c --arg n "$username" '.[] | select(.username == $n)' "$HY2_USERS_DB")"
   [[ -n "$record" ]] || { ah_err "Managed Hysteria user not found."; return 1; }
   account_id="$(jq -r '.account_id' <<< "$record")"
   backup="${HY2_USERS_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
-  cp -a "$HY2_USERS_CONFIG" "$backup"
-  hy2u_yaml_change remove "$username" || return 1
-  if ! systemctl restart hysteria-server.service; then
-    cp -a "$backup" "$HY2_USERS_CONFIG"; systemctl restart hysteria-server.service || true
-    ah_err "Hysteria restart failed; previous config restored."; return 1
+  dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  tmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || return 1
+  cp -a "$HY2_USERS_CONFIG" "$backup" || { rm -f "$tmp"; return 1; }
+  cp -a "$HY2_USERS_DB" "$dbbackup" || { rm -f "$tmp"; return 1; }
+  if ! jq --arg n "$username" '[.[] | select(.username != $n)]' "$HY2_USERS_DB" > "$tmp"; then
+    rm -f "$tmp"; return 1
   fi
-  tmp="$(mktemp)"
-  jq --arg n "$username" '[.[] | select(.username != $n)]' "$HY2_USERS_DB" > "$tmp"
-  install -m 600 "$tmp" "$HY2_USERS_DB"; rm -f "$tmp"
-  ar_set_service_status "$account_id" "hysteria" "$username" "revoked" ||
-    ah_warn "Hysteria user revoked, but registry status update failed."
+  chmod 600 "$tmp"
+  # Stage registry revocation first; compensate it if native removal fails.
+  ar_set_service_status "$account_id" "hysteria" "$username" "revoked" || {
+    rm -f "$tmp"; ah_err "Registry update failed; Hysteria account was not changed."; return 1;
+  }
+  if ! hy2u_yaml_change remove "$username"; then
+    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    rm -f "$tmp"; ah_err "Could not update Hysteria config; registry status was rolled back where possible."; return 1
+  fi
+  if ! systemctl restart hysteria-server.service; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    rm -f "$tmp"
+    ah_err "Hysteria restart failed; config restored and registry status rollback attempted."; return 1
+  fi
+  if ! install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    ar_set_service_status "$account_id" "hysteria" "$username" "active" || true
+    rm -f "$tmp"
+    ah_err "Local metadata update failed; config restored and registry status rollback attempted."; return 1
+  fi
+  rm -f "$tmp"
   ah_audit_log hysteria.account.revoke success 2>/dev/null || true
   ah_ok "Hysteria user $username revoked."
 }
