@@ -112,7 +112,6 @@ ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
-unset -f stat
 # Incomplete server setup cleanup removes only the newly-created runtime
 # directory and an empty log directory; it never follows/removes a symlink.
 ROLLBACK_RUNTIME="$TMP/rollback-runtime"
