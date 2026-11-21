@@ -203,5 +203,46 @@ with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
 assert d["auth"]["userpass"] == {}
 PY
 jq -e '[.accounts[].services[].status] == ["expired","expired"]' "$AR_REGISTRY" >/dev/null
+
+# A failed batch restart must restore the original config/database and each
+# account's exact prior registry state, including mixed active/suspended states.
+HY2_USERS_CONFIG="$tmp_dir/expire-fail.yaml"
+HY2_USERS_DB="$tmp_dir/expire-fail.json"
+HY2_USERS_LOCK="$tmp_dir/expire-fail.lock"
+AR_BASE_DIR="$tmp_dir/expire-fail-registry"
+AR_REGISTRY="$AR_BASE_DIR/registry.json"
+AR_LOCK="$tmp_dir/expire-fail-registry.lock"
+cat > "$HY2_USERS_CONFIG" <<'YAML'
+auth:
+  type: userpass
+  userpass:
+    erin: erin-password
+    frank: frank-password
+YAML
+printf '[{"account_id":"acctexpire03","username":"erin","expires_at":1,"created_at":1},{"account_id":"acctexpire04","username":"frank","expires_at":1,"created_at":1}]\n' > "$HY2_USERS_DB"
+chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
+ar_register_service acctexpire03 erin hysteria erin 1
+ar_register_service acctexpire04 frank hysteria frank 1
+ar_set_service_status acctexpire03 hysteria erin suspended
+SYSTEMCTL_CALLS=0
+systemctl() {
+  if [[ "$*" == "restart hysteria-server.service" ]]; then
+    SYSTEMCTL_CALLS=$((SYSTEMCTL_CALLS + 1))
+    (( SYSTEMCTL_CALLS > 1 ))
+  else
+    return 0
+  fi
+}
+if hy2u_expire; then
+  echo "Hysteria expiry unexpectedly succeeded after a failed restart." >&2; exit 1
+fi
+jq -e 'length == 2' "$HY2_USERS_DB" >/dev/null
+python3 - "$HY2_USERS_CONFIG" <<'PY'
+import sys, yaml
+with open(sys.argv[1], encoding="utf-8") as f: d=yaml.safe_load(f)
+assert d["auth"]["userpass"] == {"erin":"erin-password", "frank":"frank-password"}
+PY
+jq -e '[.accounts[].services[].status] == ["suspended","active"]' "$AR_REGISTRY" >/dev/null
+
 unset -f systemctl ah_require_root install
 echo "Hysteria userpass adapter validation passed."
