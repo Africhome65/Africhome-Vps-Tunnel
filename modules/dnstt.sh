@@ -83,6 +83,26 @@ through a CDN. Allow inbound UDP 53 in the VPS provider firewall.
 EOF
 }
 
+ah_dnstt_check_dns() {
+  local domain="$1" ns="$2" ns_records ns_addresses
+  if ! command -v dig >/dev/null 2>&1; then
+    ah_warn "dig is unavailable; DNS delegation could not be checked."
+    return 1
+  fi
+  ns_records="$(dig +time=3 +tries=1 +short NS "$domain" | sed 's/\\.$//' || true)"
+  ns_addresses="$(dig +time=3 +tries=1 +short A "$ns" || true)"
+  if ! printf '%s\\n' "$ns_records" | grep -Fxq "$ns"; then
+    ah_warn "The tunnel zone does not currently resolve to the nameserver $ns."
+    [[ -n "$ns_records" ]] && printf 'Observed NS records: %s\\n' "$ns_records"
+    return 1
+  fi
+  if [[ -z "$ns_addresses" ]]; then
+    ah_warn "The nameserver hostname $ns has no publicly resolvable IPv4 A record."
+    return 1
+  fi
+  ah_ok "DNS delegation and nameserver A record are visible."
+}
+
 ah_dnstt_write_service() {
   local domain="$1"
   cat > "$DNSTT_UNIT" <<EOF
@@ -173,7 +193,11 @@ ah_dnstt_configure() {
   echo "Server public key (safe to copy to clients):"
   cat "$DNSTT_PUB"
   echo
-  read -r -p "Have you created the DNS records and opened UDP 53 at your VPS provider? Start service now? [y/N]: " answer
+  if ! ah_dnstt_check_dns "$domain" "$ns"; then
+    read -r -p "DNS checks did not pass. Continue to the service start confirmation anyway? [y/N]: " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || { ah_warn "Start skipped until DNS delegation is corrected."; return 0; }
+  fi
+  read -r -p "Have you opened UDP 53 at your VPS provider? Start service now? [y/N]: " answer
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     systemctl enable --now africhome-dnstt.service
     systemctl --no-pager --full status africhome-dnstt.service || true
