@@ -120,6 +120,7 @@ mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
 echo 'DEBUG: final PKI check passed'
 unset -f stat
+set -x
 
 # Incomplete server setup cleanup removes only the newly-created runtime
 # directory and an empty log directory; it never follows/removes a symlink.
@@ -301,4 +302,5 @@ rm -rf "$SETUP_TMP"
 unset -f ah_require_root ah_ok ah_info ah_warn ovpn_require_tools ovpn_pki_paths_safe
 unset -f ovpn_port_available ip chown install systemctl journalctl
 
+set +x
 echo "OpenVPN module validation passed."
