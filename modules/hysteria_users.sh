@@ -210,6 +210,197 @@ hy2u_expire() {
       return 1
     fi
     registry_done+="$account_id|$username|$previous_status"
+      cp -a "$backup" "$HY2_USERS_CONFIG"
+      while IFS='|' read -r rollback_id rollback_name rollback_status; do
+        [[ -n "$rollback_id" ]] || continue
+        ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+      done <<< "$registry_done"
+      rm -f "$tmp"
+      ah_err "Expiry config update failed; previous config restored and registry rollback attempted."
+      return 1
+    fi
+  done <<< "$expired"
+
+  if ! systemctl restart hysteria-server.service; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name rollback_status; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Hysteria restart failed; previous config restored and registry rollback attempted."
+    return 1
+  fi
+  if ! install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name rollback_status; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Local metadata update failed; previous config restored and registry rollback attempted."
+    return 1
+  fi
+  rm -f "$tmp"
+  ah_audit_log hysteria.account.expire success 2>/dev/null || true
+  ah_ok "Expired Hysteria users removed."
+}
+
+hy2u_install_timer() {
+  ah_require_root || return 1
+  local script="/opt/africhome-vps-tunnel/modules/hysteria_users.sh"
+  [[ -r "$script" ]] || { ah_err "Install the Africhome release before enabling Hysteria expiry automation."; return 1; }
+  cat > /etc/systemd/system/africhome-hysteria-expire.service <<EOF
+[Unit]
+Description=Expire Africhome Hysteria users
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $script --expire
+EOF
+  cat > /etc/systemd/system/africhome-hysteria-expire.timer <<'EOF'
+[Unit]
+Description=Daily expiry check for Africhome Hysteria users
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now africhome-hysteria-expire.timer
+  ah_audit_log hysteria.expiry_timer.enable success 2>/dev/null || true
+  ah_ok "Daily Hysteria account expiry timer enabled."
+}
+
+hy2u_menu() {
+  while true; do
+    echo
+    echo "----- Hysteria 2 User Management -----"
+    echo "1) Create user (days-based expiry)"
+    echo "2) List users"
+    echo "3) Revoke user"
+    echo "4) Enable daily expiry automation"
+    echo "0) Back"
+    read -r -p "Select an option: " choice
+    case "$choice" in
+      1) hy2u_add; ah_pause ;;
+      2) hy2u_list; ah_pause ;;
+      3) hy2u_remove; ah_pause ;;
+      4) hy2u_install_timer; ah_pause ;;
+      0) return ;;
+      *) ah_warn "Invalid choice." ;;
+    esac
+  done
+}
+
+if [[ "${1:-}" == "--expire" ]]; then hy2u_expire; fi
+\n'
+  done <<< "$expired"
+
+  while IFS= read -r record; do
+    username="$(jq -r '.username' <<< "$record")"
+    if ! hy2u_yaml_change remove "$username"; then
+      cp -a "$backup" "$HY2_USERS_CONFIG"
+      while IFS='|' read -r rollback_id rollback_name rollback_status; do
+        [[ -n "$rollback_id" ]] || continue
+        ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+      done <<< "$registry_done"
+      rm -f "$tmp"
+      ah_err "Expiry config update failed; previous config restored and registry rollback attempted."
+      return 1
+    fi
+  done <<< "$expired"
+
+  if ! systemctl restart hysteria-server.service; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name rollback_status; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Hysteria restart failed; previous config restored and registry rollback attempted."
+    return 1
+  fi
+  if ! install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name rollback_status; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "$rollback_status" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Local metadata update failed; previous config restored and registry rollback attempted."
+    return 1
+  fi
+  rm -f "$tmp"
+  ah_audit_log hysteria.account.expire success 2>/dev/null || true
+  ah_ok "Expired Hysteria users removed."
+}
+
+hy2u_install_timer() {
+  ah_require_root || return 1
+  local script="/opt/africhome-vps-tunnel/modules/hysteria_users.sh"
+  [[ -r "$script" ]] || { ah_err "Install the Africhome release before enabling Hysteria expiry automation."; return 1; }
+  cat > /etc/systemd/system/africhome-hysteria-expire.service <<EOF
+[Unit]
+Description=Expire Africhome Hysteria users
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $script --expire
+EOF
+  cat > /etc/systemd/system/africhome-hysteria-expire.timer <<'EOF'
+[Unit]
+Description=Daily expiry check for Africhome Hysteria users
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now africhome-hysteria-expire.timer
+  ah_audit_log hysteria.expiry_timer.enable success 2>/dev/null || true
+  ah_ok "Daily Hysteria account expiry timer enabled."
+}
+
+hy2u_menu() {
+  while true; do
+    echo
+    echo "----- Hysteria 2 User Management -----"
+    echo "1) Create user (days-based expiry)"
+    echo "2) List users"
+    echo "3) Revoke user"
+    echo "4) Enable daily expiry automation"
+    echo "0) Back"
+    read -r -p "Select an option: " choice
+    case "$choice" in
+      1) hy2u_add; ah_pause ;;
+      2) hy2u_list; ah_pause ;;
+      3) hy2u_remove; ah_pause ;;
+      4) hy2u_install_timer; ah_pause ;;
+      0) return ;;
+      *) ah_warn "Invalid choice." ;;
+    esac
+  done
+}
+
+if [[ "${1:-}" == "--expire" ]]; then hy2u_expire; fi
+\n'
+  done <<< "$expired"
+
+  while IFS= read -r record; do
+    username="$(jq -r '.username' <<< "$record")"
     if ! hy2u_yaml_change remove "$username"; then
       cp -a "$backup" "$HY2_USERS_CONFIG"
       while IFS='|' read -r rollback_id rollback_name rollback_status; do
