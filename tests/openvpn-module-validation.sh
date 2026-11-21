@@ -87,17 +87,32 @@ rm "$OVPN_CLIENT_DIR"
 OVPN_EASYRSA_DIR="$TMP/easy-rsa"
 OVPN_CONFIG_DIR="$TMP/server"
 OVPN_CONFIG="$OVPN_CONFIG_DIR/africhome.conf"
-mkdir -p "$OVPN_CONFIG_DIR" "$TMP/easy-rsa/pki"
-mkdir -p "$TMP/easy-rsa/pki/private" "$TMP/easy-rsa/pki/issued"
-touch "$TMP/easy-rsa/easyrsa"
-chmod 0700 "$TMP/easy-rsa"
+mkdir -p "$OVPN_CONFIG_DIR" "$TMP/easy-rsa/pki/private" "$TMP/easy-rsa/pki/issued"
+touch "$TMP/easy-rsa/easyrsa" "$TMP/easy-rsa/pki/private/ca.key"
+chmod 0700 "$TMP/easy-rsa" "$TMP/easy-rsa/pki" "$TMP/easy-rsa/pki/private"
+chmod 0600 "$TMP/easy-rsa/pki/private/ca.key"
+stat(){
+  local path="${@: -1}"
+  if [[ -d "$path" ]]; then printf '%s\\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
+  else printf '%s\\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
+}
 ovpn_pki_paths_safe
+MOCK_OVPN_PKI_DIR_STAT=1001:700
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_DIR_STAT
+MOCK_OVPN_PKI_DIR_STAT=0:777
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_DIR_STAT
+MOCK_OVPN_PKI_FILE_STAT=0:644
+! ovpn_pki_paths_safe
+unset MOCK_OVPN_PKI_FILE_STAT
 mv "$TMP/easy-rsa/pki/private" "$TMP/private-real"
 ln -s "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ! ovpn_pki_paths_safe
 rm "$TMP/easy-rsa/pki/private"
 mv "$TMP/private-real" "$TMP/easy-rsa/pki/private"
 ovpn_pki_paths_safe
+unset -f stat
 
 # Incomplete server setup cleanup removes only the newly-created runtime
 # directory and an empty log directory; it never follows/removes a symlink.
