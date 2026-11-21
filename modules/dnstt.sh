@@ -109,7 +109,7 @@ ah_dnstt_valid_resolver() {
   case "$transport" in
     udp|dot)
       [[ "$resolver" =~ ^([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\]):[0-9]{1,5}$ ]] || return 1
-      port="\${resolver##*:}"
+      port="${resolver##*:}"
       (( port >= 1 && port <= 65535 )) || return 1
       ;;
     doh)
@@ -140,28 +140,28 @@ ah_dnstt_client_command() {
     1)
       transport_flag="-udp"
       read -r -p "DNS resolver address [8.8.8.8:53]: " resolver
-      resolver="\${resolver:-8.8.8.8:53}"
+      resolver="${resolver:-8.8.8.8:53}"
       ah_dnstt_valid_resolver udp "$resolver" || { ah_err "Use a resolver host/IP followed by a valid UDP port, e.g. 8.8.8.8:53."; return 1; }
       ;;
     2)
       transport_flag="-dot"
       read -r -p "DoT resolver address [8.8.8.8:853]: " resolver
-      resolver="\${resolver:-8.8.8.8:853}"
+      resolver="${resolver:-8.8.8.8:853}"
       ah_dnstt_valid_resolver dot "$resolver" || { ah_err "Use a resolver host/IP followed by a valid DoT port, e.g. 8.8.8.8:853."; return 1; }
       ;;
     3)
       transport_flag="-doh"
       read -r -p "DoH resolver URL [https://dns.google/dns-query]: " resolver
-      resolver="\${resolver:-https://dns.google/dns-query}"
+      resolver="${resolver:-https://dns.google/dns-query}"
       ah_dnstt_valid_resolver doh "$resolver" || { ah_err "Enter a valid HTTPS DoH URL."; return 1; }
       ;;
     *) ah_warn "Invalid resolver transport."; return 1 ;;
   esac
   read -r -p "Local tunnel port on the client [7000]: " local_port
-  local_port="\${local_port:-7000}"
+  local_port="${local_port:-7000}"
   [[ "$local_port" =~ ^[0-9]{1,5}$ ]] && (( local_port >= 1 && local_port <= 65535 )) || { ah_err "Enter a valid local TCP port."; return 1; }
   read -r -p "Public key file path on the client [server.pub]: " pubkey_file
-  pubkey_file="\${pubkey_file:-server.pub}"
+  pubkey_file="${pubkey_file:-server.pub}"
 
   echo
   echo "Run this on the CLIENT device after installing dnstt-client and securely copying server.pub:"
