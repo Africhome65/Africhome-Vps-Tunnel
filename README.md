@@ -12,6 +12,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal
 - Trojan over TLS inbound management, generated password, client URI, status, and removal
 - Shadowsocks AEAD inbound management using Xray, client URI, status, and removal
+- DNSTT DNS tunnel server installation, persistent server keys, systemd service management, and SSH TCP 22 upstream
 - Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
 
 ## Planned / not yet implemented
@@ -23,7 +24,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Ubuntu 22.04 or newer, or Debian 11 or newer
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
-- For SlowDNS: delegated DNS subdomain and UDP 53
+- For DNSTT: delegated DNS subdomain, nameserver hostname, and inbound UDP 53
 - For VLESS REALITY: chosen TCP port (default 2053)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key
 - For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
@@ -41,9 +42,13 @@ sudo africhome
 
 ## DNSTT DNS tunnel
 
-- DNSTT is the selected DNS tunnel and replaces the former iodine/SlowDNS implementation.
-- The intended server listener is public UDP 53, forwarding tunnel traffic to the local SSH service on TCP 22. Port 22 is the SSH upstream, not the DNSTT DNS listener.
-- DNSTT server installation, key generation, DNS delegation checks, systemd lifecycle, client configuration, and end-to-end tests are not implemented yet. Do not deploy or advertise DNSTT as operational until these are completed and tested.
+- The server listens on public UDP 53 and forwards tunnelled TCP streams to `127.0.0.1:22`. UDP 53 is the DNS listener; TCP 22 is the SSH upstream.
+- The module builds the official DNSTT server from the upstream Go module at a pinned version, verifies the downloaded Go toolchain archive against the SHA-256 published by go.dev, creates a persistent keypair, and installs a hardened systemd service running as an unprivileged account with only the capability needed to bind UDP 53.
+- Configure DNS delegation at your provider: create an A record for a nameserver host (for example `ns1.example.com`) pointing to the VPS IPv4 address, then an NS record delegating the tunnel zone (for example `t.example.com`) to that nameserver. The nameserver host must be outside the delegated tunnel zone. Add glue when your registrar/provider requires it. Do not proxy these DNS records through a CDN.
+- Ensure UDP 53 is free before starting the service. If UFW is already active, the module adds UDP 53; it does not enable UFW. Also open UDP 53 in the VPS provider firewall.
+- The server public key is displayed by the management menu and stored at `/etc/africhome/dnstt/server.pub`; the private key remains on the server at `/etc/africhome/dnstt/server.key` with restricted permissions. Never copy the private key to a client.
+- Client usage (after installing the upstream `dnstt-client` on the client device) is: `dnstt-client -doh https://1.1.1.1/dns-query -pubkey-file server.pub t.example.com 127.0.0.1:7000`. Replace the resolver, public-key file, tunnel zone, and local port as appropriate. Then connect SSH to `127.0.0.1:7000`.
+- A successful service start and syntax/CI checks do not prove DNS delegation or end-to-end tunnel connectivity. Validate from an external network before relying on the tunnel.
 
 ## Xray VLESS REALITY notes
 
