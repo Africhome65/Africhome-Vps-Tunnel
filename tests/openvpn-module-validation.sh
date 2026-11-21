@@ -154,6 +154,18 @@ ovpn_fail_closed "test CRL failure"
 grep -q '^stop openvpn-server@africhome$' "$TMP/systemctl.log"
 unset -f systemctl
 
+# Easy-RSA calls must force a private umask even when the caller is permissive.
+OVPN_EASYRSA_DIR="$TMP/easyrsa-umask"
+mkdir -m 0700 "$OVPN_EASYRSA_DIR"
+cat > "$OVPN_EASYRSA_DIR/easyrsa" <<'MOCK'
+#!/usr/bin/env sh
+umask > "$OVPN_UMASK_CAPTURE"
+MOCK
+chmod 0700 "$OVPN_EASYRSA_DIR/easyrsa"
+export OVPN_UMASK_CAPTURE="$TMP/easyrsa-umask.txt"
+( umask 000; ovpn_easyrsa inspect )
+[[ "$(cat "$OVPN_UMASK_CAPTURE")" == 0077 ]]
+
 # PKI initialization is staged and published only after a complete CA build.
 OVPN_EASYRSA_DIR="$TMP/pki-success"
 OVPN_EASYRSA_SOURCE="$TMP/easy-rsa-source"
