@@ -2,11 +2,12 @@
 set -Eeuo pipefail
 SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 BASE_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" ]] || {
+[[ -f "$BASE_DIR/lib/common.sh" && -f "$BASE_DIR/modules/dnstt.sh" && -f "$BASE_DIR/modules/security.sh" && -f "$BASE_DIR/modules/ssh_users.sh" && -f "$BASE_DIR/modules/xray.sh" && -f "$BASE_DIR/modules/vmess.sh" && -f "$BASE_DIR/modules/trojan.sh" && -f "$BASE_DIR/modules/shadowsocks.sh" && -f "$BASE_DIR/modules/protocol_users.sh" ]] || {
   echo "Africhome files are incomplete. Re-run the installer." >&2
   exit 1
 }
 . "$BASE_DIR/lib/common.sh"
+. "$BASE_DIR/modules/dnstt.sh"
 . "$BASE_DIR/modules/security.sh"
 . "$BASE_DIR/modules/ssh_users.sh"
 . "$BASE_DIR/modules/xray.sh"
@@ -45,7 +46,7 @@ while true; do
       ;;
     2) security_menu ;;
     3) ssh_users_menu ;;
-    4) echo "DNSTT server management is being implemented; this option is not active yet."; ah_pause ;;
+    4) dnstt_menu ;;
     5) xray_menu ;;
     6) vmess_menu ;;
     7) trojan_menu ;;
