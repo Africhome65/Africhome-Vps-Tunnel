@@ -54,7 +54,8 @@ pu_add() {
   esac
   read -r -p "Validity in days (0 = never expires): " days
   [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return 1; }
-  if (( 10#$days == 0 )); then
+  days=$((10#$days))
+  if (( days == 0 )); then
     expires_at=0
     expires="Never"
   else
