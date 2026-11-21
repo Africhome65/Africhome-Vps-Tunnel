@@ -25,7 +25,7 @@ while true; do
   echo "1) System information"
   echo "2) Security management"
   echo "3) SSH account management"
-  echo "4) DNSTT DNS tunnel management (implementation in progress)"
+  echo "4) DNSTT DNS tunnel and resolver management"
   echo "5) Xray management (VLESS REALITY)"
   echo "6) VMess management (WebSocket + TLS)"
   echo "7) Trojan management (TLS)"
