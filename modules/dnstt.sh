@@ -104,6 +104,76 @@ ah_dnstt_check_dns() {
   ah_ok "DNS delegation and nameserver A record are visible."
 }
 
+ah_dnstt_valid_resolver() {
+  local transport="$1" resolver="$2" port
+  case "$transport" in
+    udp|dot)
+      [[ "$resolver" =~ ^([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\]):[0-9]{1,5}$ ]] || return 1
+      port="\${resolver##*:}"
+      (( port >= 1 && port <= 65535 )) || return 1
+      ;;
+    doh)
+      [[ "$resolver" =~ ^https://[^[:space:]]+$ ]] || return 1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+ah_dnstt_client_command() {
+  local domain resolver_type resolver local_port transport_flag pubkey_file
+  domain="$(cat "$DNSTT_DOMAIN_FILE" 2>/dev/null || true)"
+  if ! ah_dnstt_valid_domain "$domain"; then
+    ah_err "Configure the DNSTT server domain first."
+    return 1
+  fi
+  if [[ ! -s "$DNSTT_PUB" ]]; then
+    ah_err "Server public key is missing. Configure DNSTT first."
+    return 1
+  fi
+
+  echo "Choose the recursive DNS resolver transport:"
+  echo "1) UDP DNS (example: 8.8.8.8:53) - plaintext; mainly for compatibility/testing"
+  echo "2) DNS over TLS (example: 8.8.8.8:853) - encrypted"
+  echo "3) DNS over HTTPS (example: https://dns.google/dns-query) - encrypted"
+  read -r -p "Transport [1-3]: " resolver_type
+  case "$resolver_type" in
+    1)
+      transport_flag="-udp"
+      read -r -p "DNS resolver address [8.8.8.8:53]: " resolver
+      resolver="\${resolver:-8.8.8.8:53}"
+      ah_dnstt_valid_resolver udp "$resolver" || { ah_err "Use a resolver host/IP followed by a valid UDP port, e.g. 8.8.8.8:53."; return 1; }
+      ;;
+    2)
+      transport_flag="-dot"
+      read -r -p "DoT resolver address [8.8.8.8:853]: " resolver
+      resolver="\${resolver:-8.8.8.8:853}"
+      ah_dnstt_valid_resolver dot "$resolver" || { ah_err "Use a resolver host/IP followed by a valid DoT port, e.g. 8.8.8.8:853."; return 1; }
+      ;;
+    3)
+      transport_flag="-doh"
+      read -r -p "DoH resolver URL [https://dns.google/dns-query]: " resolver
+      resolver="\${resolver:-https://dns.google/dns-query}"
+      ah_dnstt_valid_resolver doh "$resolver" || { ah_err "Enter a valid HTTPS DoH URL."; return 1; }
+      ;;
+    *) ah_warn "Invalid resolver transport."; return 1 ;;
+  esac
+  read -r -p "Local tunnel port on the client [7000]: " local_port
+  local_port="\${local_port:-7000}"
+  [[ "$local_port" =~ ^[0-9]{1,5}$ ]] && (( local_port >= 1 && local_port <= 65535 )) || { ah_err "Enter a valid local TCP port."; return 1; }
+  read -r -p "Public key file path on the client [server.pub]: " pubkey_file
+  pubkey_file="\${pubkey_file:-server.pub}"
+
+  echo
+  echo "Run this on the CLIENT device after installing dnstt-client and securely copying server.pub:"
+  printf 'dnstt-client %s %q -pubkey-file %q %q 127.0.0.1:%q\n' "$transport_flag" "$resolver" "$pubkey_file" "$domain" "$local_port"
+  echo
+  echo "Then connect your SSH client to 127.0.0.1:$local_port."
+  echo "The public key is shown below; copy only this public key to the client:"
+  cat "$DNSTT_PUB"
+  echo
+  ah_warn "UDP DNS is unencrypted and can be detected. Prefer DoT or DoH when your network permits them."
+}
+
 ah_dnstt_write_service() {
   local domain="$1"
   cat > "$DNSTT_UNIT" <<EOF
@@ -229,6 +299,7 @@ dnstt_menu() {
     echo "2) Service status and public key"
     echo "3) Restart DNSTT service"
     echo "4) Stop DNSTT service"
+    echo "5) Generate client resolver command"
     echo "0) Back"
     read -r -p "Select an option: " choice
     case "$choice" in
@@ -236,6 +307,7 @@ dnstt_menu() {
       2) ah_dnstt_status ;;
       3) ah_require_root && systemctl restart africhome-dnstt.service ;;
       4) ah_require_root && systemctl stop africhome-dnstt.service ;;
+      5) ah_dnstt_client_command ;;
       0) return 0 ;;
       *) ah_warn "Invalid choice." ;;
     esac
