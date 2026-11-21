@@ -93,8 +93,8 @@ chmod 0700 "$TMP/easy-rsa" "$TMP/easy-rsa/pki" "$TMP/easy-rsa/pki/private"
 chmod 0600 "$TMP/easy-rsa/pki/private/ca.key"
 stat(){
   local path="${@: -1}"
-  if [[ -d "$path" ]]; then printf '%s\\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
-  else printf '%s\\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
+  if [[ -d "$path" ]]; then printf '%s\n' "${MOCK_OVPN_PKI_DIR_STAT:-0:700}"
+  else printf '%s\n' "${MOCK_OVPN_PKI_FILE_STAT:-0:600}"; fi
 }
 ovpn_pki_paths_safe
 MOCK_OVPN_PKI_DIR_STAT=1001:700
