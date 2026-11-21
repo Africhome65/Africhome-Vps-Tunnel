@@ -180,33 +180,74 @@ hy2u_expire() {
   ah_require_root || return 1
   hy2u_require || return 1
   hy2u_lock || return 1
-  local expired username record account_id backup tmp changed=0
+  local expired username record account_id backup tmp dbbackup registry_done=""
   expired="$(jq -c '.[] | select(.expires_at != 0 and .expires_at <= now)' "$HY2_USERS_DB")"
   [[ -n "$expired" ]] || { ah_info "No expired Hysteria users."; return 0; }
   backup="${HY2_USERS_CONFIG}.africhome-backup.$(date +%Y%m%d%H%M%S)"
-  cp -a "$HY2_USERS_CONFIG" "$backup"
+  dbbackup="${HY2_USERS_DB}.africhome-backup.$(date +%Y%m%d%H%M%S)"
+  tmp="$(mktemp "${HY2_USERS_DB}.africhome.XXXXXX")" || return 1
+  cp -a "$HY2_USERS_CONFIG" "$backup" || { rm -f "$tmp"; return 1; }
+  cp -a "$HY2_USERS_DB" "$dbbackup" || { rm -f "$tmp"; return 1; }
+  if ! jq '[.[] | select(.expires_at == 0 or .expires_at > now)]' "$HY2_USERS_DB" > "$tmp"; then
+    rm -f "$tmp"; ah_err "Could not stage Hysteria expiry metadata."; return 1
+  fi
+  chmod 600 "$tmp"
+  # Mark every registry record expired first. If any update fails, compensate
+  # already-updated records before touching the native service configuration.
+  while IFS= read -r record; do
+    account_id="$(jq -r '.account_id' <<< "$record")"
+    username="$(jq -r '.username' <<< "$record")"
+    if ! ar_set_service_status "$account_id" "hysteria" "$username" "expired"; then
+      while IFS='|' read -r rollback_id rollback_name; do
+        [[ -n "$rollback_id" ]] || continue
+        ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "active" || true
+      done <<< "$registry_done"
+      rm -f "$tmp"
+      ah_err "Registry expiry update failed; no native accounts were removed."
+      return 1
+    fi
+    registry_done+="$account_id|$username"$'\n'
+  done <<< "$expired"
+
   while IFS= read -r record; do
     username="$(jq -r '.username' <<< "$record")"
-    hy2u_yaml_change remove "$username" || { cp -a "$backup" "$HY2_USERS_CONFIG"; ah_err "Expiry cleanup failed; config restored."; return 1; }
-    changed=1
-  done <<< "$expired"
-  if (( changed )); then
-    if ! systemctl restart hysteria-server.service; then
-      cp -a "$backup" "$HY2_USERS_CONFIG"; systemctl restart hysteria-server.service || true
-      ah_err "Hysteria restart failed; config restored."; return 1
+    if ! hy2u_yaml_change remove "$username"; then
+      cp -a "$backup" "$HY2_USERS_CONFIG"
+      while IFS='|' read -r rollback_id rollback_name; do
+        [[ -n "$rollback_id" ]] || continue
+        ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "active" || true
+      done <<< "$registry_done"
+      rm -f "$tmp"
+      ah_err "Expiry config update failed; previous config restored and registry rollback attempted."
+      return 1
     fi
-    tmp="$(mktemp)"
-    jq '[.[] | select(.expires_at == 0 or .expires_at > now)]' "$HY2_USERS_DB" > "$tmp"
-    install -m 600 "$tmp" "$HY2_USERS_DB"; rm -f "$tmp"
-    while IFS= read -r record; do
-      account_id="$(jq -r '.account_id' <<< "$record")"
-      username="$(jq -r '.username' <<< "$record")"
-      ar_set_service_status "$account_id" "hysteria" "$username" "expired" ||
-        ah_warn "Expired Hysteria user removed, but registry status update failed."
-    done <<< "$expired"
-    ah_audit_log hysteria.account.expire success 2>/dev/null || true
-    ah_ok "Expired Hysteria users removed."
+  done <<< "$expired"
+
+  if ! systemctl restart hysteria-server.service; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "active" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Hysteria restart failed; previous config restored and registry rollback attempted."
+    return 1
   fi
+  if ! install -o root -g root -m 600 "$tmp" "$HY2_USERS_DB"; then
+    cp -a "$backup" "$HY2_USERS_CONFIG"
+    systemctl restart hysteria-server.service || true
+    while IFS='|' read -r rollback_id rollback_name; do
+      [[ -n "$rollback_id" ]] || continue
+      ar_set_service_status "$rollback_id" "hysteria" "$rollback_name" "active" || true
+    done <<< "$registry_done"
+    rm -f "$tmp"
+    ah_err "Local metadata update failed; previous config restored and registry rollback attempted."
+    return 1
+  fi
+  rm -f "$tmp"
+  ah_audit_log hysteria.account.expire success 2>/dev/null || true
+  ah_ok "Expired Hysteria users removed."
 }
 
 hy2u_install_timer() {
