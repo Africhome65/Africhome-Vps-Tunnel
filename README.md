@@ -22,7 +22,7 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
 - For SlowDNS: delegated DNS subdomain and UDP 53
-- For VLESS REALITY: chosen TCP port (default 443)
+- For VLESS REALITY: chosen TCP port (default 2053)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key\n- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
 
 ## Installation
@@ -48,7 +48,7 @@ sudo africhome
 
 ## Xray VLESS REALITY notes
 
-- The module installs Xray using the upstream XTLS Xray-install script and creates a VLESS + REALITY TCP inbound.
+- The module installs Xray using the upstream XTLS Xray-install script and creates a VLESS + REALITY TCP inbound (default port 2053, leaving TCP 443 available for VMess WebSocket + TLS).
 - Existing `/usr/local/etc/xray/config.json` files are not overwritten during VLESS setup.
 - The module validates the generated configuration with `xray run -test` before restarting the service.
 - Open the selected TCP port in the VPS provider firewall.
@@ -59,7 +59,7 @@ sudo africhome
 - VMess adds an inbound to the existing Xray JSON config; it preserves other inbounds and creates a timestamped backup first.
 - Supply a domain and matching certificate/key files already installed on the VPS. The module does not issue certificates or configure DNS.
 - The module validates the resulting config before restarting Xray and restores the backup if validation or restart fails.
-- Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
+- The default listener is TCP 443. Open the selected TCP port in the VPS provider firewall. UFW is updated only if already active.
 - Client import URIs contain account credentials; keep them private.
 
 ## Security and limitations
