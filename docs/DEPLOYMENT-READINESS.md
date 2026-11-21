@@ -4,7 +4,7 @@
 
 ## Implemented and regression-tested foundations
 
-- Installer Ed25519 licence verification and install-target safety checks.
+- Installer Ed25519 licence verification and install-target safety checks. The installer now targets the current `fix/dnstt-transactional-install` release-candidate branch rather than the older DNSTT integration base, with a regression test preventing accidental checkout of the stale branch.
 - Existing Xray VLESS REALITY, VMess WebSocket/TLS, Trojan, Shadowsocks, Hysteria 2 and account-management modules.
 - Read-only listener/service inventory.
 - Central TCP 443 SNI, TCP 80 HTTP Host/path, and combined HAProxy configuration renderers.
@@ -37,4 +37,4 @@
 
 ## Validation interpretation
 
-The full GitHub Actions suite passed on commit 80e5e10578008ed7551b9ad9b425d28b1d9f3d6a (run 44894585974). All validation steps completed successfully, including Bash syntax, ShellCheck, licence verification/rejection, DNSTT and Hysteria rollback fault injection, OpenVPN PKI ownership/mode and effective-umask checks, SSH TLS safeguards, REALITY/VMess shared-443 candidate validation, HAProxy render/apply rollback, and the shared-443 process-ownership regression test. These automated checks do not replace disposable-VPS and external-client interoperability testing.
+The full GitHub Actions suite passed on commit e6c019e643ad76895b1c1c1b7e03678c93002e36 (run 44895988077). All validation steps completed successfully, including Bash syntax, installer ordering and release-candidate branch checks, ShellCheck, licence verification/rejection, DNSTT and Hysteria rollback fault injection, OpenVPN PKI ownership/mode and effective-umask checks, SSH TLS safeguards, REALITY/VMess shared-443 candidate validation, HAProxy render/apply rollback, and the shared-443 process-ownership regression test. These automated checks do not replace disposable-VPS and external-client interoperability testing.
