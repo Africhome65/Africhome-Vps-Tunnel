@@ -131,7 +131,7 @@ hy2u_add() {
   if [[ -r /etc/africhome-hysteria.env ]]; then
     # shellcheck disable=SC1091
     . /etc/africhome-hysteria.env
-    printf 'Client URI: hysteria2://%s:%s@%s:%s/?sni=%s#Africhome-%s\\n' "$username" "$password" "$HY2_DOMAIN" "$HY2_PORT_SPEC" "$HY2_DOMAIN" "$username"
+    printf 'Client URI: hysteria2://%s:%s@%s:%s/?sni=%s#Africhome-%s\n' "$username" "$password" "$HY2_DOMAIN" "$HY2_PORT_SPEC" "$HY2_DOMAIN" "$username"
   fi
   ah_warn "Save this password securely. Hysteria userpass stores passwords in the server config."
 }
