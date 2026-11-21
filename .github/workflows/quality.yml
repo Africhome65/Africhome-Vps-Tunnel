@@ -1,0 +1,38 @@
+name: Shell quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bash-and-shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      - name: Validate Bash syntax
+        shell: bash
+        run: |
+          mapfile -d '' scripts < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          if (('${#scripts[@]}' == 0)); then
+            echo "No shell scripts found."
+            exit 1
+          fi
+          for script in "${scripts[@]}"; do
+            echo "Checking syntax: $script"
+            bash -n "$script"
+          done
+      - name: Run ShellCheck errors
+        shell: bash
+        run: |
+          mapfile -d '' scripts < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          shellcheck --severity=error "${scripts[@]}"
