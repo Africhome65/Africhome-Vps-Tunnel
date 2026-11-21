@@ -110,7 +110,7 @@ ah_dnstt_valid_resolver() {
     udp|dot)
       [[ "$resolver" =~ ^([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\]):[0-9]{1,5}$ ]] || return 1
       port="${resolver##*:}"
-      (( port >= 1 && port <= 65535 )) || return 1
+      (( 10#$port >= 1 && 10#$port <= 65535 )) || return 1
       ;;
     doh)
       [[ "$resolver" =~ ^https://[^[:space:]]+$ ]] || return 1
@@ -145,8 +145,8 @@ ah_dnstt_client_command() {
       ;;
     2)
       transport_flag="-dot"
-      read -r -p "DoT resolver address [8.8.8.8:853]: " resolver
-      resolver="${resolver:-8.8.8.8:853}"
+      read -r -p "DoT resolver address [dns.google:853]: " resolver
+      resolver="${resolver:-dns.google:853}"
       ah_dnstt_valid_resolver dot "$resolver" || { ah_err "Use a resolver host/IP followed by a valid DoT port, e.g. 8.8.8.8:853."; return 1; }
       ;;
     3)
@@ -159,7 +159,9 @@ ah_dnstt_client_command() {
   esac
   read -r -p "Local tunnel port on the client [7000]: " local_port
   local_port="${local_port:-7000}"
-  [[ "$local_port" =~ ^[0-9]{1,5}$ ]] && (( local_port >= 1 && local_port <= 65535 )) || { ah_err "Enter a valid local TCP port."; return 1; }
+  [[ "$local_port" =~ ^[0-9]{1,5}$ ]] || { ah_err "Enter a valid local TCP port."; return 1; }
+  local_port=$((10#$local_port))
+  (( local_port >= 1 && local_port <= 65535 )) || { ah_err "Enter a valid local TCP port."; return 1; }
   read -r -p "Public key file path on the client [server.pub]: " pubkey_file
   pubkey_file="${pubkey_file:-server.pub}"
 
