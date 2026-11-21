@@ -8,7 +8,6 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Fail2ban installation and status
 - UFW status and guarded enablement
 - Basic nftables filtering for common BitTorrent ports (not comprehensive torrent detection)
-- WireGuard installation, server setup, client profile creation, peer listing, and client removal
 - SlowDNS SSH using iodine, with systemd service management and client instructions
 - Xray installation and VLESS + REALITY TCP server setup, service controls, and client import URI
 - VMess over WebSocket + TLS inbound management, client import URI, status, and removal\n- Trojan over TLS inbound management, generated password, client URI, status, and removal\n- Shadowsocks AEAD inbound management using Xray, client URI, status, and removal\n- Managed VLESS, VMess, and Trojan accounts with manual and daily automatic expiry
@@ -22,7 +21,6 @@ A terminal-only VPS installation and management toolkit for Ubuntu 22.04+ and De
 - Ubuntu 22.04 or newer, or Debian 11 or newer
 - Root access
 - Public IP or DNS endpoint and provider firewall access for tunnel ports
-- For WireGuard: UDP 51820 (or chosen port)
 - For SlowDNS: delegated DNS subdomain and UDP 53
 - For VLESS REALITY: chosen TCP port (default 443)
 - For VMess and Trojan: a DNS name pointing to the VPS and an existing valid TLS certificate/private key\n- For Shadowsocks: a reachable public IP or DNS name; TCP and UDP on the selected port
@@ -48,14 +46,6 @@ sudo africhome
 - After the DNS tunnel is established, SSH is reached at `10.77.0.1`.
 - DNS tunnels have inherently limited throughput and can be blocked or rate-limited. Lazy mode and fragment negotiation help, but actual speed depends on the DNS resolver/relay, network path, and client. Use strong credentials and SSH keys where practical.
 
-## WireGuard notes
-
-- Server config: `/etc/wireguard/wg0.conf`.
-- Client profiles: `/root/africhome-wireguard-clients/`; they contain private keys and must be transferred securely.
-- Setup enables IPv4 forwarding and configures NAT/forwarding through WireGuard hooks.
-- Open the selected UDP port in both UFW (if active) and the VPS provider firewall.
-- Client profiles route IPv4 traffic through the VPN; IPv6 is not configured by this module.
-
 ## Xray VLESS REALITY notes
 
 - The module installs Xray using the upstream XTLS Xray-install script and creates a VLESS + REALITY TCP inbound.
@@ -74,7 +64,7 @@ sudo africhome
 
 ## Security and limitations
 
-Review scripts before running them. Keep VPS console access available when changing firewall/network settings. Torrent-port filtering is only a basic port rule and can be bypassed; it is not application-level torrent detection. These modules have not been tested on every VPS provider or network configuration. Do not treat publication or JSON validation as proof of live service operation.
+Review scripts before running them. SSH account passwords are displayed as you type them in the terminal for easier copying; avoid screen sharing or terminal recording while entering credentials. Keep VPS console access available when changing firewall/network settings. Torrent-port filtering is only a basic port rule and can be bypassed; it is not application-level torrent detection. These modules have not been tested on every VPS provider or network configuration. Do not treat publication or JSON validation as proof of live service operation.
 
 ## License
 
