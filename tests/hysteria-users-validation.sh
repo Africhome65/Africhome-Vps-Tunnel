@@ -61,4 +61,13 @@ if hy2u_yaml_change add bob password; then
   echo "Unsupported auth mode was modified." >&2; exit 1
 fi
 cmp -s "$HY2_USERS_CONFIG" "$tmp_dir/unsupported.yaml"
+
+# Revocation must stage metadata and update the registry before changing the
+# native config, with compensating rollback paths for failures.
+remove_fn="$(sed -n '/^hy2u_remove() {/,/^}/p' "$ROOT/modules/hysteria_users.sh")"
+grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "revoked"' <<< "$remove_fn"
+grep -Fq 'ar_set_service_status "$account_id" "hysteria" "$username" "active"' <<< "$remove_fn"
+grep -Fq 'dbbackup=' <<< "$remove_fn"
+grep -Fq 'systemctl restart hysteria-server.service' <<< "$remove_fn"
+
 echo "Hysteria userpass adapter validation passed."
