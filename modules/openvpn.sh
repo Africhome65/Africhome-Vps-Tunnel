@@ -38,12 +38,38 @@ ovpn_valid_remote(){
 }
 ovpn_easyrsa(){
   [[ -x "$OVPN_EASYRSA_DIR/easyrsa" ]] || { ovpn_error "Easy-RSA is not initialized."; return 1; }
-  (cd "$OVPN_EASYRSA_DIR" && EASYRSA_BATCH=1 ./easyrsa "$@")
+  # Easy-RSA may create new private keys; enforce a restrictive umask even
+  # when a caller or interactive shell has a permissive umask.
+  (cd "$OVPN_EASYRSA_DIR" && umask 077 && EASYRSA_BATCH=1 ./easyrsa "$@")
 }
 ovpn_pki_paths_safe(){
-  local path
+  local path metadata
   for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/easyrsa" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private" "$OVPN_EASYRSA_DIR/pki/issued" "$OVPN_EASYRSA_DIR/pki/reqs" "$OVPN_EASYRSA_DIR/pki/reqs/server.req" "$OVPN_EASYRSA_DIR/pki/ca.crt" "$OVPN_EASYRSA_DIR/pki/crl.pem" "$OVPN_EASYRSA_DIR/pki/ta.key" "$OVPN_EASYRSA_DIR/pki/private/ca.key" "$OVPN_EASYRSA_DIR/pki/private/server.key" "$OVPN_EASYRSA_DIR/pki/issued/server.crt"; do
     [[ ! -L "$path" ]] || { ovpn_error "Easy-RSA PKI path is a symlink: $path"; return 1; }
+  done
+  # The Easy-RSA tree and private-key directory must not be writable or
+  # readable by other users. This also rejects non-root-owned PKI trees.
+  for path in "$OVPN_EASYRSA_DIR" "$OVPN_EASYRSA_DIR/pki" "$OVPN_EASYRSA_DIR/pki/private"; do
+    [[ -d "$path" ]] || { ovpn_error "Easy-RSA private directory is missing: $path"; return 1; }
+    metadata="$(stat -c '%u:%a' -- "$path" 2>/dev/null)" || {
+      ovpn_error "Could not inspect Easy-RSA directory ownership: $path"; return 1;
+    }
+    [[ "$metadata" == "0:700" ]] || {
+      ovpn_error "Easy-RSA directory must be root-owned mode 0700: $path"; return 1;
+    }
+  done
+  # Check every key, including customer keys created after initial setup.
+  for path in "$OVPN_EASYRSA_DIR"/pki/private/*; do
+    [[ -e "$path" || -L "$path" ]] || continue
+    [[ -f "$path" && ! -L "$path" ]] || {
+      ovpn_error "Unexpected non-regular item in Easy-RSA private directory: $path"; return 1;
+    }
+    metadata="$(stat -c '%u:%a' -- "$path" 2>/dev/null)" || {
+      ovpn_error "Could not inspect Easy-RSA private-key permissions: $path"; return 1;
+    }
+    [[ "$metadata" == "0:600" ]] || {
+      ovpn_error "Easy-RSA private key must be root-owned mode 0600: $path"; return 1;
+    }
   done
 }
 ovpn_prepare_client_dir(){
