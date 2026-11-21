@@ -41,9 +41,10 @@ ah_dnstt_ensure_go() {
   trap 'rm -rf "$tmp"' RETURN
   curl -fL --retry 3 "https://go.dev/dl/$file" -o "$tmp/$file"
   printf '%s  %s\n' "$sha" "$tmp/$file" | sha256sum -c -
-  rm -rf /usr/local/go
-  tar -C /usr/local -xzf "$tmp/$file"
-  export PATH="/usr/local/go/bin:$PATH"
+  install -d -o root -g root -m 0755 /opt/africhome
+  rm -rf /opt/africhome/go
+  tar -C /opt/africhome -xzf "$tmp/$file"
+  export PATH="/opt/africhome/go/bin:$PATH"
   go version
 }
 
