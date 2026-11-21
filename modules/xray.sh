@@ -43,7 +43,7 @@ xray_setup_vless_reality() {
     ah_ok "Existing credentials backed up securely."
   fi
 
-  read -r -p "VLESS REALITY TCP port [443]: " port
+  read -r -p "VLESS REALITY TCP port [2053]: " port
   port="${port:-443}"
   [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || { ah_err "Invalid TCP port."; return 1; }
   read -r -p "REALITY SNI / server name (a hostname with a valid TLS service): " server_name
