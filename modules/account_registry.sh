@@ -16,7 +16,7 @@ ar_init() {
   install -d -m 700 "$AR_BASE_DIR"
   if [[ ! -e "$AR_REGISTRY" ]]; then
     local tmp
-    tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || return 1
+    tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || { ar_unlock; return 1; }
     printf '{"schema_version":1,"accounts":[]}\n' > "$tmp"
     chmod 600 "$tmp"
     if ! mv -n "$tmp" "$AR_REGISTRY"; then rm -f "$tmp"; return 1; fi
@@ -34,6 +34,12 @@ ar_lock() {
   install -d -m 755 "$(dirname "$AR_LOCK")"
   exec 8>"$AR_LOCK"
   flock -n 8 || { echo "[WARN] Another registry operation is running." >&2; return 1; }
+}
+
+# Release the process-scoped descriptor after each registry mutation so
+# subsequent status updates in the same shell can acquire the same lock.
+ar_unlock() {
+  flock -u 8 2>/dev/null || true
 }
 
 ar_valid_id() { [[ "${1:-}" =~ ^[A-Za-z0-9_-]{8,64}$ ]]; }
@@ -56,7 +62,7 @@ ar_register_service() {
   ar_lock || return 1
   local tmp now
   now="$(date +%s)"
-  tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || return 1
+  tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || { ar_unlock; return 1; }
   if ! jq --arg id "$account_id" --arg label "$label" --arg service "$service" \
       --arg ref "$service_ref" --argjson expiry "$expires_at" --argjson now "$now" '
     .accounts |= (
@@ -79,10 +85,12 @@ ar_register_service() {
       end
     )
   ' "$AR_REGISTRY" > "$tmp"; then
-    rm -f "$tmp"; return 1
+    rm -f "$tmp"; ar_unlock; return 1
   fi
-  chmod 600 "$tmp"
-  mv -f "$tmp" "$AR_REGISTRY"
+  if ! chmod 600 "$tmp" || ! mv -f "$tmp" "$AR_REGISTRY"; then
+    rm -f "$tmp"; ar_unlock; return 1
+  fi
+  ar_unlock
 }
 
 ar_set_service_status() {
@@ -93,7 +101,7 @@ ar_set_service_status() {
   ar_lock || return 1
   jq -e --arg id "$account_id" --arg s "$service" --arg r "$service_ref" \
     'any(.accounts[]; .id == $id and any(.services[]; .service == $s and .ref == $r))' \
-    "$AR_REGISTRY" >/dev/null || { echo "[FAIL] Service account not found." >&2; return 1; }
+    "$AR_REGISTRY" >/dev/null || { echo "[FAIL] Service account not found." >&2; ar_unlock; return 1; }
   local tmp now
   now="$(date +%s)"
   tmp="$(mktemp "${AR_REGISTRY}.XXXXXX")" || return 1
@@ -104,9 +112,11 @@ ar_set_service_status() {
         .status = $status | .updated_at = $now
       else . end)
     else . end)
-  ' "$AR_REGISTRY" > "$tmp" || { rm -f "$tmp"; return 1; }
-  chmod 600 "$tmp"
-  mv -f "$tmp" "$AR_REGISTRY"
+  ' "$AR_REGISTRY" > "$tmp" || { rm -f "$tmp"; ar_unlock; return 1; }
+  if ! chmod 600 "$tmp" || ! mv -f "$tmp" "$AR_REGISTRY"; then
+    rm -f "$tmp"; ar_unlock; return 1
+  fi
+  ar_unlock
 }
 
 
