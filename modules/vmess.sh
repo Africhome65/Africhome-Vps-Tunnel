@@ -16,7 +16,7 @@ vmess_add() {
   local domain port cert key path uuid backup tmp
   read -r -p "VMess TLS domain (must match certificate): " domain
   [[ "$domain" =~ ^[A-Za-z0-9.-]+$ ]] || { ah_err "Invalid domain."; return 1; }
-  read -r -p "VMess WebSocket TLS port [8443]: " port
+  read -r -p "VMess WebSocket TLS port [443]: " port
   port="${port:-8443}"
   [[ "$port" =~ ^[0-9]+$ ]] && (( port >= 1 && port <= 65535 )) || { ah_err "Invalid port."; return 1; }
   read -r -p "TLS certificate full path: " cert
