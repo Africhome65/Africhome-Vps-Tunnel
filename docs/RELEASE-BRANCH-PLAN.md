@@ -34,7 +34,7 @@ The current release-candidate tree already contains DNSTT custom-password prompt
 - Default branch: `main`.
 - Active release-candidate branch: `fix/dnstt-transactional-install`.
 - Active PR chain: #4 → #5 → #7.
-- All six historical PRs remain open and draft at the time this document was prepared; PRs #1–#3 are not part of the active stack.
+- The six currently open PRs are #1, #2, #3, #4, #5, and #7; all are draft. PRs #1–#3 are not part of the active stack.
 - The latest complete GitHub Actions run before this document was added passed on commit `c7837974b0fc6543da69d8d95507545ef387ff8a` (run `44896061187`).
 
 ## Release gate before merging
