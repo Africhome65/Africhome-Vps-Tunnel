@@ -114,11 +114,11 @@ auth:
   userpass:
     alice: alice-password
 YAML
-printf '[{"account_id":"acctremove01","username":"alice","expires_at":0,"created_at":1}]\\n' > "$HY2_USERS_DB"
+printf '[{"account_id":"acctremove01","username":"alice","expires_at":0,"created_at":1}]\n' > "$HY2_USERS_DB"
 chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
 ar_register_service acctremove01 alice hysteria alice 0
 ar_set_service_status acctremove01 hysteria alice suspended
-printf 'alice\\n' | hy2u_remove
+printf 'alice\n' | hy2u_remove
 jq -e 'length == 0' "$HY2_USERS_DB" >/dev/null
 python3 - "$HY2_USERS_CONFIG" <<'PY'
 import sys, yaml
@@ -141,7 +141,7 @@ auth:
   userpass:
     bob: bob-password
 YAML
-printf '[{"account_id":"acctremove02","username":"bob","expires_at":0,"created_at":1}]\\n' > "$HY2_USERS_DB"
+printf '[{"account_id":"acctremove02","username":"bob","expires_at":0,"created_at":1}]\n' > "$HY2_USERS_DB"
 chmod 600 "$HY2_USERS_CONFIG" "$HY2_USERS_DB"
 ar_register_service acctremove02 bob hysteria bob 0
 ar_set_service_status acctremove02 hysteria bob suspended
@@ -154,7 +154,7 @@ systemctl() {
     return 0
   fi
 }
-if printf 'bob\\n' | hy2u_remove; then
+if printf 'bob\n' | hy2u_remove; then
   echo "Hysteria revocation unexpectedly succeeded after a failed restart." >&2; exit 1
 fi
 jq -e 'length == 1 and .[0].username == "bob"' "$HY2_USERS_DB" >/dev/null
@@ -165,4 +165,4 @@ assert d["auth"]["userpass"]["bob"] == "bob-password"
 PY
 jq -e '.accounts[] | select(.id == "acctremove02") | .services[] | select(.ref == "bob") | .status == "suspended"' "$AR_REGISTRY" >/dev/null
 unset -f systemctl ah_require_root
-\necho "Hysteria userpass adapter validation passed."
+echo "Hysteria userpass adapter validation passed."
