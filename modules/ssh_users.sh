@@ -9,6 +9,7 @@ ssh_users_create(){
   local days
   read -r -p "Account duration in days (0 = no expiry): " days
   [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return; }
+  days=$((10#$days))
   expiry=""
   if (( days > 0 )); then
     expiry="$(date -d "+${days} days" +%F)" || { ah_err "Could not calculate expiry date."; return; }
@@ -89,6 +90,7 @@ ssh_users_set_expiry(){
   [[ "$username" != root ]] || { ah_err "Refusing to change root expiry."; return; }
   read -r -p "Account duration in days from today (0 = no expiry): " days
   [[ "$days" =~ ^[0-9]{1,5}$ ]] && (( 10#$days <= 36500 )) || { ah_err "Enter 0-36500 days."; return; }
+  days=$((10#$days))
   if (( days == 0 )); then
     chage --expiredate "" "$username" && ah_ok "Expiry cleared for $username."
     return
