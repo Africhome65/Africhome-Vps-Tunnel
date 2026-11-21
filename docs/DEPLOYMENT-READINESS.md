@@ -12,7 +12,7 @@
 - Hysteria 2 installer pinned to a verified official release, architecture-specific binary checksum verification, transactional binary/unit/config rollback, transactional first setup, and certificate/key renewal rollback tests.
 - VMess shared TCP 443 candidate generation: VLESS REALITY moves to loopback TCP 1443, VMess WebSocket + TLS uses loopback TCP 8443, and HAProxy routes TLS SNI to the appropriate backend. The generator validates the VMess certificate SAN and key match, supports safe Let's Encrypt symlinks, checks Xray service-user read access, and writes root-only candidate files, including the VMess management state used by the existing client/status menu functions.
 - A guarded combined shared-443 apply command with root/licence gate, explicit APPLY confirmation, protected Xray/HAProxy backups, Xray-first migration, TCP/443 availability check, HAProxy listener ownership verification, and rollback. It writes protected VMess management state and blocks generic VMess removal while shared mode is active. Fault-injection tests cover HAProxy restart failure, another process occupying TCP/443, VMess state-file replacement failure, and a failed Xray restore.
-- Native OpenVPN UDP/TCP setup, Easy-RSA CA, server/client certificate lifecycle, client profiles, revocation, service status, and read-only inventory.
+- Native OpenVPN UDP/TCP setup, Easy-RSA CA, server/client certificate lifecycle, client profiles, revocation, service status, and read-only inventory. PKI operations reject non-root-owned or permissively accessible private-key trees; Easy-RSA generation uses a restrictive umask and regression tests cover unsafe ownership/modes.
 - Protected backup collection and staged restore include /etc/openvpn, /etc/stunnel, the OpenVPN state file, and Africhome systemd units.
 
 ## Still required before production
@@ -37,4 +37,4 @@
 
 ## Validation interpretation
 
-The full GitHub Actions suite passed on commit 4252ed05e6c7a2237d4234f96b4ec5122bd99741 (run 44891943724). All 38 validation steps completed successfully, including Bash syntax, ShellCheck, licence verification/rejection, DNSTT and Hysteria rollback fault injection, OpenVPN and SSH TLS safeguards, REALITY/VMess shared-443 candidate validation, HAProxy render/apply rollback, and the shared-443 process-ownership regression test. These automated checks do not replace disposable-VPS and external-client interoperability testing.
+The full GitHub Actions suite passed on commit e7f75277e159bbf40cf8626e7cbf7894f239bed1 (run 44894408407). All validation steps completed successfully, including Bash syntax, ShellCheck, licence verification/rejection, DNSTT and Hysteria rollback fault injection, OpenVPN PKI ownership/mode checks, SSH TLS safeguards, REALITY/VMess shared-443 candidate validation, HAProxy render/apply rollback, and the shared-443 process-ownership regression test. These automated checks do not replace disposable-VPS and external-client interoperability testing.
